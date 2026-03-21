@@ -2,6 +2,7 @@ set(CORE_SOURCES
         Application.cpp
         Base.cpp
         Log.cpp
+        Window.cpp
 )
 
 set(CORE_HEADERS
@@ -10,6 +11,7 @@ set(CORE_HEADERS
         Base.hpp
         Log.hpp
         Version.hpp
+        Window.hpp
 )
 
 target_sources(Vanta

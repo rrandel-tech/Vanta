@@ -7,6 +7,10 @@ public:
         : Application(specification)
     {
     }
+
+    virtual void OnInit() override
+    {
+    }
 };
 
 Vanta::Application* Vanta::CreateApplication(int argc, char** argv)

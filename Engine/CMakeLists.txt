@@ -15,6 +15,7 @@ add_library(Vanta STATIC)
 target_sources(Vanta PRIVATE ${VANTA_ROOT_SOURCES} ${VANTA_ROOT_HEADERS})
 
 add_subdirectory(${VANTA_SRC_DIR}/Core)
+add_subdirectory(${VANTA_SRC_DIR}/Events)
 
 target_precompile_headers(Vanta PRIVATE ${VANTA_SRC_DIR}/vapch.hpp)
 
