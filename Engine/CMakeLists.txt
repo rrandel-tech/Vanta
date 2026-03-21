@@ -22,11 +22,16 @@ target_precompile_headers(Vanta PRIVATE ${VANTA_SRC_DIR}/vapch.hpp)
 target_compile_features(Vanta PUBLIC cxx_std_23)
 target_include_directories(Vanta PUBLIC ${VANTA_SRC_DIR})
 
+target_compile_definitions(Vanta PUBLIC
+        SDL_MAIN_HANDLED
+)
+
 target_link_libraries(Vanta
         PUBLIC
 
         # ==== Core Dependencies ====
         spdlog
+        SDL3::SDL3-static
 )
 
 vanta_enable_lto(Vanta)

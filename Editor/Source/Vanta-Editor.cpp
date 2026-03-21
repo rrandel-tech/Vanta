@@ -19,9 +19,10 @@ public:
 Vanta::Application* Vanta::CreateApplication(int argc, char** argv)
 {
     ApplicationSpecification specification;
-    specification.name = "Vanta-Editor";
-    specification.windowWidth = 1280;
-    specification.windowHeight = 720;
+    specification.Name = "Vanta-Editor";
+    specification.WindowWidth = 1280;
+    specification.WindowHeight = 720;
+    specification.Mode = WindowMode::Windowed;
 
     return new VantaEditorApplication(specification);
 }
