@@ -4,39 +4,75 @@
 namespace Vanta {
 
     Application::Application(const ApplicationSpecification& specification)
-        : m_specification(specification)
+        : m_Specification(specification)
     {
         WindowSpecification windowSpec;
-        windowSpec.title = m_specification.name;
-        windowSpec.width = m_specification.windowWidth;
-        windowSpec.height = m_specification.windowHeight;
+        windowSpec.title = m_Specification.name;
+        windowSpec.width = m_Specification.windowWidth;
+        windowSpec.height = m_Specification.windowHeight;
         m_Window = std::unique_ptr(Window::Create(windowSpec));
         m_Window->Init();
+        m_Window->SetEventCallback([this](Event& e) { OnEvent(e); });
     }
 
     Application::~Application()
     {
+        m_Window->SetEventCallback([](Event& e) {});
+
+        for (Layer* layer : m_LayerStack)
+        {
+            layer->OnDetach();
+            delete layer;
+        }
     }
 
-    void Application::Close()
+    void Application::PushLayer(Layer* layer)
     {
-        m_isRunning = false;
+        m_LayerStack.PushLayer(layer);
+        layer->OnAttach();
     }
 
-    void Application::OnShutdown()
+    void Application::PushOverlay(Layer* layer)
     {
+        m_LayerStack.PushOverlay(layer);
+        layer->OnAttach();
+    }
+
+    void Application::PopLayer(Layer* layer)
+    {
+        m_LayerStack.PopLayer(layer);
+        layer->OnDetach();
+    }
+
+    void Application::PopOverlay(Layer* layer)
+    {
+        m_LayerStack.PopOverlay(layer);
+        layer->OnDetach();
     }
 
     void Application::Run()
     {
         OnInit();
-        while (m_isRunning)
+        while (m_Running)
         {
-            if (!m_isMinimized)
+            if (!m_Minimized)
             {
+                for (Layer* layer : m_LayerStack)
+                    layer->OnUpdate();
+
+                m_Window->SwapBuffers();
             }
         }
         OnShutdown();
+    }
+
+    void Application::Close()
+    {
+        m_Running = false;
+    }
+
+    void Application::OnShutdown()
+    {
     }
 
     void Application::OnEvent(Event& event)
@@ -56,7 +92,7 @@ namespace Vanta {
 
     bool Application::OnWindowMinimize(WindowMinimizeEvent& e)
     {
-        m_isMinimized = e.IsMinimized();
+        m_Minimized = e.IsMinimized();
         return false;
     }
 

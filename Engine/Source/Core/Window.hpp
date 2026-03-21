@@ -22,6 +22,8 @@ namespace Vanta {
         ~Window();
 
         void Init();
+        void ProcessEvents();
+        void SwapBuffers();
 
         uint32_t GetWidth() const { return m_data.width; }
         uint32_t GetHeight() const { return m_data.height; }

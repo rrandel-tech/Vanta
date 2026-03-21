@@ -1,3 +1,5 @@
+#include "EditorLayer.hpp"
+
 #include "EntryPoint.hpp"
 
 class VantaEditorApplication : public Vanta::Application
@@ -10,6 +12,7 @@ public:
 
     virtual void OnInit() override
     {
+        PushLayer(new Vanta::EditorLayer());
     }
 };
 

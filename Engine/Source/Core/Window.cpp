@@ -31,6 +31,15 @@ namespace Vanta {
     {
     }
 
+    void Window::ProcessEvents()
+    {
+    }
+
+    void Window::SwapBuffers()
+    {
+        // swapchain
+    }
+
     void Window::SetTitle(const std::string& title)
     {
         m_data.title = title;
