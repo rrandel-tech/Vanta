@@ -16,6 +16,7 @@ target_sources(Vanta PRIVATE ${VANTA_ROOT_SOURCES} ${VANTA_ROOT_HEADERS})
 
 add_subdirectory(${VANTA_SRC_DIR}/Core)
 add_subdirectory(${VANTA_SRC_DIR}/Events)
+add_subdirectory(${VANTA_SRC_DIR}/ImGui)
 
 target_precompile_headers(Vanta PRIVATE ${VANTA_SRC_DIR}/vapch.hpp)
 
@@ -32,6 +33,8 @@ target_link_libraries(Vanta
         # ==== Core Dependencies ====
         spdlog
         SDL3::SDL3-static
+        imgui
+        glad
 )
 
 vanta_enable_lto(Vanta)

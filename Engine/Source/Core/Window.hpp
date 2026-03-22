@@ -55,12 +55,17 @@ namespace Vanta {
         const std::string& GetTitle() const { return m_data.title; }
         void SetTitle(const std::string& title);
 
-        static std::unique_ptr<Window> Create(const WindowSpecification& specification = WindowSpecification());
+        SDL_Window* GetNativeWindow() const { return m_Window; }
+
+        SDL_GLContext GetGLContext() const { return m_GLContext; }
+
+        static Window* Create(const WindowSpecification& specification = WindowSpecification());
     private:
         void PollEvents();
         void Shutdown();
     private:
         SDL_Window* m_Window = nullptr;
+        SDL_GLContext m_GLContext = nullptr;
         SDL_Event m_Event {};
 
         WindowSpecification m_specification;

@@ -45,6 +45,10 @@ namespace Vanta {
 
         void AddEventCallback(const EventCallbackFn& eventCallback) { m_EventCallbacks.push_back(eventCallback); }
 
+        inline Window& GetWindow() { return *m_Window; }
+
+        static inline Application& Get() { return *s_Instance; }
+
         float GetTime() const; // TODO: This should be in "Platform"
 
         static const char* GetConfigurationName();
@@ -67,6 +71,8 @@ namespace Vanta {
         float m_LastFrameTime = 0.0f;
 
         std::vector<EventCallbackFn> m_EventCallbacks;
+
+        static Application* s_Instance;
     };
 
     // Implemented by CLIENT

@@ -5,6 +5,10 @@
 #include "Events/KeyEvent.hpp"
 #include "Events/MouseEvent.hpp"
 
+#include <glad/glad.h>
+
+#include <imgui_impl_sdl3.h>
+
 namespace Vanta {
 
     static void SDLErrorCallback(const char* context)
@@ -12,9 +16,9 @@ namespace Vanta {
         VA_CORE_ERROR("SDL Error ({}): {}", context, SDL_GetError());
     }
 
-    std::unique_ptr<Window> Window::Create(const WindowSpecification& specification)
+	Window* Window::Create(const WindowSpecification& specification)
     {
-        return std::make_unique<Window>(specification);
+    	return new Window(specification);
     }
 
     Window::Window(const WindowSpecification& props)
@@ -37,7 +41,15 @@ namespace Vanta {
 
         SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
-		Uint32 windowFlags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+    	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+
+#ifdef VA_DEBUG
+    	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#endif
+
+    	Uint32 windowFlags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_OPENGL;
 
 		switch (m_specification.Mode)
 		{
@@ -75,6 +87,20 @@ namespace Vanta {
 			VA_CORE_ASSERT(false, "Could not create window!");
 		}
 
+    	m_GLContext = SDL_GL_CreateContext(m_Window);
+    	if (!m_GLContext)
+    	{
+    		SDLErrorCallback("SDL_GL_CreateContext");
+    		VA_CORE_ASSERT(false, "Could not create OpenGL context!");
+    	}
+
+    	SDL_GL_MakeCurrent(m_Window, m_GLContext);
+
+    	if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
+    	{
+    		VA_CORE_ASSERT(false, "Failed to initialize GLAD!");
+    	}
+
 		// Update window size to actual size
 		int w, h;
 		SDL_GetWindowSize(m_Window, &w, &h);
@@ -84,6 +110,11 @@ namespace Vanta {
 
 	void Window::PollEvents()
 	{
+    	if (ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().BackendPlatformUserData != nullptr)
+    	{
+    		ImGui_ImplSDL3_ProcessEvent(&m_Event);
+    	}
+
 		SDL_WindowID windowID = SDL_GetWindowID(m_Window);
 		if (windowID == 0)
 		{
@@ -176,6 +207,12 @@ namespace Vanta {
 
     void Window::Shutdown()
     {
+    	if (m_GLContext)
+    	{
+    		SDL_GL_DestroyContext(m_GLContext);
+    		m_GLContext = nullptr;
+    	}
+
     	if (m_Window)
     	{
     		SDL_DestroyWindow(m_Window);
@@ -202,14 +239,20 @@ namespace Vanta {
 
     void Window::SwapBuffers()
     {
-        // swapchain
+    	SDL_GL_SwapWindow(m_Window);
+        // swapchain for vulkan
     }
 
 	void Window::SetVSync(bool enabled)
     {
     	m_specification.VSync = enabled;
 
-    	// swapchain
+    	if (SDL_GL_SetSwapInterval(enabled ? 1 : 0) != 0)
+    	{
+    		SDLErrorCallback("SDL_GL_SetSwapInterval");
+    	}
+
+    	// swapchain for vulkan
     }
 
 	bool Window::IsVSync() const
