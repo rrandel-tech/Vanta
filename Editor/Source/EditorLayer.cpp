@@ -19,12 +19,14 @@ namespace Vanta {
     {
     }
 
-    void EditorLayer::OnUpdate()
+    void EditorLayer::OnUpdate(Timestep ts)
     {
     }
 
     void EditorLayer::OnEvent(Event& e)
     {
+        if (Input::IsKeyPressed(SDL_SCANCODE_W))
+            VA_INFO("W key pressed from app!");
     }
 
 }

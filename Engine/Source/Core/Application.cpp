@@ -64,10 +64,16 @@ namespace Vanta {
             if (!m_Minimized)
             {
                 for (Layer* layer : m_LayerStack)
-                    layer->OnUpdate();
+                    layer->OnUpdate(m_TimeStep);
 
                 m_Window->SwapBuffers();
             }
+
+            Timestep m_frametime;
+            m_frametime = GetTime();
+            m_TimeStep = (m_frametime < Timestep(0.0333f)) ? m_frametime : Timestep(0.0333f);
+            m_LastFrameTime += m_frametime; // Keep total time
+            VA_CORE_TRACE("Timestep: {:.3f}ms ({:.1f} FPS)", m_TimeStep * 1000.0f, 1.0f / m_TimeStep);
         }
         OnShutdown();
     }
@@ -140,6 +146,15 @@ namespace Vanta {
     const char* Application::GetPlatformName()
     {
         return VA_BUILD_PLATFORM_NAME;
+    }
+
+    float Application::GetTime() const
+    {
+        static uint64_t last = SDL_GetTicksNS();
+        uint64_t now = SDL_GetTicksNS();
+        uint64_t delta = now - last;
+        last = now;
+        return static_cast<float>(delta * 1e-9f);
     }
 
 }

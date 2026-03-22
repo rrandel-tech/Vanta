@@ -4,6 +4,8 @@ set(CORE_SOURCES
         Layer.cpp
         LayerStack.cpp
         Log.cpp
+        TimeStep.cpp
+        Input.cpp
         Window.cpp
 )
 
@@ -13,7 +15,9 @@ set(CORE_HEADERS
         Base.hpp
         Layer.cpp
         LayerStack.cpp
+        Input.hpp
         Log.hpp
+        TimeStep.hpp
         Version.hpp
         Window.hpp
 )
