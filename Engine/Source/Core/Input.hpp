@@ -10,7 +10,7 @@ namespace Vanta {
         Input() = delete;
 
         static bool IsKeyPressed(SDL_Scancode scancode);
-        static bool IsMouseButtonPressed(int button);
+        static bool IsMouseButtonPressed(uint8_t button);
 
         static float GetMouseX();
         static float GetMouseY();

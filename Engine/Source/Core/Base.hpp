@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 namespace Vanta {
     void InitializeCore();
     void ShutdownCore();
@@ -34,3 +36,10 @@ namespace Vanta {
 #else
 #error "Unknown compiler! Vanta only supports MSVC, GCC, and Clang."
 #endif
+
+// Pointer wrappers
+namespace Vanta {
+
+    using byte = uint8_t;
+
+}

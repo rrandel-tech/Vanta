@@ -1,6 +1,10 @@
 #include "vapch.hpp"
 #include "Application.hpp"
 
+#include "Renderer/Renderer.hpp"
+
+#include "glad/glad.h"
+
 namespace Vanta {
 
     Application* Application::s_Instance = nullptr;
@@ -21,6 +25,9 @@ namespace Vanta {
         m_Window->SetResizable(m_Specification.Resizable);
         if (windowSpec.Mode == WindowMode::Windowed)
             m_Window->CenterWindow();
+
+        m_ImGuiLayer = new ImGuiLayer("ImGui");
+        PushOverlay(m_ImGuiLayer);
     }
 
     Application::~Application()
@@ -58,6 +65,15 @@ namespace Vanta {
         layer->OnDetach();
     }
 
+    void Application::RenderImGui()
+    {
+        m_ImGuiLayer->Begin();
+        for (Layer* layer : m_LayerStack)
+            layer->OnImGuiRender();
+
+        m_ImGuiLayer->End();
+    }
+
     void Application::Run()
     {
         OnInit();
@@ -69,6 +85,12 @@ namespace Vanta {
             {
                 for (Layer* layer : m_LayerStack)
                     layer->OnUpdate(m_TimeStep);
+
+                // Render ImGui on render thread
+                Application* app = this;
+                VA_RENDER_1(app, { app->RenderImGui(); });
+
+                Renderer::Get().WaitAndRender();
 
                 m_Window->SwapBuffers();
             }

@@ -64,16 +64,15 @@ namespace Vanta {
 		ImGui::DestroyContext();
 	}
 
-	void ImGuiLayer::OnUpdate(Timestep ts)
+	void ImGuiLayer::Begin()
 	{
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
+	}
 
-		static bool show_demo_window = true;
-		if (show_demo_window)
-			ImGui::ShowDemoWindow(&show_demo_window);
-
+	void ImGuiLayer::End()
+	{
 		ImGuiIO& io = ImGui::GetIO();
 		Application& app = Application::Get();
 		io.DisplaySize = ImVec2(app.GetWindow().GetWidth(), app.GetWindow().GetHeight());
@@ -92,6 +91,10 @@ namespace Vanta {
 
 			SDL_GL_MakeCurrent(backup_window, backup_context);
 		}
+	}
+
+	void ImGuiLayer::OnImGuiRender()
+	{
 	}
 
 }

@@ -9,11 +9,10 @@ namespace Vanta {
         return state[scancode];
     }
 
-    bool Input::IsMouseButtonPressed(int button)
+    bool Input::IsMouseButtonPressed(uint8_t button)
     {
         Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
-        Uint32 buttonFlag = SDL_BUTTON_MASK(button);
-        return (mouseState & buttonFlag) != 0;
+        return (mouseState & SDL_BUTTON_MASK(button)) != 0;
     }
 
     float Input::GetMouseX()

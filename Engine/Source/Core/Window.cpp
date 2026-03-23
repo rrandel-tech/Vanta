@@ -110,11 +110,6 @@ namespace Vanta {
 
 	void Window::PollEvents()
 	{
-    	if (ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().BackendPlatformUserData != nullptr)
-    	{
-    		ImGui_ImplSDL3_ProcessEvent(&m_Event);
-    	}
-
 		SDL_WindowID windowID = SDL_GetWindowID(m_Window);
 		if (windowID == 0)
 		{
@@ -124,6 +119,11 @@ namespace Vanta {
 
 		while (SDL_PollEvent(&m_Event))
 		{
+			if (ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().BackendPlatformUserData != nullptr)
+			{
+				ImGui_ImplSDL3_ProcessEvent(&m_Event);
+			}
+
 			switch (m_Event.type)
 			{
 				case SDL_EVENT_QUIT:

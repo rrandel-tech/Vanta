@@ -7,6 +7,8 @@
 
 #include "Events/ApplicationEvent.hpp"
 
+#include "ImGui/ImGuiLayer.hpp"
+
 #include <string>
 #include <memory>
 
@@ -42,6 +44,7 @@ namespace Vanta {
         void PushOverlay(Layer* layer);
         void PopLayer(Layer* layer);
         void PopOverlay(Layer* layer);
+        void RenderImGui();
 
         void AddEventCallback(const EventCallbackFn& eventCallback) { m_EventCallbacks.push_back(eventCallback); }
 
@@ -66,6 +69,7 @@ namespace Vanta {
         ApplicationSpecification m_Specification;
         bool m_Running = true, m_Minimized = false;
         LayerStack m_LayerStack;
+        ImGuiLayer* m_ImGuiLayer;
         Timestep m_TimeStep;
 
         float m_LastFrameTime = 0.0f;
