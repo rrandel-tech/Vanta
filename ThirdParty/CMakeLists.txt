@@ -44,3 +44,11 @@ target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS IMGUI_IMPL_O
 
 # ==== glad (OpenGL loader) ====
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/glad SYSTEM)
+
+# ==== GLM (Header-only library) ====
+set(GLM_BUILD_TESTS OFF)
+set(GLM_BUILD_INSTALL OFF)
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/glm SYSTEM)
+
+target_compile_definitions(glm PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

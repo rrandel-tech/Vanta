@@ -1,5 +1,8 @@
 #include "EditorLayer.hpp"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 static void ImGuiShowHelpMarker(const char* desc)
 {
     ImGui::TextDisabled("(?)");
@@ -16,7 +19,7 @@ static void ImGuiShowHelpMarker(const char* desc)
 namespace Vanta {
 
     EditorLayer::EditorLayer()
-        : m_ClearColor{0.2f, 0.3f, 0.8f, 1.0f}
+        : m_ClearColor{ 0.1f, 0.1f, 0.1f, 1.0f }, m_TriangleColor{ 0.75f, 0.45f, 0.50f, 1.0f }
     {
     }
 
@@ -26,7 +29,23 @@ namespace Vanta {
 
     void EditorLayer::OnAttach()
     {
-        VA_INFO("Hello from editor!");
+        static float vertices[] = {
+            -0.5f, -0.5f, 0.0f,
+             0.5f, -0.5f, 0.0f,
+             0.0f,  0.5f, 0.0f
+        };
+
+        static uint32_t indices[] = {
+            0, 1, 2
+        };
+
+        m_VB = std::unique_ptr<VertexBuffer>(VertexBuffer::Create());
+        m_VB->SetData(vertices, sizeof(vertices));
+
+        m_IB = std::unique_ptr<IndexBuffer>(IndexBuffer::Create());
+        m_IB->SetData(indices, sizeof(indices));
+
+        m_Shader.reset(Shader::Create("C:\\Development\\Vanta\\Editor\\assets\\shaders\\shader.glsl"));
     }
 
     void EditorLayer::OnDetach()
@@ -35,17 +54,23 @@ namespace Vanta {
 
     void EditorLayer::OnUpdate(Timestep ts)
     {
-        Vanta::Renderer::Clear(m_ClearColor[0], m_ClearColor[1], m_ClearColor[2], m_ClearColor[3]);
+        Renderer::Clear(m_ClearColor[0], m_ClearColor[1], m_ClearColor[2], m_ClearColor[3]);
+
+        UniformBufferDeclaration<sizeof(glm::vec4), 1> buffer;
+        buffer.Push("u_Color", m_TriangleColor);
+        m_Shader->UploadUniformBuffer(buffer);
+
+        m_Shader->Bind();
+        m_VB->Bind();
+        m_IB->Bind();
+        Renderer::DrawIndexed(6);
     }
 
     void EditorLayer::OnImGuiRender()
     {
-        static bool show_demo_window = true;
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
-        ImGui::Begin("GameLayer");
+        ImGui::Begin("EditorLayer");
         ImGui::ColorEdit4("Clear Color", m_ClearColor);
+        ImGui::ColorEdit4("Triangle Color", glm::value_ptr(m_TriangleColor));
         ImGui::End();
     }
 

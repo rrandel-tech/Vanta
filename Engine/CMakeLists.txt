@@ -36,6 +36,7 @@ target_link_libraries(Vanta
         SDL3::SDL3-static
         imgui
         glad
+        glm
 )
 
 vanta_enable_lto(Vanta)

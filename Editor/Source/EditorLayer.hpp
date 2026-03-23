@@ -17,6 +17,11 @@ namespace Vanta {
         virtual void OnEvent(Event& e) override;
     private:
         float m_ClearColor[4];
+
+        std::unique_ptr<VertexBuffer> m_VB;
+        std::unique_ptr<IndexBuffer> m_IB;
+        std::unique_ptr<Shader> m_Shader;
+        glm::vec4 m_TriangleColor;
     };
 
 }

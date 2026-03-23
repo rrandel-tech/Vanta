@@ -4,9 +4,11 @@
 namespace Vanta {
 
     Renderer* Renderer::s_Instance = new Renderer();
+    RendererAPIType RendererAPI::s_CurrentRendererAPI = RendererAPIType::OpenGL;
 
     void Renderer::Init()
     {
+        VA_RENDER({ RendererAPI::Init(); });
     }
 
     void Renderer::Clear()
@@ -28,6 +30,13 @@ namespace Vanta {
 
     void Renderer::SetClearColor(float r, float g, float b, float a)
     {
+    }
+
+    void Renderer::DrawIndexed(uint32_t count)
+    {
+        VA_RENDER_1(count, {
+            RendererAPI::DrawIndexed(count);
+        });
     }
 
     void Renderer::WaitAndRender()

@@ -26,3 +26,6 @@
 
 // ==== Vanta Render API ====
 #include "Renderer/Renderer.hpp"
+#include "Renderer/Buffer.hpp"
+#include "Renderer/Shader.hpp"
+// ==========================
