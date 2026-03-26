@@ -2,7 +2,6 @@
 #include "OpenGLFramebuffer.hpp"
 
 #include "Renderer/Renderer.hpp"
-
 #include <glad/glad.h>
 
 namespace Vanta {

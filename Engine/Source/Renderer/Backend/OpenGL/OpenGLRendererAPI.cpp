@@ -9,14 +9,21 @@ namespace Vanta {
 
 	static void OpenGLLogMessage(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 	{
-		if (severity != GL_DEBUG_SEVERITY_NOTIFICATION)
+		switch (severity)
 		{
-			VA_CORE_ERROR("{0}", message);
-			VA_CORE_ASSERT(false, "");
-		}
-		else
-		{
-			// VA_CORE_TRACE("{0}", message);
+			case GL_DEBUG_SEVERITY_HIGH:
+				VA_CORE_ERROR("[OpenGL Debug HIGH] {0}", message);
+				VA_CORE_ASSERT(false, "GL_DEBUG_SEVERITY_HIGH");
+				break;
+			case GL_DEBUG_SEVERITY_MEDIUM:
+				VA_CORE_WARN("[OpenGL Debug MEDIUM] {0}", message);
+				break;
+			case GL_DEBUG_SEVERITY_LOW:
+				VA_CORE_INFO("[OpenGL Debug LOW] {0}", message);
+				break;
+			case GL_DEBUG_SEVERITY_NOTIFICATION:
+				// VA_CORE_TRACE("[OpenGL Debug NOTIFICATION] {0}", message);
+				break;
 		}
 	}
 

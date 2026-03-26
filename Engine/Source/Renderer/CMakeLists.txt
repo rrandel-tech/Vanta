@@ -1,37 +1,39 @@
 set(RENDERER_SOURCES
-        Buffer.cpp
-        Camera.cpp
-        Framebuffer.cpp
-        Mesh.cpp
-        Material.cpp
-        RenderCommandQueue.cpp
-        Renderer.cpp
-        RenderPass.cpp
-        Shader.cpp
-        Texture.cpp
-        VertexArray.cpp
+		Buffer.cpp
+		Camera.cpp
+		Framebuffer.cpp
+		Material.cpp
+		Mesh.cpp
+		RenderCommandQueue.cpp
+		Renderer.cpp
+		RenderPass.cpp
+		Shader.cpp
+		Texture.cpp
+		VertexArray.cpp
+		SceneRenderer.cpp
 )
 
 set(RENDERER_HEADERS
-        Buffer.hpp
-        Camera.hpp
-        Framebuffer.hpp
-        Mesh.hpp
-        Material.hpp
-        RenderCommandQueue.hpp
-        Renderer.hpp
-        RenderPass.hpp
-        RendererAPI.hpp
-        Shader.hpp
-        ShaderUniform.hpp
-        Texture.hpp
-        VertexArray.hpp
+		Buffer.hpp
+		Camera.hpp
+		Framebuffer.hpp
+		Material.hpp
+		Mesh.hpp
+		RenderCommandQueue.hpp
+		Renderer.hpp
+		RendererAPI.hpp
+		RenderPass.hpp
+		Shader.hpp
+		ShaderUniform.hpp
+		Texture.hpp
+		VertexArray.hpp
+		SceneRenderer.cpp
 )
 
 target_sources(Vanta
-        PRIVATE
-        ${RENDERER_SOURCES}
-        ${RENDERER_HEADERS}
+		PRIVATE
+		${RENDERER_SOURCES}
+		${RENDERER_HEADERS}
 )
 
 add_subdirectory(Backend/OpenGL)

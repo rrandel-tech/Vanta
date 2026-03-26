@@ -31,6 +31,9 @@
 #include "imgui_internal.h"
 #include "ImGuizmo.h"
 
+#include "Core/Input.hpp"
+#include "Core/KeyCodes.hpp"
+
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #include <malloc.h>
 #endif
@@ -1649,6 +1652,10 @@ namespace IMGUIZMO_NAMESPACE
 
    static bool CanActivate()
    {
+      // Check for modifiers
+      if (Vanta::Input::IsKeyPressed(VA_KEY_LEFT_ALT) || Vanta::Input::IsKeyPressed(VA_KEY_LEFT_SHIFT) || Vanta::Input::IsKeyPressed(VA_KEY_LEFT_CONTROL))
+         return false;
+
       if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && !ImGui::IsAnyItemActive())
       {
          return true;

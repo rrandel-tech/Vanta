@@ -1,9 +1,9 @@
 #include "vapch.hpp"
 #include "OpenGLBuffer.hpp"
 
-#include "Renderer/Renderer.hpp"
+#include <Glad/glad.h>
 
-#include <glad/glad.h>
+#include "Renderer/Renderer.hpp"
 
 namespace Vanta {
 

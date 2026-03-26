@@ -22,6 +22,9 @@
 #include "Events/KeyEvent.hpp"
 #include "Events/MouseEvent.hpp"
 
+// Math
+#include <Math/Mat4.hpp>
+
 #include <imgui.h>
 
 // ==== Vanta Render API ====
@@ -35,4 +38,9 @@
 #include "Renderer/Material.hpp"
 #include "Renderer/VertexArray.hpp"
 #include "Renderer/RenderPass.hpp"
+#include "Renderer/SceneRenderer.hpp"
 // ==========================
+
+// Scenes
+#include "Scene/Entity.hpp"
+#include "Scene/Scene.hpp"

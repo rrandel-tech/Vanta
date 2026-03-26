@@ -1,13 +1,13 @@
 #include "vapch.hpp"
 #include "OpenGLShader.hpp"
 
-#include "Renderer/Renderer.hpp"
-
 #include <string>
 #include <sstream>
 #include <limits>
 
 #include <glm/gtc/type_ptr.hpp>
+
+#include "Renderer/Renderer.hpp"
 
 namespace Vanta {
 
@@ -45,7 +45,8 @@ namespace Vanta {
 	void OpenGLShader::Load(const std::string& source)
 	{
 		m_ShaderSource = PreProcess(source);
-		Parse();
+		if (!m_IsCompute)
+			Parse();
 
 		Renderer::Submit([this]()
 		{
@@ -53,8 +54,11 @@ namespace Vanta {
 				glDeleteShader(m_RendererID);
 
 			CompileAndUploadShader();
-			ResolveUniforms();
-			ValidateUniforms();
+			if (!m_IsCompute)
+			{
+				ResolveUniforms();
+				ValidateUniforms();
+			}
 
 			if (m_Loaded)
 			{
@@ -73,7 +77,7 @@ namespace Vanta {
 
 	void OpenGLShader::Bind()
 	{
-		Renderer::Submit([this]() {
+		Renderer::Submit([=]() {
 			glUseProgram(m_RendererID);
 		});
 	}
@@ -92,7 +96,7 @@ namespace Vanta {
 		}
 		else
 		{
-			VA_CORE_WARN("Could not read shader file {0}", filepath);
+			VA_CORE_ASSERT(false, "Could not load shader!");
 		}
 
 		return result;
@@ -111,11 +115,19 @@ namespace Vanta {
 			VA_CORE_ASSERT(eol != std::string::npos, "Syntax error");
 			size_t begin = pos + typeTokenLength + 1;
 			std::string type = source.substr(begin, eol - begin);
-			VA_CORE_ASSERT(type == "vertex" || type == "fragment" || type == "pixel", "Invalid shader type specified");
+			VA_CORE_ASSERT(type == "vertex" || type == "fragment" || type == "pixel" || type == "compute", "Invalid shader type specified");
 
 			size_t nextLinePos = source.find_first_not_of("\r\n", eol);
 			pos = source.find(typeToken, nextLinePos);
-			shaderSources[ShaderTypeFromString(type)] = source.substr(nextLinePos, pos - (nextLinePos == std::string::npos ? source.size() - 1 : nextLinePos));
+			auto shaderType = ShaderTypeFromString(type);
+			shaderSources[shaderType] = source.substr(nextLinePos, pos - (nextLinePos == std::string::npos ? source.size() - 1 : nextLinePos));
+
+			// Compute shaders cannot contain other types
+			if (shaderType == GL_COMPUTE_SHADER)
+			{
+				m_IsCompute = true;
+				break;
+			}
 		}
 
 		return shaderSources;
@@ -504,7 +516,6 @@ namespace Vanta {
 
 	void OpenGLShader::ValidateUniforms()
 	{
-
 	}
 
 	int32_t OpenGLShader::GetUniformLocation(const std::string& name) const
@@ -522,6 +533,8 @@ namespace Vanta {
 			return GL_VERTEX_SHADER;
 		if (type == "fragment" || type == "pixel")
 			return GL_FRAGMENT_SHADER;
+		if (type == "compute")
+			return GL_COMPUTE_SHADER;
 
 		return GL_NONE;
 	}
@@ -539,6 +552,14 @@ namespace Vanta {
 			GLuint shaderRendererID = glCreateShader(type);
 			const GLchar *sourceCstr = (const GLchar *)source.c_str();
 			glShaderSource(shaderRendererID, 1, &sourceCstr, 0);
+
+			VA_CORE_INFO(
+				"Compiling OpenGL shader '{}' | Stage: {}",
+				m_Name,
+				type == GL_VERTEX_SHADER   ? "Vertex" :
+				type == GL_FRAGMENT_SHADER ? "Fragment" :
+				type == GL_COMPUTE_SHADER  ? "Compute" : "Unknown"
+			);
 
 			glCompileShader(shaderRendererID);
 
