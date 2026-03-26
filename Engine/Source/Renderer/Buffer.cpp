@@ -1,5 +1,7 @@
 #include "vapch.hpp"
 
+#include "Renderer.hpp"
+
 #include "Renderer/Backend/OpenGL/OpenGLBuffer.hpp"
 
 namespace Vanta {

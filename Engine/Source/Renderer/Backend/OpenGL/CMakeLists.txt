@@ -6,6 +6,7 @@ set(OPENGL_SOURCES
         OpenGLShaderUniform.cpp
         OpenGLTexture.cpp
         OpenGLVertexArray.cpp
+        OpenGLRenderPass.cpp
 )
 
 set(OPENGL_HEADERS
@@ -15,6 +16,7 @@ set(OPENGL_HEADERS
         OpenGLShaderUniform.hpp
         OpenGLTexture.hpp
         OpenGLVertexArray.hpp
+        OpenGLRenderPass.hpp
 )
 
 target_sources(Vanta

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <memory>
 #include "Renderer/Buffer.hpp"
+
+#include <memory>
 
 namespace Vanta {
 

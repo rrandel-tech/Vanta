@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/Renderer.hpp"
+#include "RendererAPI.hpp"
 
 namespace Vanta {
 

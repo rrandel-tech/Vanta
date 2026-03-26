@@ -23,6 +23,7 @@ namespace Vanta {
 		Ref<Mesh> m_Mesh;
 		Ref<Mesh> m_SphereMesh, m_PlaneMesh;
 		Ref<Texture2D> m_BRDFLUT;
+		Ref<RenderPass> m_GeoPass, m_CompositePass;
 
 		Ref<MaterialInstance> m_MeshMaterial;
 		Ref<MaterialInstance> m_GridMaterial;
@@ -63,8 +64,6 @@ namespace Vanta {
 			bool UseTexture = false;
 		};
 		RoughnessInput m_RoughnessInput;
-
-		Ref<Framebuffer> m_Framebuffer, m_FinalPresentBuffer;
 
 		Ref<VertexArray> m_FullscreenQuadVertexArray;
 		Ref<TextureCube> m_EnvironmentCubeMap, m_EnvironmentIrradiance;

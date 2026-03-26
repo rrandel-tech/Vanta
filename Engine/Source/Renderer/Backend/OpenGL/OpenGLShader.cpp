@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "OpenGLShader.hpp"
 
+#include "Renderer/Renderer.hpp"
+
 #include <string>
 #include <sstream>
 #include <limits>
@@ -783,9 +785,18 @@ namespace Vanta {
 		});
 	}
 
-	void OpenGLShader::SetMat4FromRenderThread(const std::string& name, const glm::mat4& value)
+	void OpenGLShader::SetMat4FromRenderThread(const std::string& name, const glm::mat4& value, bool bind)
 	{
-		UploadUniformMat4(name, value);
+		if (bind)
+		{
+			UploadUniformMat4(name, value);
+		}
+		else
+		{
+			int location = glGetUniformLocation(m_RendererID, name.c_str());
+			if (location != -1)
+				UploadUniformMat4(location, value);
+		}
 	}
 
 	void OpenGLShader::UploadUniformInt(uint32_t location, int32_t value)

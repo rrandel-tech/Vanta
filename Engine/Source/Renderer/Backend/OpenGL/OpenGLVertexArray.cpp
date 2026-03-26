@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "OpenGLVertexArray.hpp"
 
+#include "Renderer/Renderer.hpp"
+
 #include <glad/glad.h>
 
 namespace Vanta {
