@@ -47,21 +47,22 @@ namespace Vanta {
 		m_ShaderSource = PreProcess(source);
 		Parse();
 
-		VA_RENDER_S({
-			if (self->m_RendererID)
-				glDeleteShader(self->m_RendererID);
+		Renderer::Submit([this]()
+		{
+			if (m_RendererID)
+				glDeleteShader(m_RendererID);
 
-			self->CompileAndUploadShader();
-			self->ResolveUniforms();
-			self->ValidateUniforms();
+			CompileAndUploadShader();
+			ResolveUniforms();
+			ValidateUniforms();
 
-			if (self->m_Loaded)
+			if (m_Loaded)
 			{
-				for (auto& callback : self->m_ShaderReloadedCallbacks)
+				for (auto& callback : m_ShaderReloadedCallbacks)
 					callback();
 			}
 
-			self->m_Loaded = true;
+			m_Loaded = true;
 		});
 	}
 
@@ -72,8 +73,8 @@ namespace Vanta {
 
 	void OpenGLShader::Bind()
 	{
-		VA_RENDER_S({
-			glUseProgram(self->m_RendererID);
+		Renderer::Submit([this]() {
+			glUseProgram(m_RendererID);
 		});
 	}
 
@@ -596,17 +597,17 @@ namespace Vanta {
 
 	void OpenGLShader::SetVSMaterialUniformBuffer(Buffer buffer)
 	{
-		VA_RENDER_S1(buffer, {
-			glUseProgram(self->m_RendererID);
-			self->ResolveAndSetUniforms(self->m_VSMaterialUniformBuffer, buffer);
+		Renderer::Submit([this, buffer]() {
+			glUseProgram(m_RendererID);
+			ResolveAndSetUniforms(m_VSMaterialUniformBuffer, buffer);
 		});
 	}
 
 	void OpenGLShader::SetPSMaterialUniformBuffer(Buffer buffer)
 	{
-		VA_RENDER_S1(buffer, {
-			glUseProgram(self->m_RendererID);
-			self->ResolveAndSetUniforms(self->m_PSMaterialUniformBuffer, buffer);
+		Renderer::Submit([this, buffer]() {
+			glUseProgram(m_RendererID);
+			ResolveAndSetUniforms(m_PSMaterialUniformBuffer, buffer);
 		});
 	}
 
@@ -730,58 +731,58 @@ namespace Vanta {
 
 	void OpenGLShader::UploadUniformBuffer(const UniformBufferBase& uniformBuffer)
 	{
-		for (uint32_t i = 0; i < uniformBuffer.GetUniformCount(); i++)
+		for (unsigned int i = 0; i < uniformBuffer.GetUniformCount(); i++)
 		{
 			const UniformDecl& decl = uniformBuffer.GetUniforms()[i];
 			switch (decl.Type)
 			{
-			case UniformType::Float:
-			{
-				const std::string& name = decl.Name;
-				float value = *(float*)(uniformBuffer.GetBuffer() + decl.Offset);
-				VA_RENDER_S2(name, value, {
-					self->UploadUniformFloat(name, value);
+				case UniformType::Float:
+				{
+					const std::string& name = decl.Name;
+					float value = *(float*)(uniformBuffer.GetBuffer() + decl.Offset);
+					Renderer::Submit([=]() {
+						UploadUniformFloat(name, value);
 					});
-			}
-			case UniformType::Float3:
-			{
-				const std::string& name = decl.Name;
-				glm::vec3& values = *(glm::vec3*)(uniformBuffer.GetBuffer() + decl.Offset);
-				VA_RENDER_S2(name, values, {
-					self->UploadUniformFloat3(name, values);
+				}
+				case UniformType::Float3:
+				{
+					const std::string& name = decl.Name;
+					glm::vec3& values = *(glm::vec3*)(uniformBuffer.GetBuffer() + decl.Offset);
+					Renderer::Submit([=]() {
+						UploadUniformFloat3(name, values);
 					});
-			}
-			case UniformType::Float4:
-			{
-				const std::string& name = decl.Name;
-				glm::vec4& values = *(glm::vec4*)(uniformBuffer.GetBuffer() + decl.Offset);
-				VA_RENDER_S2(name, values, {
-					self->UploadUniformFloat4(name, values);
+				}
+				case UniformType::Float4:
+				{
+					const std::string& name = decl.Name;
+					glm::vec4& values = *(glm::vec4*)(uniformBuffer.GetBuffer() + decl.Offset);
+					Renderer::Submit([=]() {
+						UploadUniformFloat4(name, values);
 					});
-			}
-			case UniformType::Matrix4x4:
-			{
-				const std::string& name = decl.Name;
-				glm::mat4& values = *(glm::mat4*)(uniformBuffer.GetBuffer() + decl.Offset);
-				VA_RENDER_S2(name, values, {
-					self->UploadUniformMat4(name, values);
+				}
+				case UniformType::Matrix4x4:
+				{
+					const std::string& name = decl.Name;
+					glm::mat4& values = *(glm::mat4*)(uniformBuffer.GetBuffer() + decl.Offset);
+					Renderer::Submit([=]() {
+						UploadUniformMat4(name, values);
 					});
-			}
+				}
 			}
 		}
 	}
 
 	void OpenGLShader::SetFloat(const std::string& name, float value)
 	{
-		VA_RENDER_S2(name, value, {
-			self->UploadUniformFloat(name, value);
+		Renderer::Submit([=]() {
+			UploadUniformFloat(name, value);
 		});
 	}
 
 	void OpenGLShader::SetMat4(const std::string& name, const glm::mat4& value)
 	{
-		VA_RENDER_S2(name, value, {
-			self->UploadUniformMat4(name, value);
+		Renderer::Submit([=]() {
+			UploadUniformMat4(name, value);
 		});
 	}
 

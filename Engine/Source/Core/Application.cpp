@@ -102,7 +102,7 @@ namespace Vanta {
 
                 // Render ImGui on render thread
                 Application* app = this;
-                VA_RENDER_1(app, { app->RenderImGui(); });
+                Renderer::Submit([app]() { app->RenderImGui(); });
 
                 Renderer::Get().WaitAndRender();
 
@@ -170,7 +170,7 @@ namespace Vanta {
             return false;
         }
         m_Minimized = false;
-        VA_RENDER_2(width, height, { glViewport(0, 0, width, height); });
+        Renderer::Submit([=]() { glViewport(0, 0, width, height); });
         auto& fbs = FramebufferPool::GetGlobal()->GetAll();
         for (auto& fb : fbs)
         {
