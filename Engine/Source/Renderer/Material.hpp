@@ -26,7 +26,7 @@ namespace Vanta {
 			VA_CORE_ASSERT(decl, "Could not find uniform with name 'x'");
 			auto& buffer = GetUniformBufferTarget(decl);
 			buffer.Write((byte*)&value, decl->GetSize(), decl->GetOffset());
-
+			
 			for (auto mi : m_MaterialInstances)
 				mi->OnMaterialValueUpdated(decl);
 		}

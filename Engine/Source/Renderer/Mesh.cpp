@@ -24,7 +24,7 @@ namespace Vanta {
 		aiProcess_Triangulate |             // Make sure we're triangles
 		aiProcess_SortByPType |             // Split meshes by primitive type
 		aiProcess_GenNormals |              // Make sure we have legit normals
-		aiProcess_GenUVCoords |             // Convert UVs if required
+		aiProcess_GenUVCoords |             // Convert UVs if required 
 		aiProcess_OptimizeMeshes |          // Batch draws where possible
 		aiProcess_ValidateDataStructure;    // Validation
 
@@ -62,7 +62,7 @@ namespace Vanta {
 		LogStream::Initialize();
 
 		VA_CORE_INFO("Loading mesh: {0}", filename.c_str());
-
+		
 		m_Importer = std::make_unique<Assimp::Importer>();
 
 		const aiScene* scene = m_Importer->ReadFile(filename, s_MeshImportFlags);
@@ -143,7 +143,7 @@ namespace Vanta {
 				VA_CORE_ASSERT(mesh->mFaces[i].mNumIndices == 3, "Must have 3 indices.");
 				m_Indices.push_back({ mesh->mFaces[i].mIndices[0], mesh->mFaces[i].mIndices[1], mesh->mFaces[i].mIndices[2] });
 			}
-
+			
 		}
 
 		VA_CORE_TRACE("NODES:");
@@ -191,14 +191,36 @@ namespace Vanta {
 			}
 		}
 
-		m_VertexBuffer.reset(VertexBuffer::Create());
+		m_VertexArray = VertexArray::Create();
 		if (m_IsAnimated)
-			m_VertexBuffer->SetData(m_AnimatedVertices.data(), m_AnimatedVertices.size() * sizeof(AnimatedVertex));
+		{
+			auto vb = VertexBuffer::Create(m_AnimatedVertices.data(), m_AnimatedVertices.size() * sizeof(AnimatedVertex));
+			vb->SetLayout({
+				{ ShaderDataType::Float3, "a_Position" },
+				{ ShaderDataType::Float3, "a_Normal" },
+				{ ShaderDataType::Float3, "a_Tangent" },
+				{ ShaderDataType::Float3, "a_Binormal" },
+				{ ShaderDataType::Float2, "a_TexCoord" },
+				{ ShaderDataType::Int4, "a_BoneIDs" },
+				{ ShaderDataType::Float4, "a_BoneWeights" },
+			});
+			m_VertexArray->AddVertexBuffer(vb);
+		}
 		else
-			m_VertexBuffer->SetData(m_StaticVertices.data(), m_StaticVertices.size() * sizeof(Vertex));
+		{
+			auto vb = VertexBuffer::Create(m_StaticVertices.data(), m_StaticVertices.size() * sizeof(Vertex));
+			vb->SetLayout({
+				{ ShaderDataType::Float3, "a_Position" },
+				{ ShaderDataType::Float3, "a_Normal" },
+				{ ShaderDataType::Float3, "a_Tangent" },
+				{ ShaderDataType::Float3, "a_Binormal" },
+				{ ShaderDataType::Float2, "a_TexCoord" },
+			});
+			m_VertexArray->AddVertexBuffer(vb);
+		}
 
-		m_IndexBuffer.reset(IndexBuffer::Create());
-		m_IndexBuffer->SetData(m_Indices.data(), m_Indices.size() * sizeof(Index));
+		auto ib = IndexBuffer::Create(m_Indices.data(), m_Indices.size() * sizeof(Index));
+		m_VertexArray->SetIndexBuffer(ib);
 
 		m_Scene = scene;
 	}
@@ -383,7 +405,7 @@ namespace Vanta {
 				return nodeAnim;
 		}
 		return nullptr;
-	}
+	} 
 
 	void Mesh::BoneTransform(float time)
 	{
@@ -413,13 +435,12 @@ namespace Vanta {
 
 			BoneTransform(m_AnimationTime);
 		}
-
+		
 		if (materialInstance)
 			materialInstance->Bind();
 
 		// TODO: Sort this out
-		m_VertexBuffer->Bind();
-		m_IndexBuffer->Bind();
+		m_VertexArray->Bind();
 
 		bool materialOverride = !!materialInstance;
 
@@ -429,49 +450,11 @@ namespace Vanta {
 			{
 				if (self->m_IsAnimated)
 				{
-					glEnableVertexAttribArray(0);
-					glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, Position));
-
-					glEnableVertexAttribArray(1);
-					glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, Normal));
-
-					glEnableVertexAttribArray(2);
-					glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, Tangent));
-
-					glEnableVertexAttribArray(3);
-					glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, Binormal));
-
-					glEnableVertexAttribArray(4);
-					glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, Texcoord));
-
-					glEnableVertexAttribArray(5);
-					glVertexAttribIPointer(5, 4, GL_INT, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, IDs));
-
-					glEnableVertexAttribArray(6);
-					glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(AnimatedVertex), (const void*)offsetof(AnimatedVertex, Weights));
-
 					for (size_t i = 0; i < self->m_BoneTransforms.size(); i++)
 					{
 						std::string uniformName = std::string("u_BoneTransforms[") + std::to_string(i) + std::string("]");
 						self->m_MeshShader->SetMat4FromRenderThread(uniformName, self->m_BoneTransforms[i]);
 					}
-				}
-				else
-				{
-					glEnableVertexAttribArray(0);
-					glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Position));
-
-					glEnableVertexAttribArray(1);
-					glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Normal));
-
-					glEnableVertexAttribArray(2);
-					glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Tangent));
-
-					glEnableVertexAttribArray(3);
-					glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Binormal));
-
-					glEnableVertexAttribArray(4);
-					glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Texcoord));
 				}
 
 				if (!materialOverride)

@@ -22,6 +22,8 @@ namespace Vanta {
 
 	class RendererAPI
 	{
+	private:
+
 	public:
 		static void Init();
 		static void Shutdown();
@@ -43,5 +45,6 @@ namespace Vanta {
 	private:
 		static RendererAPIType s_CurrentRendererAPI;
 	};
+
 
 }

@@ -7,11 +7,10 @@ namespace Vanta {
 
 	Renderer* Renderer::s_Instance = new Renderer();
 	RendererAPIType RendererAPI::s_CurrentRendererAPI = RendererAPIType::OpenGL;
-
+	
 	void Renderer::Init()
 	{
 		s_Instance->m_ShaderLibrary = std::make_unique<ShaderLibrary>();
-
 		VA_RENDER({ RendererAPI::Init(); });
 
 		Renderer::GetShaderLibrary()->Load("C:/Development/Vanta/Editor/assets/shaders/PBR_StaticMesh.glsl");
@@ -34,7 +33,7 @@ namespace Vanta {
 
 	void Renderer::ClearMagenta()
 	{
-		Clear(1.0f, 0.0f, 1.0f);
+		Clear(1, 0, 1);
 	}
 
 	void Renderer::SetClearColor(float r, float g, float b, float a)

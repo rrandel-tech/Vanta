@@ -60,7 +60,7 @@ namespace Vanta {
 		TextureFormat m_Format;
 		uint32_t m_Width, m_Height;
 
-		unsigned char* m_ImageData;
+		uint8_t* m_ImageData;
 
 		std::string m_FilePath;
 	};

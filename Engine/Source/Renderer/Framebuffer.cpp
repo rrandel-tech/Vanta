@@ -5,9 +5,9 @@
 
 namespace Vanta {
 
-	Framebuffer* Framebuffer::Create(uint32_t width, uint32_t height, FramebufferFormat format)
+	Vanta::Framebuffer* Framebuffer::Create(uint32_t width, uint32_t height, FramebufferFormat format)
 	{
-		Framebuffer* result = nullptr;
+		Vanta::Framebuffer* result = nullptr;
 
 		switch (RendererAPI::Current())
 		{
@@ -22,10 +22,12 @@ namespace Vanta {
 
 	FramebufferPool::FramebufferPool(uint32_t maxFBs /* = 32 */)
 	{
+
 	}
 
 	FramebufferPool::~FramebufferPool()
 	{
+		
 	}
 
 	std::weak_ptr<Framebuffer> FramebufferPool::AllocateBuffer()

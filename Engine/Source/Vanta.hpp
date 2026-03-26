@@ -33,4 +33,5 @@
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Camera.hpp"
 #include "Renderer/Material.hpp"
+#include "Renderer/VertexArray.hpp"
 // ==========================

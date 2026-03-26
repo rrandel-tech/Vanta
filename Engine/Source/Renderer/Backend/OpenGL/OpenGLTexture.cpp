@@ -5,7 +5,7 @@
 #include "Renderer/Renderer.hpp"
 
 #include <glad/glad.h>
-#include <stb_image.h>
+#include "stb_image.h"
 
 namespace Vanta {
 
@@ -160,9 +160,9 @@ namespace Vanta {
 		uint32_t faceHeight = m_Height / 3;
 		VA_CORE_ASSERT(faceWidth == faceHeight, "Non-square faces!");
 
-		std::array<unsigned char*, 6> faces;
+		std::array<uint8_t*, 6> faces;
 		for (size_t i = 0; i < faces.size(); i++)
-			faces[i] = new unsigned char[faceWidth * faceHeight * 3]; // 3 BPP
+			faces[i] = new uint8_t[faceWidth * faceHeight * 3]; // 3 BPP
 
 		int faceIndex = 0;
 

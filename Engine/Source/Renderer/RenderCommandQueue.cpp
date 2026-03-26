@@ -5,13 +5,11 @@
 
 namespace Vanta {
 
-	constexpr size_t kCommandBufferSize = 10 * 1024 * 1024; // 10MB buffer
-
 	RenderCommandQueue::RenderCommandQueue()
 	{
-		m_CommandBuffer = new uint8_t[kCommandBufferSize];
+		m_CommandBuffer = new uint8_t[10 * 1024 * 1024]; // 10mb buffer
 		m_CommandBufferPtr = m_CommandBuffer;
-		memset(m_CommandBuffer, 0, kCommandBufferSize);
+		memset(m_CommandBuffer, 0, 10 * 1024 * 1024);
 	}
 
 	RenderCommandQueue::~RenderCommandQueue()
@@ -19,10 +17,10 @@ namespace Vanta {
 		delete[] m_CommandBuffer;
 	}
 
-	void* RenderCommandQueue::Allocate(RenderCommandFn function, uint32_t size)
+	void* RenderCommandQueue::Allocate(RenderCommandFn fn, uint32_t size)
 	{
 		// TODO: alignment
-		*(RenderCommandFn*)m_CommandBufferPtr = function;
+		*(RenderCommandFn*)m_CommandBufferPtr = fn;
 		m_CommandBufferPtr += sizeof(RenderCommandFn);
 
 		*(int*)m_CommandBufferPtr = size;
@@ -37,7 +35,7 @@ namespace Vanta {
 
 	void RenderCommandQueue::Execute()
 	{
-		// VA_RENDER_TRACE("RenderCommandQueue::Execute -- {0} commands, {1} bytes", m_commandCount, (m_CommandBufferPtr - m_commandBuffer));
+		//VA_RENDER_TRACE("RenderCommandQueue::Execute -- {0} commands, {1} bytes", m_CommandCount, (m_CommandBufferPtr - m_CommandBuffer));
 
 		byte* buffer = m_CommandBuffer;
 

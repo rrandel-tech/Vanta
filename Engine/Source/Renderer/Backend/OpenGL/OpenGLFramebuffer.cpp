@@ -40,7 +40,7 @@ namespace Vanta {
 
 			glGenTextures(1, &self->m_ColorAttachment);
 			glBindTexture(GL_TEXTURE_2D, self->m_ColorAttachment);
-			
+
 			// TODO: Create Vanta texture object based on format here
 			if (self->m_Format == FramebufferFormat::RGBA16F)
 			{

@@ -83,7 +83,7 @@ namespace Vanta {
 			m_DielectricSphereMaterialInstances.push_back(mi);
 		}
 
-		// Create Quad
+		// Create fullscreen quad for final composite
 		x = -1;
 		float y = -1;
 		float width = 2, height = 2;
@@ -107,12 +107,20 @@ namespace Vanta {
 		data[3].Position = glm::vec3(x, y + height, 0);
 		data[3].TexCoord = glm::vec2(0, 1);
 
-		m_VertexBuffer.reset(VertexBuffer::Create());
-		m_VertexBuffer->SetData(data, 4 * sizeof(QuadVertex));
+		m_FullscreenQuadVertexArray = VertexArray::Create();
+		auto quadVB = VertexBuffer::Create(data, 4 * sizeof(QuadVertex));
+		quadVB->SetLayout({
+			{ ShaderDataType::Float3, "a_Position" },
+			{ ShaderDataType::Float2, "a_TexCoord" }
+		});
 
-		uint32_t* indices = new uint32_t[6] { 0, 1, 2, 2, 3, 0, };
-		m_IndexBuffer.reset(IndexBuffer::Create());
-		m_IndexBuffer->SetData(indices, 6 * sizeof(uint32_t));
+		uint32_t indices[6] = { 0, 1, 2, 2, 3, 0, };
+		auto quadIB = IndexBuffer::Create(indices, 6 * sizeof(uint32_t));
+
+		m_FullscreenQuadVertexArray->AddVertexBuffer(quadVB);
+		m_FullscreenQuadVertexArray->SetIndexBuffer(quadIB);
+
+		// Set lights
 
 		m_Light.Direction = { -0.5f, -0.5f, 1.0f };
 		m_Light.Radiance = { 1.0f, 1.0f, 1.0f };
@@ -143,9 +151,8 @@ namespace Vanta {
 		m_QuadShader->Bind();
 		m_QuadShader->SetMat4("u_InverseVP", inverse(viewProjection));
 		m_EnvironmentIrradiance->Bind(0);
-		m_VertexBuffer->Bind();
-		m_IndexBuffer->Bind();
-		Renderer::DrawIndexed(m_IndexBuffer->GetCount(), false);
+		m_FullscreenQuadVertexArray->Bind();
+		Renderer::DrawIndexed(m_FullscreenQuadVertexArray->GetIndexBuffer()->GetCount(), false);
 
 		m_MeshMaterial->Set("u_AlbedoColor", m_AlbedoInput.Color);
 		m_MeshMaterial->Set("u_Metalness", m_MetalnessInput.Value);
@@ -161,21 +168,6 @@ namespace Vanta {
 		m_MeshMaterial->Set("u_RoughnessTexToggle", m_RoughnessInput.UseTexture ? 1.0f : 0.0f);
 		m_MeshMaterial->Set("u_EnvMapRotation", m_EnvMapRotation);
 
-#if 0
-		// Bind default texture unit
-		UploadUniformInt("u_Texture", 0);
-
-		// PBR shader textures
-		UploadUniformInt("u_AlbedoTexture", 1);
-		UploadUniformInt("u_NormalTexture", 2);
-		UploadUniformInt("u_MetalnessTexture", 3);
-		UploadUniformInt("u_RoughnessTexture", 4);
-
-		UploadUniformInt("u_EnvRadianceTex", 10);
-		UploadUniformInt("u_EnvIrradianceTex", 11);
-
-		UploadUniformInt("u_BRDFLUTTexture", 15);
-#endif
 		m_MeshMaterial->Set("u_EnvRadianceTex", m_EnvironmentCubeMap);
 		m_MeshMaterial->Set("u_EnvIrradianceTex", m_EnvironmentIrradiance);
 		m_MeshMaterial->Set("u_BRDFLUTTexture", m_BRDFLUT);
@@ -231,9 +223,8 @@ namespace Vanta {
 		m_HDRShader->Bind();
 		m_HDRShader->SetFloat("u_Exposure", m_Exposure);
 		m_Framebuffer->BindTexture();
-		m_VertexBuffer->Bind();
-		m_IndexBuffer->Bind();
-		Renderer::DrawIndexed(m_IndexBuffer->GetCount(), false);
+		m_FullscreenQuadVertexArray->Bind();
+		Renderer::DrawIndexed(m_FullscreenQuadVertexArray->GetIndexBuffer()->GetCount(), false);
 		m_FinalPresentBuffer->Unbind();
 	}
 
@@ -350,9 +341,9 @@ namespace Vanta {
 
 		// Editor Panel ------------------------------------------------------------------------------
 		ImGui::Begin("Model");
-		ImGui::RadioButton("Spheres", (int*)&m_Scene, (int)Scene::Spheres);
+		ImGui::RadioButton("Spheres", (int*)& m_Scene, (int)Scene::Spheres);
 		ImGui::SameLine();
-		ImGui::RadioButton("Model", (int*)&m_Scene, (int)Scene::Model);
+		ImGui::RadioButton("Model", (int*)& m_Scene, (int)Scene::Model);
 
 		ImGui::Begin("Environment");
 
@@ -360,7 +351,7 @@ namespace Vanta {
 		ImGui::AlignTextToFramePadding();
 
 		Property("Light Direction", m_Light.Direction);
-		Property("Light Radiance", m_Light.Radiance, static_cast<float>(PropertyFlag::ColorProperty));
+		// Property("Light Radiance", m_Light.Radiance, static_cast<float>(PropertyFlag::ColorProperty));
 		Property("Light Multiplier", m_LightMultiplier, 0.0f, 5.0f);
 		Property("Exposure", m_Exposure, 0.0f, 5.0f);
 

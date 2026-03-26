@@ -23,7 +23,7 @@ namespace Vanta {
 		static void ClearMagenta();
 
 		static void Init();
-
+		
 		static const Scope<ShaderLibrary>& GetShaderLibrary() { return Get().m_ShaderLibrary; }
 
 		static void* Submit(RenderCommandFn fn, uint32_t size)
@@ -48,13 +48,13 @@ namespace Vanta {
 #define VA_RENDER_UNIQUE(x) VA_RENDER_PASTE(x, __LINE__)
 
 #define VA_RENDER(code) \
-	struct VA_RENDER_UNIQUE(VARenderCommand) \
-	{\
-		static void Execute(void*)\
-		{\
-			code\
-		}\
-	};\
+    struct VA_RENDER_UNIQUE(VARenderCommand) \
+    {\
+        static void Execute(void*)\
+        {\
+            code\
+        }\
+    };\
 	{\
 		auto mem = ::Vanta::Renderer::Submit(VA_RENDER_UNIQUE(VARenderCommand)::Execute, sizeof(VA_RENDER_UNIQUE(VARenderCommand)));\
 		new (mem) VA_RENDER_UNIQUE(VARenderCommand)();\
@@ -62,94 +62,94 @@ namespace Vanta {
 
 #define VA_RENDER_1(arg0, code) \
 	do {\
-	struct VA_RENDER_UNIQUE(VARenderCommand) \
-	{\
+    struct VA_RENDER_UNIQUE(VARenderCommand) \
+    {\
 		VA_RENDER_UNIQUE(VARenderCommand)(typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0) \
 		: arg0(arg0) {}\
 		\
-		static void Execute(void* argBuffer)\
-		{\
+        static void Execute(void* argBuffer)\
+        {\
 			auto& arg0 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg0;\
-			code\
-		}\
+            code\
+        }\
 		\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0;\
-	};\
+    };\
 	{\
 		auto mem = ::Vanta::Renderer::Submit(VA_RENDER_UNIQUE(VARenderCommand)::Execute, sizeof(VA_RENDER_UNIQUE(VARenderCommand)));\
 		new (mem) VA_RENDER_UNIQUE(VARenderCommand)(arg0);\
 	} } while(0)
 
 #define VA_RENDER_2(arg0, arg1, code) \
-	struct VA_RENDER_UNIQUE(VARenderCommand) \
-	{\
+    struct VA_RENDER_UNIQUE(VARenderCommand) \
+    {\
 		VA_RENDER_UNIQUE(VARenderCommand)(typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0,\
 											typename ::std::remove_const<typename ::std::remove_reference<decltype(arg1)>::type>::type arg1) \
 		: arg0(arg0), arg1(arg1) {}\
 		\
-		static void Execute(void* argBuffer)\
-		{\
+        static void Execute(void* argBuffer)\
+        {\
 			auto& arg0 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg0;\
 			auto& arg1 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg1;\
-			code\
-		}\
+            code\
+        }\
 		\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0;\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg1)>::type>::type arg1;\
-	};\
+    };\
 	{\
 		auto mem = ::Vanta::Renderer::Submit(VA_RENDER_UNIQUE(VARenderCommand)::Execute, sizeof(VA_RENDER_UNIQUE(VARenderCommand)));\
 		new (mem) VA_RENDER_UNIQUE(VARenderCommand)(arg0, arg1);\
 	}\
 
 #define VA_RENDER_3(arg0, arg1, arg2, code) \
-	struct VA_RENDER_UNIQUE(VARenderCommand) \
-	{\
+    struct VA_RENDER_UNIQUE(VARenderCommand) \
+    {\
 		VA_RENDER_UNIQUE(VARenderCommand)(typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0,\
 											typename ::std::remove_const<typename ::std::remove_reference<decltype(arg1)>::type>::type arg1,\
 											typename ::std::remove_const<typename ::std::remove_reference<decltype(arg2)>::type>::type arg2) \
 		: arg0(arg0), arg1(arg1), arg2(arg2) {}\
 		\
-		static void Execute(void* argBuffer)\
-		{\
+        static void Execute(void* argBuffer)\
+        {\
 			auto& arg0 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg0;\
 			auto& arg1 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg1;\
 			auto& arg2 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg2;\
-			code\
-		}\
+            code\
+        }\
 		\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0;\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg1)>::type>::type arg1;\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg2)>::type>::type arg2;\
-	};\
+    };\
 	{\
 		auto mem = ::Vanta::Renderer::Submit(VA_RENDER_UNIQUE(VARenderCommand)::Execute, sizeof(VA_RENDER_UNIQUE(VARenderCommand)));\
 		new (mem) VA_RENDER_UNIQUE(VARenderCommand)(arg0, arg1, arg2);\
 	}\
 
 #define VA_RENDER_4(arg0, arg1, arg2, arg3, code) \
-	struct VA_RENDER_UNIQUE(VARenderCommand) \
-	{\
+    struct VA_RENDER_UNIQUE(VARenderCommand) \
+    {\
 		VA_RENDER_UNIQUE(VARenderCommand)(typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0,\
 											typename ::std::remove_const<typename ::std::remove_reference<decltype(arg1)>::type>::type arg1,\
 											typename ::std::remove_const<typename ::std::remove_reference<decltype(arg2)>::type>::type arg2,\
 											typename ::std::remove_const<typename ::std::remove_reference<decltype(arg3)>::type>::type arg3)\
 		: arg0(arg0), arg1(arg1), arg2(arg2), arg3(arg3) {}\
 		\
-		static void Execute(void* argBuffer)\
-		{\
+        static void Execute(void* argBuffer)\
+        {\
 			auto& arg0 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg0;\
 			auto& arg1 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg1;\
 			auto& arg2 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg2;\
 			auto& arg3 = ((VA_RENDER_UNIQUE(VARenderCommand)*)argBuffer)->arg3;\
-			code\
-		}\
+            code\
+        }\
 		\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg0)>::type>::type arg0;\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg1)>::type>::type arg1;\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg2)>::type>::type arg2;\
 		typename ::std::remove_const<typename ::std::remove_reference<decltype(arg3)>::type>::type arg3;\
-	};\
+    };\
 	{\
 		auto mem = Renderer::Submit(VA_RENDER_UNIQUE(VARenderCommand)::Execute, sizeof(VA_RENDER_UNIQUE(VARenderCommand)));\
 		new (mem) VA_RENDER_UNIQUE(VARenderCommand)(arg0, arg1, arg2, arg3);\

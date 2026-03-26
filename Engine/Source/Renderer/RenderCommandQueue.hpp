@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "vapch.hpp"
 
 namespace Vanta {
 
@@ -12,7 +12,7 @@ namespace Vanta {
 		RenderCommandQueue();
 		~RenderCommandQueue();
 
-		void* Allocate(RenderCommandFn function, uint32_t size);
+		void* Allocate(RenderCommandFn func, uint32_t size);
 
 		void Execute();
 	private:
