@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 namespace Vanta {
 
 	using RendererID = uint32_t;
@@ -40,6 +38,8 @@ namespace Vanta {
 		}
 
 		static RendererAPIType Current() { return s_CurrentRendererAPI; }
+	private:
+		static void LoadRequiredAssets();
 	private:
 		static RendererAPIType s_CurrentRendererAPI;
 	};

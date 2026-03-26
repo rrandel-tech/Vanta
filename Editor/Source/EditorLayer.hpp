@@ -16,15 +16,15 @@ namespace Vanta {
 		virtual void OnImGuiRender() override;
 		virtual void OnEvent(Event& e) override;
 	private:
-		Ref<Shader> m_SimplePBRShader;
-		Scope<Shader> m_QuadShader;
-		Scope<Shader> m_HDRShader;
-		Scope<Shader> m_GridShader;
-		Scope<Mesh> m_Mesh;
-		Scope<Mesh> m_SphereMesh, m_PlaneMesh;
+		Ref<Shader> m_QuadShader;
+		Ref<Shader> m_HDRShader;
+		Ref<Shader> m_GridShader;
+		Ref<Mesh> m_Mesh;
+		Ref<Mesh> m_SphereMesh, m_PlaneMesh;
 		Ref<Texture2D> m_BRDFLUT;
 
-		Ref<Material> m_PBRMaterial;
+		Ref<MaterialInstance> m_MeshMaterial;
+		Ref<MaterialInstance> m_GridMaterial;
 		std::vector<Ref<MaterialInstance>> m_MetalSphereMaterialInstances;
 		std::vector<Ref<MaterialInstance>> m_DielectricSphereMaterialInstances;
 

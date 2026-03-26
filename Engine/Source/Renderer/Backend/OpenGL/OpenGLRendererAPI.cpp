@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "Renderer/RendererAPI.hpp"
 
+#include "Renderer/Shader.hpp"
+
 #include <glad/glad.h>
 
 namespace Vanta {
@@ -14,13 +16,14 @@ namespace Vanta {
 		}
 		else
 		{
-			VA_CORE_TRACE("{0}", message);
+			// VA_CORE_TRACE("{0}", message);
 		}
 	}
 
 	void RendererAPI::Init()
 	{
 		glDebugMessageCallback(OpenGLLogMessage, nullptr);
+		glEnable(GL_DEBUG_OUTPUT);
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
 		uint32_t vao;
@@ -50,9 +53,15 @@ namespace Vanta {
 			VA_CORE_ERROR("OpenGL Error {0}", error);
 			error = glGetError();
 		}
+
+		LoadRequiredAssets();
 	}
 
 	void RendererAPI::Shutdown()
+	{
+	}
+
+	void RendererAPI::LoadRequiredAssets()
 	{
 	}
 

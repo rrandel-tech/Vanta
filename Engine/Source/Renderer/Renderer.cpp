@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "Renderer.hpp"
 
+#include "Shader.hpp"
+
 namespace Vanta {
 
 	Renderer* Renderer::s_Instance = new Renderer();
@@ -8,7 +10,12 @@ namespace Vanta {
 
 	void Renderer::Init()
 	{
+		s_Instance->m_ShaderLibrary = std::make_unique<ShaderLibrary>();
+
 		VA_RENDER({ RendererAPI::Init(); });
+
+		Renderer::GetShaderLibrary()->Load("C:/Development/Vanta/Editor/assets/shaders/PBR_StaticMesh.glsl");
+		Renderer::GetShaderLibrary()->Load("C:/Development/Vanta/Editor/assets/shaders/PBR_AnimMesh.glsl");
 	}
 
 	void Renderer::Clear()
