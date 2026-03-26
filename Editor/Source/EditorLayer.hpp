@@ -14,7 +14,8 @@ namespace Vanta {
 		virtual void OnDetach() override;
 		virtual void OnUpdate(Timestep ts) override;
 		virtual void OnImGuiRender() override;
-		virtual void OnEvent(Event& e) override;
+		virtual void OnEvent(Event& event) override;
+		bool OnKeyPressedEvent(KeyPressedEvent& event);
 	private:
 		Ref<Shader> m_QuadShader;
 		Ref<Shader> m_HDRShader;
@@ -93,6 +94,9 @@ namespace Vanta {
 
 		// Editor resources
 		Ref<Texture2D> m_CheckerboardTex;
+
+		int m_GizmoType = -1; // -1 = no gizmo
+		glm::mat4 m_Transform;
 	};
 
 }
