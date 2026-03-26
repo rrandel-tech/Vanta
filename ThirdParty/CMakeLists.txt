@@ -52,3 +52,25 @@ set(GLM_BUILD_INSTALL OFF)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/glm SYSTEM)
 
 target_compile_definitions(glm PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+# ==== Assimp (3D Model Loader) ====
+set(ASSIMP_BUILD_TESTS OFF)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
+set(ASSIMP_BUILD_SAMPLES OFF)
+set(ASSIMP_INSTALL OFF)
+set(ASSIMP_NO_EXPORT ON)
+set(BUILD_SHARED_LIBS OFF)
+
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
+set(ASSIMP_BUILD_OBJ_IMPORTER ON)
+set(ASSIMP_BUILD_GLTF_IMPORTER ON)
+set(ASSIMP_BUILD_FBX_IMPORTER ON)
+
+set(ASSIMP_BUILD_DRACO OFF)
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/assimp SYSTEM)
+
+# ==== stb (Single header libraries) ====
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${CMAKE_CURRENT_LIST_DIR}/stb)
+add_library(stb::stb ALIAS stb)

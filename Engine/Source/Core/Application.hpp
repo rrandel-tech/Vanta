@@ -58,6 +58,8 @@ namespace Vanta {
         static const char* GetPlatformName();
 
         [[nodiscard]] const ApplicationSpecification& GetSpecification() const { return m_Specification; }
+
+        std::string OpenFile(const std::string& filter) const;
     private:
         void processEvents();
 

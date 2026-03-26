@@ -1,9 +1,7 @@
 #pragma once
 
-#ifdef VA_PLATFORM_WINDOWS
 #include <Windows.h>
 #include <intrin.h>
-#endif
 
 #include <cassert>
 #include <cmath>

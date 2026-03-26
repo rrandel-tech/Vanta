@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "Input.hpp"
 
+#include "Window.hpp"
+
 namespace Vanta {
 
     bool Input::IsKeyPressed(SDL_Scancode scancode)
@@ -17,21 +19,21 @@ namespace Vanta {
 
     float Input::GetMouseX()
     {
-        float x, y;
-        SDL_GetMouseState(&x, &y);
-        return x;
+        auto [x, y] = GetMousePosition();
+        return (float)x;
     }
 
     float Input::GetMouseY()
     {
-        float x, y;
-        SDL_GetMouseState(&x, &y);
-        return y;
+        auto [x, y] = GetMousePosition();
+        return (float)y;
     }
 
-    void Input::GetMousePosition(float& x, float& y)
+    std::pair<float, float> Input::GetMousePosition()
     {
+        float x, y;
         SDL_GetMouseState(&x, &y);
+        return { x, y };
     }
 
 }

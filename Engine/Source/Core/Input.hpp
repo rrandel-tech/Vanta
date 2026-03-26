@@ -7,14 +7,12 @@ namespace Vanta {
     class Input
     {
     public:
-        Input() = delete;
-
         static bool IsKeyPressed(SDL_Scancode scancode);
         static bool IsMouseButtonPressed(uint8_t button);
 
         static float GetMouseX();
         static float GetMouseY();
-        static void GetMousePosition(float& x, float& y);
+        static std::pair<float, float> GetMousePosition();
     };
 
 }

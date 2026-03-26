@@ -2,8 +2,10 @@
 #include "Application.hpp"
 
 #include "Renderer/Renderer.hpp"
+#include "Renderer/Framebuffer.hpp"
 
-#include "glad/glad.h"
+#include <imgui.h>
+#include <glad/glad.h>
 
 namespace Vanta {
 
@@ -70,6 +72,15 @@ namespace Vanta {
     void Application::RenderImGui()
     {
         m_ImGuiLayer->Begin();
+
+        ImGui::Begin("Renderer");
+        auto& caps = RendererAPI::GetCapabilities();
+        ImGui::Text("Vendor: %s", caps.Vendor.c_str());
+        ImGui::Text("Renderer: %s", caps.Renderer.c_str());
+        ImGui::Text("Version: %s", caps.Version.c_str());
+        ImGui::Text("Frame Time: %.2fms\n", m_TimeStep.GetMilliseconds());
+        ImGui::End();
+
         for (Layer* layer : m_LayerStack)
             layer->OnImGuiRender();
 
@@ -101,7 +112,7 @@ namespace Vanta {
             m_frametime = GetTime();
             m_TimeStep = (m_frametime < Timestep(0.0333f)) ? m_frametime : Timestep(0.0333f);
             m_LastFrameTime += m_frametime; // Keep total time
-            // VA_CORE_TRACE("Timestep: {:.3f}ms ({:.1f} FPS)", m_TimeStep * 1000.0f, 1.0f / m_TimeStep);
+            VA_CORE_TRACE("Timestep: {:.3f}ms ({:.1f} FPS)", m_TimeStep * 1000.0f, 1.0f / m_TimeStep);
         }
         OnShutdown();
     }
@@ -151,6 +162,17 @@ namespace Vanta {
 
     bool Application::OnWindowResize(WindowResizeEvent& e)
     {
+        int width = e.GetWidth(), height = e.GetHeight();
+        if (width == 0 || height == 0)
+        {
+            m_Minimized = true;
+            return false;
+        }
+        m_Minimized = false;
+        VA_RENDER_2(width, height, { glViewport(0, 0, width, height); });
+        auto& fbs = FramebufferPool::GetGlobal()->GetAll();
+        for (auto& fb : fbs)
+            fb->Resize(width, height);
         return false;
     }
 
@@ -183,6 +205,31 @@ namespace Vanta {
         uint64_t delta = now - last;
         last = now;
         return static_cast<float>(delta * 1e-9f);
+    }
+
+    std::string Application::OpenFile(const std::string& filter) const
+    {
+        OPENFILENAMEA ofn;       // common dialog box structure
+        CHAR szFile[260] = { 0 };       // if using TCHAR macros
+
+        // Initialize OPENFILENAME
+        ZeroMemory(&ofn, sizeof(OPENFILENAME));
+        ofn.lStructSize = sizeof(OPENFILENAME);
+        ofn.hwndOwner = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(static_cast<SDL_Window*>(m_Window->GetNativeWindow())), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+        ofn.lpstrFile = szFile;
+        ofn.nMaxFile = sizeof(szFile);
+        ofn.lpstrFilter = filter.c_str();
+        ofn.nFilterIndex = 1;
+        ofn.lpstrFileTitle = NULL;
+        ofn.nMaxFileTitle = 0;
+        ofn.lpstrInitialDir = NULL;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+        if (GetOpenFileNameA(&ofn) == TRUE)
+        {
+            return ofn.lpstrFile;
+        }
+        return std::string();
     }
 
 }

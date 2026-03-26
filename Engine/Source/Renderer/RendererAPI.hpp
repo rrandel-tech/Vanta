@@ -1,29 +1,47 @@
 #pragma once
 
+#include <cstdint>
+
 namespace Vanta {
 
-    using RendererID = uint32_t;
+	using RendererID = uint32_t;
 
-    enum class RendererAPIType
-    {
-        None,
-        OpenGL
-    };
+	enum class RendererAPIType
+	{
+		None,
+		OpenGL
+	};
 
-    class RendererAPI
-    {
-    public:
-        static void Init();
-        static void Shutdown();
+	struct RenderAPICapabilities
+	{
+		std::string Vendor;
+		std::string Renderer;
+		std::string Version;
 
-        static void Clear(float r, float g, float b, float a);
-        static void SetClearColor(float r, float g, float b, float a);
+		int MaxSamples;
+		float MaxAnisotropy;
+	};
 
-        static void DrawIndexed(uint32_t count);
+	class RendererAPI
+	{
+	public:
+		static void Init();
+		static void Shutdown();
 
-        static RendererAPIType Current() { return s_CurrentRendererAPI; }
-    private:
-        static RendererAPIType s_CurrentRendererAPI;
-    };
+		static void Clear(float r, float g, float b, float a);
+		static void SetClearColor(float r, float g, float b, float a);
+
+		static void DrawIndexed(uint32_t count, bool depthTest = true);
+
+		static RenderAPICapabilities& GetCapabilities()
+		{
+			static RenderAPICapabilities capabilities;
+			return capabilities;
+		}
+
+		static RendererAPIType Current() { return s_CurrentRendererAPI; }
+	private:
+		static RendererAPIType s_CurrentRendererAPI;
+	};
 
 }

@@ -1,12 +1,18 @@
 set(OPENGL_SOURCES
-        OpenGLRendererAPI.cpp
         OpenGLBuffer.cpp
+        OpenGLFramebuffer.cpp
+        OpenGLRendererAPI.cpp
         OpenGLShader.cpp
+        OpenGLShaderUniform.cpp
+        OpenGLTexture.cpp
 )
 
 set(OPENGL_HEADERS
         OpenGLBuffer.hpp
+        OpenGLFramebuffer.hpp
         OpenGLShader.hpp
+        OpenGLShaderUniform.hpp
+        OpenGLTexture.hpp
 )
 
 target_sources(Vanta
