@@ -113,7 +113,7 @@ namespace Vanta {
             m_frametime = GetTime();
             m_TimeStep = (m_frametime < Timestep(0.0333f)) ? m_frametime : Timestep(0.0333f);
             m_LastFrameTime += m_frametime; // Keep total time
-            VA_CORE_TRACE("Timestep: {:.3f}ms ({:.1f} FPS)", m_TimeStep * 1000.0f, 1.0f / m_TimeStep);
+            // VA_CORE_TRACE("Timestep: {:.3f}ms ({:.1f} FPS)", m_TimeStep * 1000.0f, 1.0f / m_TimeStep);
         }
         OnShutdown();
     }

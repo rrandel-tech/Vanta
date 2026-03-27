@@ -4,6 +4,8 @@ set(MATH_SOURCES
 
 set(MATH_HEADERS
 		Mat4.hpp
+		AABB.hpp
+		Ray.hpp
 )
 
 target_sources(Vanta
