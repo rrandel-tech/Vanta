@@ -11,6 +11,7 @@ set(RENDERER_SOURCES
 		Texture.cpp
 		VertexArray.cpp
 		SceneRenderer.cpp
+		Renderer2D.cpp
 )
 
 set(RENDERER_HEADERS
@@ -27,7 +28,8 @@ set(RENDERER_HEADERS
 		ShaderUniform.hpp
 		Texture.hpp
 		VertexArray.hpp
-		SceneRenderer.cpp
+		SceneRenderer.hpp
+		Renderer2D.hpp
 )
 
 target_sources(Vanta

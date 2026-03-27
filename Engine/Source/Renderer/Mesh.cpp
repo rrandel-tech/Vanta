@@ -92,12 +92,11 @@ namespace Vanta {
 		{
 			aiMesh* mesh = scene->mMeshes[m];
 
-			Submesh submesh;
+			Submesh& submesh = m_Submeshes.emplace_back();
 			submesh.BaseVertex = vertexCount;
 			submesh.BaseIndex = indexCount;
 			submesh.MaterialIndex = mesh->mMaterialIndex;
 			submesh.IndexCount = mesh->mNumFaces * 3;
-			m_Submeshes.push_back(submesh);
 
 			vertexCount += mesh->mNumVertices;
 			indexCount += submesh.IndexCount;
@@ -128,11 +127,19 @@ namespace Vanta {
 			}
 			else
 			{
+				submesh.Min = { FLT_MAX, FLT_MAX, FLT_MAX };
+				submesh.Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 				for (size_t i = 0; i < mesh->mNumVertices; i++)
 				{
 					Vertex vertex;
 					vertex.Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 					vertex.Normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+					submesh.Min.x = glm::min(vertex.Position.x, submesh.Min.x);
+					submesh.Min.y = glm::min(vertex.Position.y, submesh.Min.y);
+					submesh.Min.z = glm::min(vertex.Position.z, submesh.Min.z);
+					submesh.Max.x = glm::max(vertex.Position.x, submesh.Max.x);
+					submesh.Max.y = glm::max(vertex.Position.y, submesh.Max.y);
+					submesh.Max.z = glm::max(vertex.Position.z, submesh.Max.z);
 
 					if (mesh->HasTangentsAndBitangents())
 					{
@@ -247,7 +254,93 @@ namespace Vanta {
 				{
 					mi->Set("u_AlbedoTexToggle", 0.0f);
 					mi->Set("u_AlbedoColor", glm::vec3 { aiColor.r, aiColor.g, aiColor.b });
+					VA_CORE_TRACE("Mesh has no albedo map");
 				}
+
+				// Normal maps
+				mi->Set("u_NormalTexToggle", 0.0f);
+				if (aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS)
+				{
+					// TODO: Temp - this should be handled by Vanta's filesystem
+					std::filesystem::path path = filename;
+					auto parentPath = path.parent_path();
+					parentPath /= std::string(aiTexPath.data);
+					std::string texturePath = parentPath.string();
+
+					auto texture = Texture2D::Create(texturePath);
+					if (texture->Loaded())
+					{
+						VA_CORE_TRACE("  Normal map path = {0}", texturePath);
+						mi->Set("u_NormalTexture", texture);
+						mi->Set("u_NormalTexToggle", 1.0f);
+					}
+					else
+					{
+						VA_CORE_ERROR("Could not load texture: {0}", texturePath);
+					}
+				}
+				else
+				{
+					VA_CORE_TRACE("Mesh has no normal map");
+				}
+
+				// Roughness map
+				// mi->Set("u_Roughness", 1.0f);
+				// mi->Set("u_RoughnessTexToggle", 0.0f);
+				if (aiMaterial->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) == AI_SUCCESS)
+				{
+					// TODO: Temp - this should be handled by Vanta's filesystem
+					std::filesystem::path path = filename;
+					auto parentPath = path.parent_path();
+					parentPath /= std::string(aiTexPath.data);
+					std::string texturePath = parentPath.string();
+
+					auto texture = Texture2D::Create(texturePath);
+					if (texture->Loaded())
+					{
+						VA_CORE_TRACE("  Roughness map path = {0}", texturePath);
+						mi->Set("u_RoughnessTexture", texture);
+						mi->Set("u_RoughnessTexToggle", 1.0f);
+					}
+					else
+					{
+						VA_CORE_ERROR("Could not load texture: {0}", texturePath);
+					}
+				}
+				else
+				{
+					VA_CORE_TRACE("Mesh has no roughness texture");
+				}
+
+				// Metalness map
+				// mi->Set("u_Metalness", 0.0f);
+				// mi->Set("u_MetalnessTexToggle", 0.0f);
+				if (aiMaterial->Get("$raw.ReflectionFactor|file", aiPTI_String, 0, aiTexPath) == AI_SUCCESS)
+				{
+					// TODO: Temp - this should be handled by Vanta's filesystem
+					std::filesystem::path path = filename;
+					auto parentPath = path.parent_path();
+					parentPath /= std::string(aiTexPath.data);
+					std::string texturePath = parentPath.string();
+
+					auto texture = Texture2D::Create(texturePath);
+					if (texture->Loaded())
+					{
+						VA_CORE_TRACE("  Metalness map path = {0}", texturePath);
+						mi->Set("u_MetalnessTexture", texture);
+						mi->Set("u_MetalnessTexToggle", 1.0f);
+					}
+					else
+					{
+						VA_CORE_ERROR("Could not load texture: {0}", texturePath);
+					}
+				}
+				else
+				{
+					VA_CORE_TRACE("Mesh has no metalness texture");
+				}
+
+				continue;
 
 				for (uint32_t i = 0; i < aiMaterial->mNumProperties; i++)
 				{
@@ -327,79 +420,6 @@ namespace Vanta {
 								mi->Set("u_MetalnessTexToggle", 1.0f);
 							}
 						}
-					}
-				}
-
-
-				// Normal maps
-				if (aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS)
-				{
-					// TODO: Temp - this should be handled by Vanta's filesystem
-					std::filesystem::path path = filename;
-					auto parentPath = path.parent_path();
-					parentPath /= std::string(aiTexPath.data);
-					std::string texturePath = parentPath.string();
-
-					auto texture = Texture2D::Create(texturePath);
-					if (texture->Loaded())
-					{
-						VA_CORE_TRACE("  Normal map path = {0}", texturePath);
-						mi->Set("u_NormalTexture", texture);
-						mi->Set("u_NormalTexToggle", 1.0f);
-					}
-					else
-					{
-						VA_CORE_ERROR("Could not load texture: {0}", texturePath);
-						//mi->Set("u_AlbedoTexToggle", 0.0f);
-						// mi->Set("u_AlbedoColor", glm::vec3{ color.r, color.g, color.b });
-					}
-				}
-
-				// Roughness map
-				if (aiMaterial->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) == AI_SUCCESS)
-				{
-					// TODO: Temp - this should be handled by Vanta's filesystem
-					std::filesystem::path path = filename;
-					auto parentPath = path.parent_path();
-					parentPath /= std::string(aiTexPath.data);
-					std::string texturePath = parentPath.string();
-
-					auto texture = Texture2D::Create(texturePath);
-					if (texture->Loaded())
-					{
-						VA_CORE_TRACE("  Roughness map path = {0}", texturePath);
-						mi->Set("u_RoughnessTexture", texture);
-						mi->Set("u_RoughnessTexToggle", 1.0f);
-					}
-					else
-					{
-						VA_CORE_ERROR("Could not load texture: {0}", texturePath);
-						mi->Set("u_RoughnessTexToggle", 1.0f);
-						mi->Set("u_Roughness", 0.5f);
-					}
-				}
-
-				// Metalness map
-				if (aiMaterial->Get("$raw.ReflectionFactor|file", aiPTI_String, 0, aiTexPath) == AI_SUCCESS)
-				{
-					// TODO: Temp - this should be handled by Vanta's filesystem
-					std::filesystem::path path = filename;
-					auto parentPath = path.parent_path();
-					parentPath /= std::string(aiTexPath.data);
-					std::string texturePath = parentPath.string();
-
-					auto texture = Texture2D::Create(texturePath);
-					if (texture->Loaded())
-					{
-						VA_CORE_TRACE("  Metalness map path = {0}", texturePath);
-						mi->Set("u_MetalnessTexture", texture);
-						mi->Set("u_MetalnessTexToggle", 1.0f);
-					}
-					else
-					{
-						VA_CORE_ERROR("Could not load texture: {0}", texturePath);
-						mi->Set("u_Metalness", 0.5f);
-						mi->Set("u_MetalnessTexToggle", 1.0f);
 					}
 				}
 			}

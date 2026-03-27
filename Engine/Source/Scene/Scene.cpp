@@ -5,6 +5,8 @@
 
 namespace Vanta {
 
+	static const std::string DefaultEntityName = "Entity";
+
 	Scene::Scene(const std::string& debugName)
 		: m_DebugName(debugName)
 	{
@@ -26,8 +28,6 @@ namespace Vanta {
 
 	void Scene::OnUpdate(Timestep ts)
 	{
-		m_Camera.Update(ts);
-
 		m_SkyboxMaterial->Set("u_TextureLod", m_SkyboxLod);
 
 		// Update all entities
@@ -48,6 +48,11 @@ namespace Vanta {
 		}
 
 		SceneRenderer::EndScene();
+	}
+
+	void Scene::OnEvent(Event& e)
+	{
+		m_Camera.OnEvent(e);
 	}
 
 	void Scene::SetCamera(const Camera& camera)
@@ -72,9 +77,10 @@ namespace Vanta {
 		m_Entities.push_back(entity);
 	}
 
-	Entity* Scene::CreateEntity()
+	Entity* Scene::CreateEntity(const std::string& name)
 	{
-		Entity* entity = new Entity();
+		const std::string& entityName = name.empty() ? DefaultEntityName : name;
+		Entity* entity = new Entity(entityName);
 		AddEntity(entity);
 		return entity;
 	}

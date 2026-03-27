@@ -110,6 +110,7 @@ namespace Vanta {
 		uint32_t IndexCount;
 
 		glm::mat4 Transform;
+		glm::vec3 Min, Max; // TODO: AABB
 	};
 
 	class Mesh

@@ -118,13 +118,11 @@ namespace Vanta {
 		virtual const BufferLayout& GetLayout() const = 0;
 		virtual void SetLayout(const BufferLayout& layout) = 0;
 
-		virtual uint32_t GetSize() const = 0;
+		virtual unsigned int GetSize() const = 0;
 		virtual RendererID GetRendererID() const = 0;
 
 		static Ref<VertexBuffer> Create(void* data, uint32_t size, VertexBufferUsage usage = VertexBufferUsage::Static);
 		static Ref<VertexBuffer> Create(uint32_t size, VertexBufferUsage usage = VertexBufferUsage::Dynamic);
-
-		static VertexBuffer* Create(uint32_t size = 0);
 	};
 
 	class IndexBuffer
@@ -137,7 +135,7 @@ namespace Vanta {
 
 		virtual uint32_t GetCount() const = 0;
 
-		virtual uint32_t GetSize() const = 0;
+		virtual unsigned int GetSize() const = 0;
 		virtual RendererID GetRendererID() const = 0;
 
 		static Ref<IndexBuffer> Create(void* data, uint32_t size = 0);
