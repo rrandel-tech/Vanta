@@ -264,4 +264,40 @@ namespace Vanta::UI {
 		ImGui::TreePop();
 	}
 
+	static int s_CheckboxCount = 0;
+
+	static void BeginCheckboxGroup(const char* label)
+	{
+		ImGui::Text(label);
+		ImGui::NextColumn();
+		ImGui::PushItemWidth(-1);
+	}
+
+	static bool PropertyCheckboxGroup(const char* label, bool& value)
+	{
+		bool modified = false;
+
+		if (++s_CheckboxCount > 1)
+			ImGui::SameLine();
+
+		ImGui::Text(label);
+		ImGui::SameLine();
+
+		s_IDBuffer[0] = '#';
+		s_IDBuffer[1] = '#';
+		memset(s_IDBuffer + 2, 0, 14);
+		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		if (ImGui::Checkbox(s_IDBuffer, &value))
+			modified = true;
+
+		return modified;
+	}
+
+	static void EndCheckboxGroup()
+	{
+		ImGui::PopItemWidth();
+		ImGui::NextColumn();
+		s_CheckboxCount = 0;
+	}
+
 }

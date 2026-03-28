@@ -1,6 +1,7 @@
 set(MATH_SOURCES
 		Mat4.cpp
 		Noise.cpp
+		Math.cpp
 )
 
 set(MATH_HEADERS
@@ -8,6 +9,7 @@ set(MATH_HEADERS
 		AABB.hpp
 		Ray.hpp
 		Noise.hpp
+		Math.hpp
 )
 
 target_sources(Vanta
