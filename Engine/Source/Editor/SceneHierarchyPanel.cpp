@@ -1,7 +1,6 @@
 #include "vapch.hpp"
 #include "SceneHierarchyPanel.hpp"
 
-
 #include "Core/Application.hpp"
 #include "Renderer/Mesh.hpp"
 
@@ -14,6 +13,8 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include "ImGui/ImGui.hpp"
 
 // TODO:
 // - Eventually change imgui node IDs to be entity/asset GUID
@@ -61,9 +62,34 @@ namespace Vanta {
 
 			if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 			{
-				if (ImGui::MenuItem("Create Empty Entity"))
+				if (ImGui::BeginMenu("Create"))
 				{
-					m_Context->CreateEntity("Empty Entity");
+					if (ImGui::MenuItem("Empty Entity"))
+					{
+						auto newEntity = m_Context->CreateEntity("Empty Entity");
+						SetSelected(newEntity);
+					}
+					if (ImGui::MenuItem("Mesh"))
+					{
+						auto newEntity = m_Context->CreateEntity("Mesh");
+						newEntity.AddComponent<MeshComponent>();
+						SetSelected(newEntity);
+					}
+					ImGui::Separator();
+					if (ImGui::MenuItem("Directional Light"))
+					{
+						auto newEntity = m_Context->CreateEntity("Directional Light");
+						newEntity.AddComponent<DirectionalLightComponent>();
+						newEntity.GetComponent<TransformComponent>().Transform = glm::toMat4(glm::quat(glm::radians(glm::vec3{80.0f, 10.0f, 0.0f})));
+						SetSelected(newEntity);
+					}
+					if (ImGui::MenuItem("Sky Light"))
+					{
+						auto newEntity = m_Context->CreateEntity("Sky Light");
+						newEntity.AddComponent<SkyLightComponent>();
+						SetSelected(newEntity);
+					}
+					ImGui::EndMenu();
 				}
 				ImGui::EndPopup();
 			}
@@ -189,207 +215,6 @@ namespace Vanta {
 			ImGui::TreePop();
 		}
 
-	}
-
-	static int s_UIContextID = 0;
-	static uint32_t s_Counter = 0;
-	static char s_IDBuffer[16];
-
-	static void PushID()
-	{
-		ImGui::PushID(s_UIContextID++);
-		s_Counter = 0;
-	}
-
-	static void PopID()
-	{
-		ImGui::PopID();
-		s_UIContextID--;
-	}
-
-	static void BeginPropertyGrid()
-	{
-		PushID();
-		ImGui::Columns(2);
-	}
-
-	static bool Property(const char* label, std::string& value, bool error = false)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		char buffer[256];
-		strcpy(buffer, value.c_str());
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-
-		if (error)
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.2f, 0.2f, 1.0f));
-		if (ImGui::InputText(s_IDBuffer, buffer, 256))
-		{
-			value = buffer;
-			modified = true;
-		}
-		if (error)
-			ImGui::PopStyleColor();
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static void Property(const char* label, const char* value)
-	{
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		ImGui::InputText(s_IDBuffer, (char*)value, 256, ImGuiInputTextFlags_ReadOnly);
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-	}
-
-	static bool Property(const char* label, bool& value)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		if (ImGui::Checkbox(s_IDBuffer, &value))
-			modified = true;
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static bool Property(const char* label, int& value)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		if (ImGui::DragInt(s_IDBuffer, &value))
-			modified = true;
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static bool Property(const char* label, float& value, float delta = 0.1f)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		if (ImGui::DragFloat(s_IDBuffer, &value, delta))
-			modified = true;
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static bool Property(const char* label, glm::vec2& value, float delta = 0.1f)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		if (ImGui::DragFloat2(s_IDBuffer, glm::value_ptr(value), delta))
-			modified = true;
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static bool Property(const char* label, glm::vec3& value, float delta = 0.1f)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		if (ImGui::DragFloat3(s_IDBuffer, glm::value_ptr(value), delta))
-			modified = true;
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static bool Property(const char* label, glm::vec4& value, float delta = 0.1f)
-	{
-		bool modified = false;
-
-		ImGui::Text(label);
-		ImGui::NextColumn();
-		ImGui::PushItemWidth(-1);
-
-		s_IDBuffer[0] = '#';
-		s_IDBuffer[1] = '#';
-		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
-		if (ImGui::DragFloat4(s_IDBuffer, glm::value_ptr(value), delta))
-			modified = true;
-
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-
-		return modified;
-	}
-
-	static void EndPropertyGrid()
-	{
-		ImGui::Columns(1);
-		PopID();
 	}
 
 	template<typename T, typename UIFunction>
@@ -563,6 +388,22 @@ namespace Vanta {
 					ImGui::CloseCurrentPopup();
 				}
 			}
+			if (!m_SelectionContext.HasComponent<DirectionalLightComponent>())
+			{
+				if (ImGui::Button("Directional Light"))
+				{
+					m_SelectionContext.AddComponent<DirectionalLightComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+			if (!m_SelectionContext.HasComponent<SkyLightComponent>())
+			{
+				if (ImGui::Button("Sky Light"))
+				{
+					m_SelectionContext.AddComponent<SkyLightComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
 			if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
 			{
 				if (ImGui::Button("Sprite Renderer"))
@@ -637,20 +478,20 @@ namespace Vanta {
 				ImGui::EndCombo();
 			}
 
-			BeginPropertyGrid();
+			UI::BeginPropertyGrid();
 			// Perspective parameters
 			if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Perspective)
 			{
 				float verticalFOV = cc.Camera.GetPerspectiveVerticalFOV();
-				if (Property("Vertical FOV", verticalFOV))
+				if (UI::Property("Vertical FOV", verticalFOV))
 					cc.Camera.SetPerspectiveVerticalFOV(verticalFOV);
 
 				float nearClip = cc.Camera.GetPerspectiveNearClip();
-				if (Property("Near Clip", nearClip))
+				if (UI::Property("Near Clip", nearClip))
 					cc.Camera.SetPerspectiveNearClip(nearClip);
 				ImGui::SameLine();
 				float farClip = cc.Camera.GetPerspectiveFarClip();
-				if (Property("Far Clip", farClip))
+				if (UI::Property("Far Clip", farClip))
 					cc.Camera.SetPerspectiveFarClip(farClip);
 			}
 
@@ -658,25 +499,63 @@ namespace Vanta {
 			else if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Orthographic)
 			{
 				float orthoSize = cc.Camera.GetOrthographicSize();
-				if (Property("Size", orthoSize))
+				if (UI::Property("Size", orthoSize))
 					cc.Camera.SetOrthographicSize(orthoSize);
 
 				float nearClip = cc.Camera.GetOrthographicNearClip();
-				if (Property("Near Clip", nearClip))
+				if (UI::Property("Near Clip", nearClip))
 					cc.Camera.SetOrthographicNearClip(nearClip);
 				ImGui::SameLine();
 				float farClip = cc.Camera.GetOrthographicFarClip();
-				if (Property("Far Clip", farClip))
+				if (UI::Property("Far Clip", farClip))
 					cc.Camera.SetOrthographicFarClip(farClip);
 			}
 
-			EndPropertyGrid();
+			UI::EndPropertyGrid();
 		});
 
 		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [](SpriteRendererComponent& mc)
 		{
 		});
 
+		DrawComponent<DirectionalLightComponent>("Directional Light", entity, [](DirectionalLightComponent& dlc)
+		{
+			UI::BeginPropertyGrid();
+			UI::PropertyColor("Radiance", dlc.Radiance);
+			UI::Property("Intensity", dlc.Intensity);
+			UI::Property("Cast Shadows", dlc.CastShadows);
+			UI::Property("Soft Shadows", dlc.SoftShadows);
+			UI::Property("Source Size", dlc.LightSize);
+			UI::EndPropertyGrid();
+		});
+
+		DrawComponent<SkyLightComponent>("Sky Light", entity, [](SkyLightComponent& slc)
+		{
+			ImGui::Columns(3);
+			ImGui::SetColumnWidth(0, 100);
+			ImGui::SetColumnWidth(1, 300);
+			ImGui::SetColumnWidth(2, 40);
+			ImGui::Text("File Path");
+			ImGui::NextColumn();
+			ImGui::PushItemWidth(-1);
+			if (!slc.SceneEnvironment.FilePath.empty())
+				ImGui::InputText("##envfilepath", (char*)slc.SceneEnvironment.FilePath.c_str(), 256, ImGuiInputTextFlags_ReadOnly);
+			else
+				ImGui::InputText("##envfilepath", (char*)"Empty", 256, ImGuiInputTextFlags_ReadOnly);
+			ImGui::PopItemWidth();
+			ImGui::NextColumn();
+			if (ImGui::Button("...##openenv"))
+			{
+				std::string file = Application::Get().OpenFile("*.hdr");
+				if (!file.empty())
+					slc.SceneEnvironment = Environment::Load(file);
+			}
+			ImGui::Columns(1);
+
+			UI::BeginPropertyGrid();
+			UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
+			UI::EndPropertyGrid();
+		});
 	}
 
 }

@@ -4,11 +4,14 @@
 #include "imgui.h"
 #include "ImGuizmo.h"
 
+#define IMGUI_IMPL_API
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_opengl3.h"
 
 #include "Core/Application.hpp"
 #include <SDL3/SDL.h>
+
+#include "Renderer/Renderer.hpp"
 
 namespace Vanta {
 
@@ -24,11 +27,19 @@ namespace Vanta {
 	{
 	}
 
+	void ImGuiLayer::OnEvent(Event& e)
+	{
+		//ImGuiIO& io = ImGui::GetIO();
+		//e.Handled |= e.IsInCategory(EventCategoryMouse) & io.WantCaptureMouse;
+		//e.Handled |= e.IsInCategory(EventCategoryKeyboard) & io.WantCaptureKeyboard;
+	}
+
 	void ImGuiLayer::OnAttach()
 	{
 		// Setup Dear ImGui context
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
+
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
@@ -55,18 +66,19 @@ namespace Vanta {
 		SetDarkThemeColors();
 
 		Application& app = Application::Get();
-		SDL_Window*  window  = app.GetWindow().GetNativeWindow();
-		SDL_GLContext context = app.GetWindow().GetGLContext();
+		SDL_Window* window = static_cast<SDL_Window*>(app.GetWindow().GetNativeWindow());
 
 		// Setup Platform/Renderer bindings
-		ImGui_ImplSDL3_InitForOpenGL(window, context);
-		ImGui_ImplOpenGL3_Init("#version 410");
+		SDL_GLContext glContext = app.GetWindow().GetGLContext();
+		ImGui_ImplSDL3_InitForOpenGL(window, glContext);
+		ImGui_ImplOpenGL3_Init("#version 460");
 	}
 
 	void ImGuiLayer::OnDetach()
 	{
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplSDL3_Shutdown();
+
 		ImGui::DestroyContext();
 	}
 
@@ -90,13 +102,13 @@ namespace Vanta {
 
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
-			SDL_Window*   backup_window  = SDL_GL_GetCurrentWindow();
-			SDL_GLContext backup_context = SDL_GL_GetCurrentContext();
+			SDL_Window* mainWindow = static_cast<SDL_Window*>(app.GetWindow().GetNativeWindow());
+			SDL_GLContext mainContext = app.GetWindow().GetGLContext();
 
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 
-			SDL_GL_MakeCurrent(backup_window, backup_context);
+			SDL_GL_MakeCurrent(mainWindow, mainContext);
 		}
 	}
 

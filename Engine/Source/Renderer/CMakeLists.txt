@@ -9,6 +9,7 @@ set(RENDERER_SOURCES
 		Renderer.cpp
 		Renderer2D.cpp
 		RenderPass.cpp
+		SceneEnvironment.cpp
 		SceneRenderer.cpp
 		Shader.cpp
 		Texture.cpp
@@ -27,6 +28,7 @@ set(RENDERER_HEADERS
 		Renderer2D.hpp
 		RendererAPI.hpp
 		RenderPass.hpp
+		SceneEnvironment.hpp
 		SceneRenderer.hpp
 		Shader.hpp
 		ShaderUniform.hpp

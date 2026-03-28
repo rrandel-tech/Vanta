@@ -65,7 +65,7 @@ namespace Vanta {
 
 		virtual void write(const char* message) override
 		{
-			VA_CORE_ERROR("Assimp error: {0}", message);
+			VA_CORE_WARN("Assimp: {0}", message);
 		}
 	};
 

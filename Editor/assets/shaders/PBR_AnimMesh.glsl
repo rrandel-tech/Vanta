@@ -1,5 +1,5 @@
 ﻿// -----------------------------
-// -- Vanta Engine PBR shader --
+// -- Hazel Engine PBR shader --
 // -----------------------------
 // Note: this shader is still very much in progress. There are likely many bugs and future additions that will go in.
 //       Currently heavily updated. 
