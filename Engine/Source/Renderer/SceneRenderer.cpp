@@ -43,7 +43,7 @@ namespace Vanta {
 		Ref<RenderPass> BloomBlurPass[2];
 		Ref<RenderPass> BloomBlendPass;
 
-		Ref<Shader> ShadowMapShader;
+		Ref<Shader> ShadowMapShader, ShadowMapAnimShader;
 		Ref<RenderPass> ShadowMapRenderPass[4];
 		float ShadowMapSize = 20.0f;
 		float LightDistance = 0.1f;
@@ -54,7 +54,7 @@ namespace Vanta {
 		float CascadeFarPlaneOffset = 15.0f, CascadeNearPlaneOffset = -15.0f;
 		bool ShowCascades = false;
 		bool SoftShadows = true;
-		float LightSize = 0.5f;
+		float LightSize = 0.25f;
 		float MaxShadowDistance = 200.0f;
 		float ShadowFade = 25.0f;
 		float CascadeTransitionFade = 1.0f;
@@ -79,7 +79,7 @@ namespace Vanta {
 
 		// Grid
 		Ref<MaterialInstance> GridMaterial;
-		Ref<MaterialInstance> OutlineMaterial;
+		Ref<MaterialInstance> OutlineMaterial, OutlineAnimMaterial;
 
 		SceneRendererOptions Options;
 	};
@@ -153,8 +153,13 @@ namespace Vanta {
 		s_Data.OutlineMaterial = MaterialInstance::Create(Material::Create(outlineShader));
 		s_Data.OutlineMaterial->SetFlag(MaterialFlag::DepthTest, false);
 
+		auto outlineAnimShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Outline_Anim.glsl");
+		s_Data.OutlineAnimMaterial = MaterialInstance::Create(Material::Create(outlineAnimShader));
+		s_Data.OutlineAnimMaterial->SetFlag(MaterialFlag::DepthTest, false);
+
 		// Shadow Map
 		s_Data.ShadowMapShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/ShadowMap.glsl");
+		s_Data.ShadowMapAnimShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/ShadowMap_Anim.glsl");
 
 		FramebufferSpecification shadowMapFramebufferSpec;
 		shadowMapFramebufferSpec.Width = 4096;
@@ -471,9 +476,10 @@ namespace Vanta {
 
 			// Draw outline here
 			s_Data.OutlineMaterial->Set("u_ViewProjection", viewProjection);
+			s_Data.OutlineAnimMaterial->Set("u_ViewProjection", viewProjection);
 			for (auto& dc : s_Data.SelectedMeshDrawList)
 			{
-				Renderer::SubmitMesh(dc.Mesh, dc.Transform, s_Data.OutlineMaterial);
+				Renderer::SubmitMesh(dc.Mesh, dc.Transform, dc.Mesh->IsAnimated() ? s_Data.OutlineAnimMaterial : s_Data.OutlineMaterial);
 			}
 
 			Renderer::Submit([]()
@@ -483,7 +489,7 @@ namespace Vanta {
 			});
 			for (auto& dc : s_Data.SelectedMeshDrawList)
 			{
-				Renderer::SubmitMesh(dc.Mesh, dc.Transform, s_Data.OutlineMaterial);
+				Renderer::SubmitMesh(dc.Mesh, dc.Transform, dc.Mesh->IsAnimated() ? s_Data.OutlineAnimMaterial : s_Data.OutlineMaterial);
 			}
 
 			Renderer::Submit([]()
@@ -733,7 +739,6 @@ namespace Vanta {
 			Renderer::BeginRenderPass(s_Data.ShadowMapRenderPass[i]);
 
 			glm::mat4 shadowMapVP = cascades[i].ViewProj;
-			s_Data.ShadowMapShader->SetMat4("u_ViewProjection", shadowMapVP);
 
 			static glm::mat4 scaleBiasMatrix = glm::scale(glm::mat4(1.0f), { 0.5f, 0.5f, 0.5f }) * glm::translate(glm::mat4(1.0f), { 1, 1, 1 });
 			s_Data.LightMatrices[i] = scaleBiasMatrix * cascades[i].ViewProj;
@@ -742,7 +747,9 @@ namespace Vanta {
 			// Render entities
 			for (auto& dc : s_Data.ShadowPassDrawList)
 			{
-				Renderer::SubmitMeshWithShader(dc.Mesh, dc.Transform, s_Data.ShadowMapShader);
+				Ref<Shader> shader = dc.Mesh->IsAnimated() ? s_Data.ShadowMapAnimShader : s_Data.ShadowMapShader;
+				shader->SetMat4("u_ViewProjection", shadowMapVP);
+				Renderer::SubmitMeshWithShader(dc.Mesh, dc.Transform, shader);
 			}
 
 			Renderer::EndRenderPass();

@@ -196,7 +196,7 @@ namespace Vanta {
 			s_Data.LinePipeline->Bind();
 			s_Data.LineIndexBuffer->Bind();
 			Renderer::SetLineThickness(2.0f);
-			Renderer::DrawIndexed(s_Data.LineIndexCount, PrimitiveType::Lines, s_Data.DepthTest);
+			Renderer::DrawIndexed(s_Data.LineIndexCount, PrimitiveType::Lines, false);
 			s_Data.Stats.DrawCalls++;
 		}
 
