@@ -76,6 +76,8 @@ namespace Vanta {
 			return m_Registry.view<T>();
 		}
 
+		Entity FindEntityByTag(const std::string& tag);
+
 		const EntityMap& GetEntityMap() const { return m_EntityIDMap; }
 		void CopyTo(Ref<Scene>& target);
 
@@ -103,6 +105,8 @@ namespace Vanta {
 		Ref<MaterialInstance> m_SkyboxMaterial;
 
 		entt::entity m_SelectedEntity;
+
+		Entity* m_PhysicsBodyEntityBuffer = nullptr;
 
 		float m_SkyboxLod = 1.0f;
 		bool m_IsPlaying = false;

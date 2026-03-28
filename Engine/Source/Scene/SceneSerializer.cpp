@@ -209,7 +209,7 @@ namespace Vanta {
 			out << YAML::Key << "CameraComponent";
 			out << YAML::BeginMap; // CameraComponent
 
-			auto cameraComponent = entity.GetComponent<CameraComponent>();
+			auto& cameraComponent = entity.GetComponent<CameraComponent>();
 			out << YAML::Key << "Camera" << YAML::Value << "some camera data...";
 			out << YAML::Key << "Primary" << YAML::Value << cameraComponent.Primary;
 
@@ -221,7 +221,7 @@ namespace Vanta {
 			out << YAML::Key << "SpriteRendererComponent";
 			out << YAML::BeginMap; // SpriteRendererComponent
 
-			auto spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
+			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
 			if (spriteRendererComponent.Texture)
 				out << YAML::Key << "TextureAssetPath" << YAML::Value << "path/to/asset";
@@ -369,8 +369,6 @@ namespace Vanta {
 					auto& component = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					component.Color = spriteRendererComponent["Color"].as<glm::vec4>();
 					component.TilingFactor = spriteRendererComponent["TilingFactor"].as<float>();
-
-					VA_CORE_INFO("  SpriteRendererComponent present.");
 				}
 			}
 		}

@@ -19,8 +19,7 @@ namespace Vanta {
 		std::string Tag;
 
 		TagComponent() = default;
-		TagComponent(const TagComponent& other)
-			: Tag(other.Tag) {}
+		TagComponent(const TagComponent& other) = default;
 		TagComponent(const std::string& tag)
 			: Tag(tag) {}
 
@@ -33,8 +32,7 @@ namespace Vanta {
 		glm::mat4 Transform;
 
 		TransformComponent() = default;
-		TransformComponent(const TransformComponent& other)
-			: Transform(other.Transform) {}
+		TransformComponent(const TransformComponent& other) = default;
 		TransformComponent(const glm::mat4& transform)
 			: Transform(transform) {}
 
@@ -47,8 +45,7 @@ namespace Vanta {
 		Ref<Vanta::Mesh> Mesh;
 
 		MeshComponent() = default;
-		MeshComponent(const MeshComponent& other)
-			: Mesh(other.Mesh) {}
+		MeshComponent(const MeshComponent& other) = default;
 		MeshComponent(const Ref<Vanta::Mesh>& mesh)
 			: Mesh(mesh) {}
 
@@ -66,8 +63,7 @@ namespace Vanta {
 		bool Primary = true;
 
 		CameraComponent() = default;
-		CameraComponent(const CameraComponent& other)
-			: Camera(other.Camera), Primary(other.Primary) {}
+		CameraComponent(const CameraComponent& other) = default;
 
 		operator SceneCamera& () { return Camera; }
 		operator const SceneCamera& () const { return Camera; }
@@ -80,8 +76,7 @@ namespace Vanta {
 		float TilingFactor = 1.0f;
 
 		SpriteRendererComponent() = default;
-		SpriteRendererComponent(const SpriteRendererComponent& other)
-			: Color(other.Color), Texture(other.Texture), TilingFactor(other.TilingFactor) {}
+		SpriteRendererComponent(const SpriteRendererComponent& other) = default;
 	};
 
 
