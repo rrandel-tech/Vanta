@@ -74,3 +74,22 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/assimp SYSTEM)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${CMAKE_CURRENT_LIST_DIR}/stb)
 add_library(stb::stb ALIAS stb)
+
+# ==== EnTT (Header-only ECS library) ====
+add_library(entt INTERFACE)
+target_include_directories(entt INTERFACE ${CMAKE_CURRENT_LIST_DIR}/entt/include)
+add_library(entt::entt ALIAS entt)
+
+# ==== FastNoiseLite (Header-only noise library) ====
+add_library(fastnoise INTERFACE)
+target_include_directories(fastnoise INTERFACE ${CMAKE_CURRENT_LIST_DIR}/FastNoise)
+add_library(fastnoise::fastnoise ALIAS fastnoise)
+
+# ==== yaml-cpp ====
+set(YAML_CPP_BUILD_TESTS OFF)
+set(YAML_CPP_BUILD_TOOLS OFF)
+set(YAML_CPP_BUILD_CONTRIB OFF)
+set(YAML_CPP_INSTALL OFF)
+set(YAML_BUILD_SHARED_LIBS OFF)
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/yaml-cpp SYSTEM)

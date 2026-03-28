@@ -15,7 +15,8 @@
 #include "Core/Log.hpp"
 #include "Core/Input.hpp"
 #include "Core/TimeStep.hpp"
-#include "Core/Assert.hpp"
+#include "Core/Version.hpp"
+#include "Core/Timer.hpp"
 
 #include "Events/Event.hpp"
 #include "Events/ApplicationEvent.hpp"
@@ -45,3 +46,6 @@
 // Scenes
 #include "Scene/Entity.hpp"
 #include "Scene/Scene.hpp"
+#include "Scene/SceneCamera.hpp"
+#include "Scene/SceneSerializer.hpp"
+#include "Scene/Components.hpp"

@@ -48,6 +48,9 @@ target_link_libraries(Vanta
         glm
         assimp::assimp
         stb::stb
+        entt::entt
+        fastnoise::fastnoise
+        yaml-cpp::yaml-cpp
 )
 
 vanta_enable_lto(Vanta)

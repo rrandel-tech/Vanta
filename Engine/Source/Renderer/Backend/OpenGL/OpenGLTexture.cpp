@@ -28,20 +28,20 @@ namespace Vanta {
 	OpenGLTexture2D::OpenGLTexture2D(TextureFormat format, uint32_t width, uint32_t height, TextureWrap wrap)
 		: m_Format(format), m_Width(width), m_Height(height), m_Wrap(wrap)
 	{
-		auto self = this;
-		Renderer::Submit([this]()
+		Ref<OpenGLTexture2D> instance = this;
+		Renderer::Submit([instance]() mutable
 		{
-			glGenTextures(1, &m_RendererID);
-			glBindTexture(GL_TEXTURE_2D, m_RendererID);
+			glGenTextures(1, &instance->m_RendererID);
+			glBindTexture(GL_TEXTURE_2D, instance->m_RendererID);
 
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			GLenum wrap = m_Wrap == TextureWrap::Clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			GLenum wrap = instance->m_Wrap == TextureWrap::Clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT;
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
-			glTextureParameterf(m_RendererID, GL_TEXTURE_MAX_ANISOTROPY, RendererAPI::GetCapabilities().MaxAnisotropy);
+			glTextureParameterf(instance->m_RendererID, GL_TEXTURE_MAX_ANISOTROPY, RendererAPI::GetCapabilities().MaxAnisotropy);
 
-			glTexImage2D(GL_TEXTURE_2D, 0, VantaToOpenGLTextureFormat(m_Format), m_Width, m_Height, 0, VantaToOpenGLTextureFormat(m_Format), GL_UNSIGNED_BYTE, nullptr);
+			glTexImage2D(GL_TEXTURE_2D, 0, VantaToOpenGLTextureFormat(instance->m_Format), instance->m_Width, instance->m_Height, 0, VantaToOpenGLTextureFormat(instance->m_Format), GL_UNSIGNED_BYTE, nullptr);
 
 			glBindTexture(GL_TEXTURE_2D, 0);
 		});
@@ -76,24 +76,25 @@ namespace Vanta {
 		m_Width = width;
 		m_Height = height;
 
-		Renderer::Submit([=]()
+		Ref<OpenGLTexture2D> instance = this;
+		Renderer::Submit([instance, srgb]() mutable
 		{
 			// TODO: Consolidate properly
 			if (srgb)
 			{
-				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-				int levels = Texture::CalculateMipMapCount(m_Width, m_Height);
-				glTextureStorage2D(m_RendererID, levels, GL_SRGB8, m_Width, m_Height);
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, levels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glCreateTextures(GL_TEXTURE_2D, 1, &instance->m_RendererID);
+				int levels = Texture::CalculateMipMapCount(instance->m_Width, instance->m_Height);
+				glTextureStorage2D(instance->m_RendererID, levels, GL_SRGB8, instance->m_Width, instance->m_Height);
+				glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MIN_FILTER, levels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+				glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-				glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_ImageData.Data);
-				glGenerateTextureMipmap(m_RendererID);
+				glTextureSubImage2D(instance->m_RendererID, 0, 0, 0, instance->m_Width, instance->m_Height, GL_RGB, GL_UNSIGNED_BYTE, instance->m_ImageData.Data);
+				glGenerateTextureMipmap(instance->m_RendererID);
 			}
 			else
 			{
-				glGenTextures(1, &m_RendererID);
-				glBindTexture(GL_TEXTURE_2D, m_RendererID);
+				glGenTextures(1, &instance->m_RendererID);
+				glBindTexture(GL_TEXTURE_2D, instance->m_RendererID);
 
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -101,29 +102,31 @@ namespace Vanta {
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-				GLenum internalFormat = VantaToOpenGLTextureFormat(m_Format);
-				GLenum format = srgb ? GL_SRGB8 : (m_IsHDR ? GL_RGB : VantaToOpenGLTextureFormat(m_Format)); // HDR = GL_RGB for now
+				GLenum internalFormat = VantaToOpenGLTextureFormat(instance->m_Format);
+				GLenum format = srgb ? GL_SRGB8 : (instance->m_IsHDR ? GL_RGB : VantaToOpenGLTextureFormat(instance->m_Format)); // HDR = GL_RGB for now
 				GLenum type = internalFormat == GL_RGBA16F ? GL_FLOAT : GL_UNSIGNED_BYTE;
-				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, m_Width, m_Height, 0, format, type, m_ImageData.Data);
+				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, instance->m_Width, instance->m_Height, 0, format, type, instance->m_ImageData.Data);
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				glBindTexture(GL_TEXTURE_2D, 0);
 			}
-			stbi_image_free(m_ImageData.Data);
+			stbi_image_free(instance->m_ImageData.Data);
 		});
 	}
 
 	OpenGLTexture2D::~OpenGLTexture2D()
 	{
-		Renderer::Submit([this]() {
-			glDeleteTextures(1, &m_RendererID);
+		GLuint rendererID = m_RendererID;
+		Renderer::Submit([rendererID]() {
+			glDeleteTextures(1, &rendererID);
 		});
 	}
 
 	void OpenGLTexture2D::Bind(uint32_t slot) const
 	{
-		Renderer::Submit([this, slot]() {
-			glBindTextureUnit(slot, m_RendererID);
+		Ref<const OpenGLTexture2D> instance = this;
+		Renderer::Submit([instance, slot]() {
+			glBindTextureUnit(slot, instance->m_RendererID);
 		});
 	}
 
@@ -135,8 +138,9 @@ namespace Vanta {
 	void OpenGLTexture2D::Unlock()
 	{
 		m_Locked = false;
-		Renderer::Submit([this]() {
-			glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, VantaToOpenGLTextureFormat(m_Format), GL_UNSIGNED_BYTE, m_ImageData.Data);
+		Ref<OpenGLTexture2D> instance = this;
+		Renderer::Submit([instance]() {
+			glTextureSubImage2D(instance->m_RendererID, 0, 0, 0, instance->m_Width, instance->m_Height, VantaToOpenGLTextureFormat(instance->m_Format), GL_UNSIGNED_BYTE, instance->m_ImageData.Data);
 		});
 	}
 
@@ -172,12 +176,13 @@ namespace Vanta {
 		m_Format = format;
 
 		uint32_t levels = Texture::CalculateMipMapCount(width, height);
-
-		Renderer::Submit([=]() {
-			glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &m_RendererID);
-			glTextureStorage2D(m_RendererID, levels, VantaToOpenGLTextureFormat(m_Format), width, height);
-			glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, levels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-			glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		Ref<OpenGLTextureCube> instance = this;
+		Renderer::Submit([instance, levels]() mutable
+		{
+			glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &instance->m_RendererID);
+			glTextureStorage2D(instance->m_RendererID, levels, VantaToOpenGLTextureFormat(instance->m_Format), instance->m_Width, instance->m_Height);
+			glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MIN_FILTER, levels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+			glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -186,6 +191,8 @@ namespace Vanta {
 		});
 	}
 
+	// TODO: Revisit this, as currently env maps are being loaded as equirectangular 2D images
+	//       so this is an old path
 	OpenGLTextureCube::OpenGLTextureCube(const std::string& path)
 		: m_FilePath(path)
 	{
@@ -243,18 +250,20 @@ namespace Vanta {
 			faceIndex++;
 		}
 
-		Renderer::Submit([=]() {
-			glGenTextures(1, &m_RendererID);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, m_RendererID);
+		Ref<OpenGLTextureCube> instance = this;
+		Renderer::Submit([instance, faceWidth, faceHeight, faces]() mutable
+		{
+			glGenTextures(1, &instance->m_RendererID);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, instance->m_RendererID);
 
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-			glTextureParameterf(m_RendererID, GL_TEXTURE_MAX_ANISOTROPY, RendererAPI::GetCapabilities().MaxAnisotropy);
+			glTextureParameterf(instance->m_RendererID, GL_TEXTURE_MAX_ANISOTROPY, RendererAPI::GetCapabilities().MaxAnisotropy);
 
-			auto format = VantaToOpenGLTextureFormat(m_Format);
+			auto format = VantaToOpenGLTextureFormat(instance->m_Format);
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, format, faceWidth, faceHeight, 0, format, GL_UNSIGNED_BYTE, faces[2]);
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, format, faceWidth, faceHeight, 0, format, GL_UNSIGNED_BYTE, faces[0]);
 
@@ -271,22 +280,23 @@ namespace Vanta {
 			for (size_t i = 0; i < faces.size(); i++)
 				delete[] faces[i];
 
-			stbi_image_free(m_ImageData);
+			stbi_image_free(instance->m_ImageData);
 		});
 	}
 
 	OpenGLTextureCube::~OpenGLTextureCube()
 	{
-		auto self = this;
-		Renderer::Submit([this]() {
-			glDeleteTextures(1, &m_RendererID);
+		GLuint rendererID = m_RendererID;
+		Renderer::Submit([rendererID]() {
+			glDeleteTextures(1, &rendererID);
 		});
 	}
 
 	void OpenGLTextureCube::Bind(uint32_t slot) const
 	{
-		Renderer::Submit([this, slot]() {
-			glBindTextureUnit(slot, m_RendererID);
+		Ref<const OpenGLTextureCube> instance = this;
+		Renderer::Submit([instance, slot]() {
+			glBindTextureUnit(slot, instance->m_RendererID);
 		});
 	}
 

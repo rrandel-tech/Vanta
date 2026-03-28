@@ -1,9 +1,9 @@
 #include "vapch.hpp"
 #include "OpenGLVertexArray.hpp"
 
-#include "Renderer/Renderer.hpp"
-
 #include <glad/glad.h>
+
+#include "Renderer/Renderer.hpp"
 
 namespace Vanta {
 
@@ -37,41 +37,45 @@ namespace Vanta {
 
 	OpenGLVertexArray::~OpenGLVertexArray()
 	{
-		Renderer::Submit([this]() {
-			glDeleteVertexArrays(1, &m_RendererID);
+		GLuint rendererID = m_RendererID;
+		Renderer::Submit([rendererID]() {
+			glDeleteVertexArrays(1, &rendererID);
 		});
 	}
 
 	void OpenGLVertexArray::Bind() const
 	{
-		Renderer::Submit([this]() {
-			glBindVertexArray(m_RendererID);
+		Ref<const OpenGLVertexArray> instance = this;
+		Renderer::Submit([instance]() {
+			glBindVertexArray(instance->m_RendererID);
 		});
 	}
 
 	void OpenGLVertexArray::Unbind() const
 	{
+		Ref<const OpenGLVertexArray> instance = this;
 		Renderer::Submit([this]() {
 			glBindVertexArray(0);
 		});
 	}
 
-	void OpenGLVertexArray::AddVertexBuffer(const std::shared_ptr<VertexBuffer>& vertexBuffer)
+	void OpenGLVertexArray::AddVertexBuffer(const Ref<VertexBuffer>& vertexBuffer)
 	{
 		VA_CORE_ASSERT(vertexBuffer->GetLayout().GetElements().size(), "Vertex Buffer has no layout!");
 
 		Bind();
 		vertexBuffer->Bind();
 
-		Renderer::Submit([this, vertexBuffer]() {
+		Ref<OpenGLVertexArray> instance = this;
+		Renderer::Submit([instance, vertexBuffer]() mutable {
 			const auto& layout = vertexBuffer->GetLayout();
 			for (const auto& element : layout)
 			{
 				auto glBaseType = ShaderDataTypeToOpenGLBaseType(element.Type);
-				glEnableVertexAttribArray(m_VertexBufferIndex);
+				glEnableVertexAttribArray(instance->m_VertexBufferIndex);
 				if (glBaseType == GL_INT)
 				{
-					glVertexAttribIPointer(m_VertexBufferIndex,
+					glVertexAttribIPointer(instance->m_VertexBufferIndex,
 						element.GetComponentCount(),
 						glBaseType,
 						layout.GetStride(),
@@ -79,20 +83,20 @@ namespace Vanta {
 				}
 				else
 				{
-					glVertexAttribPointer(m_VertexBufferIndex,
+					glVertexAttribPointer(instance->m_VertexBufferIndex,
 						element.GetComponentCount(),
 						glBaseType,
 						element.Normalized ? GL_TRUE : GL_FALSE,
 						layout.GetStride(),
 						(const void*)(intptr_t)element.Offset);
 				}
-				m_VertexBufferIndex++;
+				instance->m_VertexBufferIndex++;
 			}
 		});
 		m_VertexBuffers.push_back(vertexBuffer);
 	}
 
-	void OpenGLVertexArray::SetIndexBuffer(const std::shared_ptr<IndexBuffer>& indexBuffer)
+	void OpenGLVertexArray::SetIndexBuffer(const Ref<IndexBuffer>& indexBuffer)
 	{
 		Bind();
 		indexBuffer->Bind();

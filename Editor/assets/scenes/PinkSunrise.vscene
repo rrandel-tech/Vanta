@@ -1,0 +1,36 @@
+Scene: Scene Name
+Environment:
+  AssetPath: C:/Development/Vanta/Editor/assets/env/birchwood_4k.hdr
+  Light:
+    Direction: [-0.5, -0.5, 1]
+    Radiance: [1, 1, 1]
+    Multiplier: 1
+Entities:
+  - Entity: 1289165777996378215
+    TagComponent:
+      Tag: Sphere
+    TransformComponent:
+      Position: [0, 21.9805069, -1.64006281]
+      Rotation: [1, 0, 0, 0]
+      Scale: [0.100000024, 0.100000024, 0.100000024]
+    MeshComponent:
+      AssetPath: C:/Development/Vanta/Editor/assets/meshes/Sphere1m.fbx
+  - Entity: 5178862374589434728
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Position: [0, 14.75, 79.75]
+      Rotation: [0.995602965, -0.0936739072, 0, 0]
+      Scale: [1, 0.999999821, 0.999999821]
+    CameraComponent:
+      Camera: some camera data...
+      Primary: true
+  - Entity: 9095450049242347594
+    TagComponent:
+      Tag: Test Entity
+    TransformComponent:
+      Position: [0.248109579, -1.90734863e-06, -0.268640995]
+      Rotation: [1, 0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshComponent:
+      AssetPath: C:/Development/Vanta/Editor/assets/meshes/TestScene.fbx

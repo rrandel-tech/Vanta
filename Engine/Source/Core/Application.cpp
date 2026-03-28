@@ -173,10 +173,7 @@ namespace Vanta {
         Renderer::Submit([=]() { glViewport(0, 0, width, height); });
         auto& fbs = FramebufferPool::GetGlobal()->GetAll();
         for (auto& fb : fbs)
-        {
-            if (auto fbp = fb.lock())
-                fbp->Resize(width, height);
-        }
+            fb->Resize(width, height);
         return false;
     }
 
@@ -211,7 +208,7 @@ namespace Vanta {
         return static_cast<float>(delta * 1e-9f);
     }
 
-    std::string Application::OpenFile(const std::string& filter) const
+    std::string Application::OpenFile(const char* filter) const
     {
         OPENFILENAMEA ofn;       // common dialog box structure
         CHAR szFile[260] = { 0 };       // if using TCHAR macros
@@ -222,14 +219,33 @@ namespace Vanta {
         ofn.hwndOwner = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(static_cast<SDL_Window*>(m_Window->GetNativeWindow())), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
         ofn.lpstrFile = szFile;
         ofn.nMaxFile = sizeof(szFile);
-        ofn.lpstrFilter = filter.c_str();
+        ofn.lpstrFilter = filter;
         ofn.nFilterIndex = 1;
-        ofn.lpstrFileTitle = NULL;
-        ofn.nMaxFileTitle = 0;
-        ofn.lpstrInitialDir = NULL;
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
         if (GetOpenFileNameA(&ofn) == TRUE)
+        {
+            return ofn.lpstrFile;
+        }
+        return std::string();
+    }
+
+    std::string Application::SaveFile(const char* filter) const
+    {
+        OPENFILENAMEA ofn;       // common dialog box structure
+        CHAR szFile[260] = { 0 };       // if using TCHAR macros
+
+        // Initialize OPENFILENAME
+        ZeroMemory(&ofn, sizeof(OPENFILENAME));
+        ofn.lStructSize = sizeof(OPENFILENAME);
+        ofn.hwndOwner = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(static_cast<SDL_Window*>(m_Window->GetNativeWindow())), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+        ofn.lpstrFile = szFile;
+        ofn.nMaxFile = sizeof(szFile);
+        ofn.lpstrFilter = filter;
+        ofn.nFilterIndex = 1;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+        if (GetSaveFileNameA(&ofn) == TRUE)
         {
             return ofn.lpstrFile;
         }

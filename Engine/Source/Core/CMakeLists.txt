@@ -7,6 +7,8 @@ set(CORE_SOURCES
         TimeStep.cpp
         Input.cpp
         Window.cpp
+        UUID.cpp
+        Ref.cpp
 )
 
 set(CORE_HEADERS
@@ -21,6 +23,9 @@ set(CORE_HEADERS
         TimeStep.hpp
         Version.hpp
         Window.hpp
+        Ref.hpp
+        Timer.hpp
+        UUID.hpp
 )
 
 target_sources(Vanta
