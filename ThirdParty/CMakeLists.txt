@@ -80,7 +80,7 @@ add_library(entt INTERFACE)
 target_include_directories(entt INTERFACE ${CMAKE_CURRENT_LIST_DIR}/entt/include)
 add_library(entt::entt ALIAS entt)
 
-# ==== FastNoiseLite (Header-only noise library) ====
+# ==== FastNoise (Header-only noise library) ====
 add_library(fastnoise INTERFACE)
 target_include_directories(fastnoise INTERFACE ${CMAKE_CURRENT_LIST_DIR}/FastNoise)
 add_library(fastnoise::fastnoise ALIAS fastnoise)

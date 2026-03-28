@@ -1,17 +1,79 @@
 #include "vapch.hpp"
 #include "Noise.hpp"
 
-#include "FastNoiseLite.h"
+#include "FastNoise.h"
 
 namespace Vanta {
 
-	static FastNoiseLite s_FastNoise;
+	static FastNoise s_FastNoise;
+	static std::uniform_real_distribution<float> s_Jitters(0.f, 1.f);
+	static std::default_random_engine s_JitterGenerator(1337u);
+
+	Noise::Noise(int seed)
+	{
+		m_FastNoise = new FastNoise(seed);
+		m_FastNoise->SetNoiseType(FastNoise::Simplex);
+	}
+
+	Noise::~Noise()
+	{
+		delete m_FastNoise;
+	}
+
+	float Noise::GetFrequency() const
+	{
+		return m_FastNoise->GetFrequency();
+	}
+
+	void Noise::SetFrequency(float frequency)
+	{
+		m_FastNoise->SetFrequency(frequency);
+	}
+
+	int Noise::GetFractalOctaves() const
+	{
+		return m_FastNoise->GetFractalOctaves();
+	}
+
+	void Noise::SetFractalOctaves(int octaves)
+	{
+		m_FastNoise->SetFractalOctaves(octaves);
+	}
+
+	float Noise::GetFractalLacunarity() const
+	{
+		return m_FastNoise->GetFractalLacunarity();
+	}
+
+	void Noise::SetFractalLacunarity(float lacunarity)
+	{
+		return m_FastNoise->SetFractalLacunarity(lacunarity);
+	}
+
+	float Noise::GetFractalGain() const
+	{
+		return m_FastNoise->GetFractalGain();
+	}
+
+	void Noise::SetFractalGain(float gain)
+	{
+		m_FastNoise->SetFractalGain(gain);
+	}
+
+	float Noise::Get(float x, float y)
+	{
+		return m_FastNoise->GetNoise(x, y);
+	}
+
+	void Noise::SetSeed(int seed)
+	{
+		s_FastNoise.SetSeed(seed);
+	}
 
 	float Noise::PerlinNoise(float x, float y)
 	{
-		s_FastNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+		s_FastNoise.SetNoiseType(FastNoise::Perlin);
 		float result = s_FastNoise.GetNoise(x, y); // This returns a value between -1 and 1
 		return result;
 	}
-
 }
