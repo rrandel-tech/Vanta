@@ -58,7 +58,7 @@ namespace Vanta {
 		geoFramebufferSpec.ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
 
 		RenderPassSpecification geoRenderPassSpec;
-		geoRenderPassSpec.TargetFramebuffer = Vanta::Framebuffer::Create(geoFramebufferSpec);
+		geoRenderPassSpec.TargetFramebuffer = Framebuffer::Create(geoFramebufferSpec);
 		s_Data.GeoPass = RenderPass::Create(geoRenderPassSpec);
 
 		FramebufferSpecification compFramebufferSpec;
@@ -68,7 +68,7 @@ namespace Vanta {
 		compFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 
 		RenderPassSpecification compRenderPassSpec;
-		compRenderPassSpec.TargetFramebuffer = Vanta::Framebuffer::Create(compFramebufferSpec);
+		compRenderPassSpec.TargetFramebuffer = Framebuffer::Create(compFramebufferSpec);
 		s_Data.CompositePass = RenderPass::Create(compRenderPassSpec);
 
 		s_Data.CompositeShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/SceneComposite.glsl");

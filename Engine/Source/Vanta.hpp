@@ -32,15 +32,16 @@
 // ==== Vanta Render API ====
 #include "Renderer/Renderer.hpp"
 #include "Renderer/Framebuffer.hpp"
-#include "Renderer/Buffer.hpp"
 #include "Renderer/Texture.hpp"
 #include "Renderer/Shader.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Camera.hpp"
 #include "Renderer/Material.hpp"
-#include "Renderer/VertexArray.hpp"
 #include "Renderer/RenderPass.hpp"
 #include "Renderer/SceneRenderer.hpp"
+#include "Renderer/VertexBuffer.hpp"
+#include "Renderer/IndexBuffer.hpp"
+#include "Renderer/Pipeline.hpp"
 // ==========================
 
 // Scenes

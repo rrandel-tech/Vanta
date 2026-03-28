@@ -5,8 +5,9 @@
 
 #include "Core/TimeStep.hpp"
 
-#include "Renderer/VertexArray.hpp"
-#include "Renderer/Buffer.hpp"
+#include "Renderer/Pipeline.hpp"
+#include "Renderer/IndexBuffer.hpp"
+#include "Renderer/VertexBuffer.hpp"
 #include "Renderer/Shader.hpp"
 #include "Renderer/Material.hpp"
 
@@ -137,6 +138,9 @@ namespace Vanta {
 		std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
 		const std::vector<Submesh>& GetSubmeshes() const { return m_Submeshes; }
 
+		const std::vector<Vertex>& GetStaticVertices() const { return m_StaticVertices; }
+		const std::vector<Index>& GetIndices() const { return m_Indices; }
+
 		Ref<Shader> GetMeshShader() { return m_MeshShader; }
 		Ref<Material> GetMaterial() { return m_BaseMaterial; }
 		std::vector<Ref<MaterialInstance>> GetMaterials() { return m_Materials; }
@@ -166,7 +170,9 @@ namespace Vanta {
 		uint32_t m_BoneCount = 0;
 		std::vector<BoneInfo> m_BoneInfo;
 
-		Ref<VertexArray> m_VertexArray;
+		Ref<Pipeline> m_Pipeline;
+		Ref<VertexBuffer> m_VertexBuffer;
+		Ref<IndexBuffer> m_IndexBuffer;
 
 		std::vector<Vertex> m_StaticVertices;
 		std::vector<AnimatedVertex> m_AnimatedVertices;

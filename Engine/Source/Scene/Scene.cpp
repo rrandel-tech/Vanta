@@ -49,6 +49,10 @@ namespace Vanta {
 		m_SkyboxMaterial->SetFlag(MaterialFlag::DepthTest, false);
 	}
 
+	void Scene::OnShutdown()
+	{
+	}
+
 	static std::tuple<glm::vec3, glm::quat, glm::vec3> GetTransformDecomposition(const glm::mat4& transform)
 	{
 		glm::vec3 scale, translation, skew;

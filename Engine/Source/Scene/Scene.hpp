@@ -41,6 +41,7 @@ namespace Vanta {
 		~Scene();
 
 		void Init();
+		void OnShutdown();
 
 		void OnUpdate(Timestep ts);
 		void OnRenderRuntime(Timestep ts);
