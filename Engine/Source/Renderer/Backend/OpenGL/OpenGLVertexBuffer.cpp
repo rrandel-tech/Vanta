@@ -22,7 +22,7 @@ namespace Vanta {
 		: m_Size(size), m_Usage(usage)
 	{
 		m_LocalData = Buffer::Copy(data, size);
-
+		 
 		Ref<OpenGLVertexBuffer> instance = this;
 		Renderer::Submit([instance]() mutable
 		{
@@ -35,7 +35,7 @@ namespace Vanta {
 		: m_Size(size), m_Usage(usage)
 	{
 		Ref<OpenGLVertexBuffer> instance = this;
-		Renderer::Submit([instance]() mutable
+		Renderer::Submit([instance]() mutable 
 		{
 			glCreateBuffers(1, &instance->m_RendererID);
 			glNamedBufferData(instance->m_RendererID, instance->m_Size, nullptr, OpenGLUsage(instance->m_Usage));
@@ -56,7 +56,7 @@ namespace Vanta {
 		m_Size = size;
 		Ref<OpenGLVertexBuffer> instance = this;
 		Renderer::Submit([instance, offset]() {
-			glNamedBufferSubData(instance->m_RendererID, offset, instance->m_Size, instance->m_LocalData.Data);
+			glNamedBufferSubData(instance->m_RendererID, offset, instance->m_LocalData.Size, instance->m_LocalData.Data);
 		});
 	}
 

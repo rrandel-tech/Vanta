@@ -79,7 +79,7 @@ namespace Vanta {
 			VA_CORE_ASSERT(slot < m_Textures.size(), "Texture slot is invalid!");
 			return m_Textures[slot];
 		}
-
+		
 		ShaderResourceDeclaration* FindResourceDeclaration(const std::string& name);
 	public:
 		static Ref<Material> Create(const Ref<Shader>& shader);

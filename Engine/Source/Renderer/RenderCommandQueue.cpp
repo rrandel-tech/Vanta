@@ -23,7 +23,7 @@ namespace Vanta {
 		*(RenderCommandFn*)m_CommandBufferPtr = fn;
 		m_CommandBufferPtr += sizeof(RenderCommandFn);
 
-		*(int*)m_CommandBufferPtr = size;
+		*(uint32_t*)m_CommandBufferPtr = size;
 		m_CommandBufferPtr += sizeof(uint32_t);
 
 		void* memory = m_CommandBufferPtr;

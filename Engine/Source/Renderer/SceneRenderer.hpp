@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Scene/Scene.hpp"
-
+#include "Scene/Components.hpp"
 #include "Renderer/Mesh.hpp"
 #include "RenderPass.hpp"
 
@@ -38,7 +38,7 @@ namespace Vanta {
 
 		static Ref<RenderPass> GetFinalRenderPass();
 		static Ref<Texture2D> GetFinalColorBuffer();
-
+		
 		// TODO: Temp
 		static uint32_t GetFinalColorBufferRendererID();
 		static void SetFocusPoint(const glm::vec2& point);

@@ -21,8 +21,8 @@ void main()
     boneTransform += u_BoneTransforms[a_BoneIndices[2]] * a_BoneWeights[2];
     boneTransform += u_BoneTransforms[a_BoneIndices[3]] * a_BoneWeights[3];
 
-    vec4 localPosition = boneTransform * vec4(a_Position, 1.0);
-    gl_Position = u_ViewProjection * u_Transform * localPosition;
+	vec4 localPosition = boneTransform * vec4(a_Position, 1.0);
+	gl_Position = u_ViewProjection * u_Transform * localPosition;
 }
 
 #type fragment

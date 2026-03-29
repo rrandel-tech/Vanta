@@ -4,6 +4,7 @@
 #include "Events/ApplicationEvent.hpp"
 #include "Events/KeyEvent.hpp"
 #include "Events/MouseEvent.hpp"
+#include "Core/Input.hpp"
 
 #include <glad/glad.h>
 
@@ -150,8 +151,9 @@ namespace Vanta {
 				{
 					if (m_Event.key.windowID == windowID)
 					{
+						KeyCode key = static_cast<KeyCode>(m_Event.key.scancode);
 						int repeatCount = m_Event.key.repeat ? 1 : 0;
-						KeyPressedEvent event(m_Event.key.scancode, repeatCount);
+						KeyPressedEvent event(key, repeatCount);
 						m_data.eventCallback(event);
 					}
 					break;
@@ -160,7 +162,8 @@ namespace Vanta {
 				{
 					if (m_Event.key.windowID == windowID)
 					{
-						KeyReleasedEvent event(m_Event.key.scancode);
+						KeyCode key = static_cast<KeyCode>(m_Event.key.scancode);
+						KeyReleasedEvent event(key);
 						m_data.eventCallback(event);
 					}
 					break;
@@ -169,7 +172,7 @@ namespace Vanta {
 				{
 					if (m_Event.button.windowID == windowID)
 					{
-						MouseButtonPressedEvent event(m_Event.button.button);
+						MouseButtonPressedEvent event(static_cast<MouseButton>(m_Event.button.button));
 						m_data.eventCallback(event);
 					}
 					break;
@@ -178,7 +181,7 @@ namespace Vanta {
 				{
 					if (m_Event.button.windowID == windowID)
 					{
-						MouseButtonReleasedEvent event(m_Event.button.button);
+						MouseButtonReleasedEvent event(static_cast<MouseButton>(m_Event.button.button));
 						m_data.eventCallback(event);
 					}
 					break;
@@ -203,7 +206,7 @@ namespace Vanta {
 				}
 			}
 		}
-    }
+	}
 
     void Window::Shutdown()
     {

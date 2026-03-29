@@ -25,14 +25,14 @@ namespace Vanta {
 	};
 
 	static RendererData s_Data;
-
+	
 	void Renderer::Init()
 	{
 		s_Data.m_ShaderLibrary = Ref<ShaderLibrary>::Create();
 		Renderer::Submit([](){ RendererAPI::Init(); });
 
-		Renderer::GetShaderLibrary()->Load("C:/Development/Vanta/Editor/assets/shaders/PBR_StaticMesh.glsl");
-		Renderer::GetShaderLibrary()->Load("C:/Development/Vanta/Editor/assets/shaders/PBR_AnimMesh.glsl");
+		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl");
+		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Anim.glsl");
 
 		SceneRenderer::Init();
 
@@ -62,8 +62,8 @@ namespace Vanta {
 
 		PipelineSpecification pipelineSpecification;
 		pipelineSpecification.Layout = {
-				{ ShaderDataType::Float3, "a_Position" },
-				{ ShaderDataType::Float2, "a_TexCoord" }
+			{ ShaderDataType::Float3, "a_Position" },
+			{ ShaderDataType::Float2, "a_TexCoord" }
 		};
 		s_Data.m_FullscreenQuadPipeline = Pipeline::Create(pipelineSpecification);
 
@@ -102,10 +102,10 @@ namespace Vanta {
 	{
 	}
 
-	void Renderer::DrawIndexed(uint32_t count, PrimitiveType type, bool depthTest)
+	void Renderer::DrawIndexed(uint32_t count, PrimitiveType type, bool depthTest, bool faceCulling)
 	{
 		Renderer::Submit([=]() {
-			RendererAPI::DrawIndexed(count, type, depthTest);
+			RendererAPI::DrawIndexed(count, type, depthTest, faceCulling);
 		});
 	}
 
@@ -127,7 +127,7 @@ namespace Vanta {
 
 		// TODO: Convert all of this into a render command buffer
 		s_Data.m_ActiveRenderPass = renderPass;
-
+		
 		renderPass->GetSpecification().TargetFramebuffer->Bind();
 		if (clear)
 		{
@@ -159,15 +159,10 @@ namespace Vanta {
 			shader->SetMat4("u_Transform", transform);
 		}
 
-		if (cullFace)
-			Renderer::Submit([]() { glEnable(GL_CULL_FACE); });
-		else
-			Renderer::Submit([]() { glDisable(GL_CULL_FACE); });
-
 		s_Data.m_FullscreenQuadVertexBuffer->Bind();
 		s_Data.m_FullscreenQuadPipeline->Bind();
 		s_Data.m_FullscreenQuadIndexBuffer->Bind();
-		Renderer::DrawIndexed(6, PrimitiveType::Triangles, depthTest);
+		Renderer::DrawIndexed(6, PrimitiveType::Triangles, depthTest, cullFace);
 	}
 
 	void Renderer::SubmitFullscreenQuad(Ref<MaterialInstance> material)
@@ -185,12 +180,7 @@ namespace Vanta {
 		s_Data.m_FullscreenQuadPipeline->Bind();
 		s_Data.m_FullscreenQuadIndexBuffer->Bind();
 
-		if (cullFace)
-			Renderer::Submit([]() { glEnable(GL_CULL_FACE); });
-		else
-			Renderer::Submit([]() { glDisable(GL_CULL_FACE); });
-
-		Renderer::DrawIndexed(6, PrimitiveType::Triangles, depthTest);
+		Renderer::DrawIndexed(6, PrimitiveType::Triangles, depthTest, cullFace);
 	}
 
 	void Renderer::SubmitMesh(Ref<Mesh> mesh, const glm::mat4& transform, Ref<MaterialInstance> overrideMaterial)
@@ -202,7 +192,7 @@ namespace Vanta {
 		mesh->m_Pipeline->Bind();
 		mesh->m_IndexBuffer->Bind();
 
-		const auto& materials = mesh->GetMaterials();
+		auto materials = mesh->GetMaterials();
 		for (Submesh& submesh : mesh->m_Submeshes)
 		{
 			// Material
@@ -221,15 +211,15 @@ namespace Vanta {
 			shader->SetMat4("u_Transform", transform * submesh.Transform);
 
 			Renderer::Submit([submesh, material]() {
-				if (material->GetFlag(MaterialFlag::DepthTest))
+				if (material->GetFlag(MaterialFlag::DepthTest))	
 					glEnable(GL_DEPTH_TEST);
 				else
 					glDisable(GL_DEPTH_TEST);
 
 				if (!material->GetFlag(MaterialFlag::TwoSided))
-					Renderer::Submit([]() { glEnable(GL_CULL_FACE); });
+					glEnable(GL_CULL_FACE);
 				else
-					Renderer::Submit([]() { glDisable(GL_CULL_FACE); });
+					glDisable(GL_CULL_FACE);
 
 				glDrawElementsBaseVertex(GL_TRIANGLES, submesh.IndexCount, GL_UNSIGNED_INT, (void*)(sizeof(uint32_t) * submesh.BaseIndex), submesh.BaseVertex);
 			});
@@ -252,11 +242,9 @@ namespace Vanta {
 					shader->SetMat4(uniformName, mesh->m_BoneTransforms[i]);
 				}
 			}
-
 			shader->SetMat4("u_Transform", transform * submesh.Transform);
 
 			Renderer::Submit([submesh]() {
-
 				glDrawElementsBaseVertex(GL_TRIANGLES, submesh.IndexCount, GL_UNSIGNED_INT, (void*)(sizeof(uint32_t) * submesh.BaseIndex), submesh.BaseVertex);
 			});
 		}

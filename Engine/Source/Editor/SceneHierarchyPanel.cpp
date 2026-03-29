@@ -1,11 +1,15 @@
 #include "vapch.hpp"
 #include "SceneHierarchyPanel.hpp"
 
-#include "Core/Application.hpp"
-#include "Renderer/Mesh.hpp"
-
 #include <imgui.h>
 #include <imgui_internal.h>
+
+#include "Core/Application.hpp"
+#include "Math/Math.hpp"
+#include "Renderer/Mesh.hpp"
+#include "Renderer/MeshFactory.hpp"
+
+#include "Asset/AssetManager.hpp"
 
 #include <assimp/scene.h>
 
@@ -50,15 +54,45 @@ namespace Vanta {
 	void SceneHierarchyPanel::OnImGuiRender()
 	{
 		ImGui::Begin("Scene Hierarchy");
+		ImRect windowRect = { ImGui::GetWindowContentRegionMin(), ImGui::GetWindowContentRegionMax() };
+
 		if (m_Context)
 		{
 			uint32_t entityCount = 0, meshCount = 0;
 			m_Context->m_Registry.each([&](auto entity)
 			{
 				Entity e(entity, m_Context.Raw());
-				if (e.HasComponent<IDComponent>())
+				if (e.HasComponent<IDComponent>() && e.GetParentUUID() == 0)
 					DrawEntityNode(e);
 			});
+
+			if (ImGui::BeginDragDropTargetCustom(windowRect, ImGui::GetCurrentWindow()->ID))
+			{
+				const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("scene_entity_hierarchy", ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+
+				if (payload)
+				{
+					UUID droppedHandle = *((UUID*)payload->Data);
+					Entity e = m_Context->FindEntityByUUID(droppedHandle);
+					Entity previousParent = m_Context->FindEntityByUUID(e.GetParentUUID());
+
+					if (previousParent)
+					{
+						auto& children = previousParent.Children();
+						children.erase(std::remove(children.begin(), children.end(), droppedHandle), children.end());
+
+						glm::mat4 parentTransform = m_Context->GetTransformRelativeToParent(previousParent);
+						glm::vec3 parentTranslation, parentRotation, parentScale;
+						Math::DecomposeTransform(parentTransform, parentTranslation, parentRotation, parentScale);
+
+						e.Transform().Translation = e.Transform().Translation + parentTranslation;
+					}
+
+					e.SetParentUUID(0);
+				}
+
+				ImGui::EndDragDropTarget();
+			}
 
 			if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 			{
@@ -80,7 +114,7 @@ namespace Vanta {
 					{
 						auto newEntity = m_Context->CreateEntity("Directional Light");
 						newEntity.AddComponent<DirectionalLightComponent>();
-						newEntity.GetComponent<TransformComponent>().Transform = glm::toMat4(glm::quat(glm::radians(glm::vec3{80.0f, 10.0f, 0.0f})));
+						newEntity.GetComponent<TransformComponent>().Rotation = glm::radians(glm::vec3{ 80.0f, 10.0f, 0.0f });
 						SetSelected(newEntity);
 					}
 					if (ImGui::MenuItem("Sky Light"))
@@ -131,7 +165,11 @@ namespace Vanta {
 
 		ImGuiTreeNodeFlags flags = (entity == m_SelectionContext ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
 		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
-		bool opened = ImGui::TreeNodeEx((void*)(uint32_t)entity, flags, name);
+
+		if (entity.Children().empty())
+			flags |= ImGuiTreeNodeFlags_Leaf;
+
+		bool opened = ImGui::TreeNodeEx((void*)(uintptr_t)(uint32_t)entity, flags, name);
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectionContext = entity;
@@ -147,9 +185,56 @@ namespace Vanta {
 
 			ImGui::EndPopup();
 		}
+
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+		{
+			UUID entityId = entity.GetUUID();
+			ImGui::Text(entity.GetComponent<TagComponent>().Tag.c_str());
+			ImGui::SetDragDropPayload("scene_entity_hierarchy", &entityId, sizeof(UUID));
+			ImGui::EndDragDropSource();
+		}
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("scene_entity_hierarchy", ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+
+			if (payload)
+			{
+				UUID droppedHandle = *((UUID*)payload->Data);
+				Entity e = m_Context->FindEntityByUUID(droppedHandle);
+
+				if (!entity.IsDescendantOf(e))
+				{
+					// Remove from previous parent
+					Entity previousParent = m_Context->FindEntityByUUID(e.GetParentUUID());
+					if (previousParent)
+					{
+						auto& parentChildren = previousParent.Children();
+						parentChildren.erase(std::remove(parentChildren.begin(), parentChildren.end(), droppedHandle), parentChildren.end());
+					}
+
+					glm::mat4 parentTransform = m_Context->GetTransformRelativeToParent(entity);
+					glm::vec3 parentTranslation, parentRotation, parentScale;
+					Math::DecomposeTransform(parentTransform, parentTranslation, parentRotation, parentScale);
+
+					e.Transform().Translation = e.Transform().Translation - parentTranslation;
+					e.SetParentUUID(entity.GetUUID());
+					entity.Children().push_back(droppedHandle);
+				}
+			}
+
+			ImGui::EndDragDropTarget();
+		}
+
 		if (opened)
 		{
-			// TODO: Children
+			for (auto child : entity.Children())
+			{
+				Entity e = m_Context->FindEntityByUUID(child);
+				if (e)
+					DrawEntityNode(e);
+			}
+
 			ImGui::TreePop();
 		}
 
@@ -223,13 +308,17 @@ namespace Vanta {
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
 		if (entity.HasComponent<T>())
 		{
+			// NOTE:
+			//	This fixes an issue where the first "+" button would display the "Remove" buttons for ALL components on an Entity.
+			//	This is due to ImGui::TreeNodeEx only pushing the id for it's children if it's actually open
+			ImGui::PushID((void*)typeid(T).hash_code());
 			auto& component = entity.GetComponent<T>();
 			ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
 
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
 			float lineHeight = ImGui::GetFontSize() + GImGui->Style.FramePadding.y * 2.0f;
 			ImGui::Separator();
-			bool open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
+			bool open = ImGui::TreeNodeEx("##dummy_id", treeNodeFlags, name.c_str());
 			ImGui::PopStyleVar();
 			ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
 			if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
@@ -254,6 +343,8 @@ namespace Vanta {
 
 			if (removeComponent)
 				entity.RemoveComponent<T>();
+
+			ImGui::PopID();
 		}
 	}
 
@@ -384,7 +475,7 @@ namespace Vanta {
 			{
 				if (ImGui::Button("Mesh"))
 				{
-					m_SelectionContext.AddComponent<MeshComponent>();
+					MeshComponent& component = m_SelectionContext.AddComponent<MeshComponent>();
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -415,46 +506,20 @@ namespace Vanta {
 			ImGui::EndPopup();
 		}
 
-		DrawComponent<TransformComponent>("Transform", entity, [](auto& component)
+		DrawComponent<TransformComponent>("Transform", entity, [](TransformComponent& component)
 		{
-			auto [translation, rotationQuat, scale] = GetTransformDecomposition(component);
-
-			bool updateTransform = false;
-			updateTransform |= DrawVec3Control("Translation", translation);
-			glm::vec3 rotation = glm::degrees(glm::eulerAngles(rotationQuat));
-			updateTransform |= DrawVec3Control("Rotation", rotation);
-			updateTransform |= DrawVec3Control("Scale", scale, 1.0f);
-
-			if (updateTransform)
-			{
-				component.Transform = glm::translate(glm::mat4(1.0f), translation) *
-					glm::toMat4(glm::quat(glm::radians(rotation))) *
-					glm::scale(glm::mat4(1.0f), scale);
-			}
+			DrawVec3Control("Translation", component.Translation);
+			glm::vec3 rotation = glm::degrees(component.Rotation);
+			DrawVec3Control("Rotation", rotation);
+			component.Rotation = glm::radians(rotation);
+			DrawVec3Control("Scale", component.Scale, 1.0f);
 		});
 
 		DrawComponent<MeshComponent>("Mesh", entity, [](MeshComponent& mc)
 		{
-			ImGui::Columns(3);
-			ImGui::SetColumnWidth(0, 100);
-			ImGui::SetColumnWidth(1, 300);
-			ImGui::SetColumnWidth(2, 40);
-			ImGui::Text("File Path");
-			ImGui::NextColumn();
-			ImGui::PushItemWidth(-1);
-			if (mc.Mesh)
-				ImGui::InputText("##meshfilepath", (char*)mc.Mesh->GetFilePath().c_str(), 256, ImGuiInputTextFlags_ReadOnly);
-			else
-				ImGui::InputText("##meshfilepath", (char*)"Null", 256, ImGuiInputTextFlags_ReadOnly);
-			ImGui::PopItemWidth();
-			ImGui::NextColumn();
-			if (ImGui::Button("...##openmesh"))
-			{
-				std::string file = Application::Get().OpenFile();
-				if (!file.empty())
-					mc.Mesh = Ref<Mesh>::Create(file);
-			}
-			ImGui::Columns(1);
+			UI::BeginPropertyGrid();
+			UI::PropertyAssetReference("Mesh", mc.Mesh, AssetType::Mesh);
+			UI::EndPropertyGrid();
 		});
 
 		DrawComponent<CameraComponent>("Camera", entity, [](CameraComponent& cc)
@@ -531,31 +596,12 @@ namespace Vanta {
 
 		DrawComponent<SkyLightComponent>("Sky Light", entity, [](SkyLightComponent& slc)
 		{
-			ImGui::Columns(3);
-			ImGui::SetColumnWidth(0, 100);
-			ImGui::SetColumnWidth(1, 300);
-			ImGui::SetColumnWidth(2, 40);
-			ImGui::Text("File Path");
-			ImGui::NextColumn();
-			ImGui::PushItemWidth(-1);
-			if (!slc.SceneEnvironment.FilePath.empty())
-				ImGui::InputText("##envfilepath", (char*)slc.SceneEnvironment.FilePath.c_str(), 256, ImGuiInputTextFlags_ReadOnly);
-			else
-				ImGui::InputText("##envfilepath", (char*)"Empty", 256, ImGuiInputTextFlags_ReadOnly);
-			ImGui::PopItemWidth();
-			ImGui::NextColumn();
-			if (ImGui::Button("...##openenv"))
-			{
-				std::string file = Application::Get().OpenFile("*.hdr");
-				if (!file.empty())
-					slc.SceneEnvironment = Environment::Load(file);
-			}
-			ImGui::Columns(1);
-
 			UI::BeginPropertyGrid();
+			UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment, AssetType::EnvMap);
 			UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
 			UI::EndPropertyGrid();
 		});
+
 	}
 
 }

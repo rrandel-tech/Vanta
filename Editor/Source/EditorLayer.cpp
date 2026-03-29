@@ -2,11 +2,7 @@
 
 #include "ImGui/ImGuizmo.h"
 #include "Renderer/Renderer2D.hpp"
-
-#include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-#include "Core/KeyCodes.hpp"
+#include "Editor/AssetEditorPanel.hpp"
 
 #include <filesystem>
 
@@ -15,31 +11,23 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <imgui_internal.h>
-
-static void ImGuiShowHelpMarker(const char* desc)
-{
-	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered())
-	{
-		ImGui::BeginTooltip();
-		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-		ImGui::TextUnformatted(desc);
-		ImGui::PopTextWrapPos();
-		ImGui::EndTooltip();
-	}
-}
+#include "Asset/AssetManager.hpp"
+#include "Math/Math.hpp"
+#include "Utilities/FileSystem.hpp"
 
 namespace Vanta {
 
-	static std::tuple<glm::vec3, glm::quat, glm::vec3> GetTransformDecomposition(const glm::mat4& transform)
+	static void ImGuiShowHelpMarker(const char* desc)
 	{
-		glm::vec3 scale, translation, skew;
-		glm::vec4 perspective;
-		glm::quat orientation;
-		glm::decompose(transform, scale, orientation, translation, skew, perspective);
-
-		return { translation, orientation, scale };
+		ImGui::TextDisabled("(?)");
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::BeginTooltip();
+			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+			ImGui::TextUnformatted(desc);
+			ImGui::PopTextWrapPos();
+			ImGui::EndTooltip();
+		}
 	}
 
 	EditorLayer::EditorLayer()
@@ -56,21 +44,26 @@ namespace Vanta {
 		using namespace glm;
 
 		// Editor
-		m_CheckerboardTex = Texture2D::Create("C:/Development/Vanta/Editor/assets/editor/Checkerboard.tga");
-		m_PlayButtonTex = Texture2D::Create("C:/Development/Vanta/Editor/assets/editor/PlayButton.png");
+		m_CheckerboardTex = Texture2D::Create("assets/editor/Checkerboard.tga");
+		m_PlayButtonTex = Texture2D::Create("assets/editor/PlayButton.png");
 
-		m_EditorScene = Ref<Scene>::Create();
-		UpdateWindowTitle("Untitled Scene");
 		m_SceneHierarchyPanel = CreateScope<SceneHierarchyPanel>(m_EditorScene);
 		m_SceneHierarchyPanel->SetSelectionChangedCallback(std::bind(&EditorLayer::SelectEntity, this, std::placeholders::_1));
 		m_SceneHierarchyPanel->SetEntityDeletedCallback(std::bind(&EditorLayer::OnEntityDeleted, this, std::placeholders::_1));
 
-		OpenScene("C:/Development/Vanta/Editor/assets/scenes/LightingTest.vscene");
+		m_AssetManagerPanel = CreateScope<AssetManagerPanel>();
+		m_ObjectsPanel = CreateScope<ObjectsPanel>();
+
+		//OpenScene("assets/scenes/FPSDemo.vscene");
+		NewScene();
+
+		AssetEditorPanel::RegisterDefaultEditors();
+		FileSystem::StartWatching();
 	}
 
 	void EditorLayer::OnDetach()
 	{
-		m_EditorScene->OnShutdown();
+		FileSystem::StopWatching();
 	}
 
 	void EditorLayer::OnScenePlay()
@@ -84,6 +77,7 @@ namespace Vanta {
 
 		m_RuntimeScene->OnRuntimeStart();
 		m_SceneHierarchyPanel->SetContext(m_RuntimeScene);
+		m_CurrentScene = m_RuntimeScene;
 	}
 
 	void EditorLayer::OnSceneStop()
@@ -96,6 +90,7 @@ namespace Vanta {
 
 		m_SelectionContext.clear();
 		m_SceneHierarchyPanel->SetContext(m_EditorScene);
+		m_CurrentScene = m_EditorScene;
 	}
 
 	void EditorLayer::UpdateWindowTitle(const std::string& sceneName)
@@ -150,11 +145,12 @@ namespace Vanta {
 						auto viewProj = m_EditorCamera.GetViewProjection();
 						Renderer2D::BeginScene(viewProj, false);
 						glm::vec4 color = (m_SelectionMode == SelectionMode::Entity) ? glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f } : glm::vec4{ 0.2f, 0.9f, 0.2f, 1.0f };
-						Renderer::DrawAABB(selection.Mesh->BoundingBox, selection.Entity.GetComponent<TransformComponent>().Transform * selection.Mesh->Transform, color);
+						Renderer::DrawAABB(selection.Mesh->BoundingBox, selection.Entity.Transform().GetTransform() * selection.Mesh->Transform, color);
 						Renderer2D::EndScene();
 						Renderer::EndRenderPass();
 					}
 				}
+
 				break;
 			}
 			case SceneState::Play:
@@ -298,20 +294,25 @@ namespace Vanta {
 		SelectedSubmesh selection;
 		if (entity.HasComponent<MeshComponent>())
 		{
-			auto mesh = entity.GetComponent<MeshComponent>().Mesh;
-			if (mesh)
-				selection.Mesh = &mesh->GetSubmeshes()[0];
+			auto& meshComp = entity.GetComponent<MeshComponent>();
+
+			if (meshComp.Mesh)
+			{
+				selection.Mesh = &meshComp.Mesh->GetSubmeshes()[0];
+			}
 		}
 		selection.Entity = entity;
 		m_SelectionContext.clear();
 		m_SelectionContext.push_back(selection);
 
 		m_EditorScene->SetSelectedEntity(entity);
+
+		m_CurrentScene = m_EditorScene;
 	}
 
 	void EditorLayer::NewScene()
 	{
-		m_EditorScene = Ref<Scene>::Create();
+		m_EditorScene = Ref<Scene>::Create("Empty Scene", true);
 		m_SceneHierarchyPanel->SetContext(m_EditorScene);
 		UpdateWindowTitle("Untitled Scene");
 		m_SceneFilePath = std::string();
@@ -329,10 +330,11 @@ namespace Vanta {
 
 	void EditorLayer::OpenScene(const std::string& filepath)
 	{
-		Ref<Scene> newScene = Ref<Scene>::Create();
+		Ref<Scene> newScene = Ref<Scene>::Create("New Scene", true);
 		SceneSerializer serializer(newScene);
 		serializer.Deserialize(filepath);
 		m_EditorScene = newScene;
+		m_SceneFilePath = filepath;
 
 		std::filesystem::path path = filepath;
 		UpdateWindowTitle(path.filename().string());
@@ -340,6 +342,8 @@ namespace Vanta {
 
 		m_EditorScene->SetSelectedEntity({});
 		m_SelectionContext.clear();
+
+		m_CurrentScene = m_EditorScene;
 	}
 
 	void EditorLayer::SaveScene()
@@ -440,6 +444,10 @@ namespace Vanta {
 			ShowBoundingBoxes(m_UIShowBoundingBoxes, m_UIShowBoundingBoxesOnTop);
 		if (m_UIShowBoundingBoxes && Property("On Top", m_UIShowBoundingBoxesOnTop))
 			ShowBoundingBoxes(m_UIShowBoundingBoxes, m_UIShowBoundingBoxesOnTop);
+
+		m_AssetManagerPanel->OnImGuiRender();
+		m_ObjectsPanel->OnImGuiRender();
+		AssetEditorPanel::OnImGuiRender();
 
 		const char* label = m_SelectionMode == SelectionMode::Entity ? "Entity" : "Mesh";
 		if (ImGui::Button(label))
@@ -567,22 +575,49 @@ namespace Vanta {
 
 			bool snap = Input::IsKeyPressed(VA_KEY_LEFT_CONTROL);
 
-			auto& entityTransform = selection.Entity.Transform();
+			TransformComponent& entityTransform = selection.Entity.Transform();
+			glm::mat4 transform = m_CurrentScene->GetTransformRelativeToParent(selection.Entity);
 			float snapValue = GetSnapValue();
 			float snapValues[3] = { snapValue, snapValue, snapValue };
+
 			if (m_SelectionMode == SelectionMode::Entity)
 			{
 				ImGuizmo::Manipulate(glm::value_ptr(m_EditorCamera.GetViewMatrix()),
 					glm::value_ptr(m_EditorCamera.GetProjectionMatrix()),
 					(ImGuizmo::OPERATION)m_GizmoType,
 					ImGuizmo::LOCAL,
-					glm::value_ptr(entityTransform),
+					glm::value_ptr(transform),
 					nullptr,
 					snap ? snapValues : nullptr);
+
+				if (ImGuizmo::IsUsing())
+				{
+					glm::vec3 translation, rotation, scale;
+					Math::DecomposeTransform(transform, translation, rotation, scale);
+
+					Entity parent = m_CurrentScene->FindEntityByUUID(selection.Entity.GetParentUUID());
+					if (parent)
+					{
+						glm::vec3 parentTranslation, parentRotation, parentScale;
+						Math::DecomposeTransform(m_CurrentScene->GetTransformRelativeToParent(parent), parentTranslation, parentRotation, parentScale);
+
+						glm::vec3 deltaRotation = (rotation - parentRotation) - entityTransform.Rotation;
+						entityTransform.Translation = translation - parentTranslation;
+						entityTransform.Rotation += deltaRotation;
+						entityTransform.Scale = scale;
+					}
+					else
+					{
+						glm::vec3 deltaRotation = rotation - entityTransform.Rotation;
+						entityTransform.Translation = translation;
+						entityTransform.Rotation += deltaRotation;
+						entityTransform.Scale = scale;
+					}
+				}
 			}
 			else
 			{
-				glm::mat4 transformBase = entityTransform * selection.Mesh->Transform;
+				glm::mat4 transformBase = transform * selection.Mesh->Transform;
 				ImGuizmo::Manipulate(glm::value_ptr(m_EditorCamera.GetViewMatrix()),
 					glm::value_ptr(m_EditorCamera.GetProjectionMatrix()),
 					(ImGuizmo::OPERATION)m_GizmoType,
@@ -591,8 +626,37 @@ namespace Vanta {
 					nullptr,
 					snap ? snapValues : nullptr);
 
-				selection.Mesh->Transform = glm::inverse(entityTransform) * transformBase;
+				selection.Mesh->Transform = glm::inverse(transform) * transformBase;
 			}
+		}
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			auto data = ImGui::AcceptDragDropPayload("asset_payload");
+			if (data)
+			{
+				int count = data->DataSize / sizeof(AssetHandle);
+
+				for (int i = 0; i < count; i++)
+				{
+					AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
+					Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
+
+					// We can't really support dragging and dropping scenes when we're dropping multiple assets
+					if (count == 1 && asset->Type == AssetType::Scene)
+					{
+						OpenScene(asset->FilePath);
+					}
+
+					if (asset->Type == AssetType::Mesh)
+					{
+						Entity entity = m_EditorScene->CreateEntity(asset->FileName);
+						entity.AddComponent<MeshComponent>(Ref<Mesh>(asset));
+						SelectEntity(entity);
+					}
+				}
+			}
+			ImGui::EndDragDropTarget();
 		}
 
 		ImGui::End();
@@ -633,7 +697,7 @@ namespace Vanta {
 				Ref<Mesh> mesh = selectedEntity.GetComponent<MeshComponent>().Mesh;
 				if (mesh)
 				{
-					const auto& materials = mesh->GetMaterials();
+					auto materials = mesh->GetMaterials();
 					static uint32_t selectedMaterialIndex = 0;
 					for (uint32_t i = 0; i < materials.size(); i++)
 					{
@@ -655,7 +719,7 @@ namespace Vanta {
 					// Selected material
 					if (selectedMaterialIndex < materials.size())
 					{
-						auto materialInstance = materials[selectedMaterialIndex];
+						auto& materialInstance = materials[selectedMaterialIndex];
 						ImGui::Text("Shader: %s", materialInstance->GetShader()->GetName().c_str());
 						// Textures ------------------------------------------------------------------------------
 						{
@@ -847,82 +911,91 @@ namespace Vanta {
 		dispatcher.Dispatch<MouseButtonPressedEvent>(VA_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
 	}
 
-	bool EditorLayer::OnKeyPressedEvent(KeyPressedEvent& e)
+	bool EditorLayer::OnKeyPressedEvent(KeyPressedEvent& event)
 	{
 		if (GImGui->ActiveId == 0)
 		{
 			if (m_ViewportPanelMouseOver)
 			{
-				switch (e.GetKeyCode())
+				switch (event.GetKeyCode())
 				{
-				case VA_KEY_Q:
+				case KeyCode::Q:
 					m_GizmoType = -1;
 					break;
-				case VA_KEY_W:
+				case KeyCode::W:
 					m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
 					break;
-				case VA_KEY_E:
+				case KeyCode::E:
 					m_GizmoType = ImGuizmo::OPERATION::ROTATE;
 					break;
-				case VA_KEY_R:
+				case KeyCode::R:
 					m_GizmoType = ImGuizmo::OPERATION::SCALE;
 					break;
+				case KeyCode::F:
+				{
+					if (m_SelectionContext.size() == 0)
+						break;
+
+					Entity selectedEntity = m_SelectionContext[0].Entity;
+					m_EditorCamera.Focus(selectedEntity.Transform().Translation);
+					break;
+				}
 				}
 
 			}
-			switch (e.GetKeyCode())
+			switch (event.GetKeyCode())
 			{
-				case VA_KEY_DELETE: // TODO: this should be in the scene hierarchy panel
-					if (m_SelectionContext.size())
-					{
-						Entity selectedEntity = m_SelectionContext[0].Entity;
-						m_EditorScene->DestroyEntity(selectedEntity);
-						m_SelectionContext.clear();
-						m_EditorScene->SetSelectedEntity({});
-						m_SceneHierarchyPanel->SetSelected({});
-					}
-					break;
+			case KeyCode::Delete: // TODO: this should be in the scene hierarchy panel
+				if (m_SelectionContext.size())
+				{
+					Entity selectedEntity = m_SelectionContext[0].Entity;
+					m_EditorScene->DestroyEntity(selectedEntity);
+					m_SelectionContext.clear();
+					m_EditorScene->SetSelectedEntity({});
+					m_SceneHierarchyPanel->SetSelected({});
+				}
+				break;
 			}
 		}
 
 		if (Input::IsKeyPressed(VA_KEY_LEFT_CONTROL))
 		{
-			switch (e.GetKeyCode())
+			switch (event.GetKeyCode())
 			{
-				case VA_KEY_B:
+				case KeyCode::B:
 					// Toggle bounding boxes
 					m_UIShowBoundingBoxes = !m_UIShowBoundingBoxes;
 					ShowBoundingBoxes(m_UIShowBoundingBoxes, m_UIShowBoundingBoxesOnTop);
 					break;
-				case VA_KEY_D:
+				case KeyCode::D:
 					if (m_SelectionContext.size())
 					{
 						Entity selectedEntity = m_SelectionContext[0].Entity;
 						m_EditorScene->DuplicateEntity(selectedEntity);
 					}
 					break;
-				case VA_KEY_G:
+				case KeyCode::G:
 					// Toggle grid
 					SceneRenderer::GetOptions().ShowGrid = !SceneRenderer::GetOptions().ShowGrid;
 					break;
-				case VA_KEY_N:
+				case KeyCode::N:
 					NewScene();
 					break;
-				case VA_KEY_O:
+				case KeyCode::O:
 					OpenScene();
 					break;
-				case VA_KEY_S:
+				case KeyCode::S:
 					SaveScene();
 					break;
 			}
 
 			if (Input::IsKeyPressed(VA_KEY_LEFT_SHIFT))
 			{
-				switch (e.GetKeyCode())
+				switch (event.GetKeyCode())
 				{
-					case VA_KEY_S:
-						SaveSceneAs();
-						break;
+				case KeyCode::S:
+					SaveSceneAs();
+					break;
 				}
 			}
 		}
@@ -930,10 +1003,10 @@ namespace Vanta {
 		return false;
 	}
 
-	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& e)
+	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& event)
 	{
 		auto [mx, my] = Input::GetMousePosition();
-		if (e.GetMouseButton() == VA_MOUSE_BUTTON_LEFT && m_ViewportPanelMouseOver && !Input::IsKeyPressed(VA_KEY_LEFT_ALT) && !ImGuizmo::IsOver() && m_SceneState != SceneState::Play)
+		if (event.GetMouseButton() == MouseButton::Left && m_ViewportPanelMouseOver && !Input::IsKeyPressed(KeyCode::LeftAlt) && !ImGuizmo::IsOver() && m_SceneState != SceneState::Play)
 		{
 			auto [mouseX, mouseY] = GetMouseViewportSpace();
 			if (mouseX > -1.0f && mouseX < 1.0f && mouseY > -1.0f && mouseY < 1.0f)
@@ -955,9 +1028,10 @@ namespace Vanta {
 					for (uint32_t i = 0; i < submeshes.size(); i++)
 					{
 						auto& submesh = submeshes[i];
+						glm::mat4 transform = m_CurrentScene->GetTransformRelativeToParent(entity);
 						Ray ray = {
-							glm::inverse(entity.Transform() * submesh.Transform) * glm::vec4(origin, 1.0f),
-							glm::inverse(glm::mat3(entity.Transform()) * glm::mat3(submesh.Transform)) * direction
+							glm::inverse(transform * submesh.Transform) * glm::vec4(origin, 1.0f),
+							glm::inverse(glm::mat3(transform) * glm::mat3(submesh.Transform)) * direction
 						};
 
 						float t;
@@ -1019,7 +1093,7 @@ namespace Vanta {
 
 	void EditorLayer::OnEntityDeleted(Entity e)
 	{
-		if (m_SelectionContext[0].Entity == e)
+		if (m_SelectionContext.size() > 0 && m_SelectionContext[0].Entity == e)
 		{
 			m_SelectionContext.clear();
 			m_EditorScene->SetSelectedEntity({});

@@ -3,6 +3,7 @@
 
 #include "Core/Input.hpp"
 
+#include <SDL3/SDL.h>
 #include <glm/gtc/quaternion.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -18,7 +19,7 @@ namespace Vanta {
 		m_Rotation = glm::vec3(90.0f, 0.0f, 0.0f);
 		m_FocalPoint = glm::vec3(0.0f);
 
-		glm::vec3 position = { -5, 5, 5};
+		glm::vec3 position = { -5, 5, 5 };
 		m_Distance = glm::distance(position, m_FocalPoint);
 
 		m_Yaw = 3.0f * (float)M_PI / 4.0f;
@@ -37,8 +38,15 @@ namespace Vanta {
 		m_ViewMatrix = glm::inverse(m_ViewMatrix);
 	}
 
-	void EditorCamera::Focus()
+	void EditorCamera::Focus(const glm::vec3& focusPoint)
 	{
+		m_FocalPoint = focusPoint;
+		if (m_Distance > m_MinFocusDistance)
+		{
+			float distance = m_Distance - m_MinFocusDistance;
+			MouseZoom(distance / ZoomSpeed());
+			UpdateCameraView();
+		}
 	}
 
 	std::pair<float, float> EditorCamera::PanSpeed() const
@@ -68,17 +76,17 @@ namespace Vanta {
 
 	void EditorCamera::OnUpdate(Timestep ts)
 	{
-		if (Input::IsKeyPressed(SDL_SCANCODE_LALT))
+		if (Input::IsKeyPressed(KeyCode::LeftAlt))
 		{
 			const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
 			glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
 			m_InitialMousePosition = mouse;
 
-			if (Input::IsMouseButtonPressed(SDL_BUTTON_MIDDLE))
+			if (Input::IsMouseButtonPressed(MouseButton::Middle))
 				MousePan(delta);
-			else if (Input::IsMouseButtonPressed(SDL_BUTTON_LEFT))
+			else if (Input::IsMouseButtonPressed(MouseButton::Left))
 				MouseRotate(delta);
-			else if (Input::IsMouseButtonPressed(SDL_BUTTON_RIGHT))
+			else if (Input::IsMouseButtonPressed(MouseButton::Right))
 				MouseZoom(delta.y);
 		}
 

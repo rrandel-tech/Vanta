@@ -27,7 +27,7 @@ namespace Vanta {
 
 			// Resources
 			Ref<MaterialInstance> SkyboxMaterial;
-			Environment SceneEnvironment;
+			Ref<Environment> SceneEnvironment;
 			float SceneEnvironmentIntensity;
 			LightEnvironment SceneLightEnvironment;
 			Light ActiveLight;
@@ -135,13 +135,13 @@ namespace Vanta {
 		bloomBlendRenderPassSpec.TargetFramebuffer = Framebuffer::Create(bloomBlendFramebufferSpec);
 		s_Data.BloomBlendPass = RenderPass::Create(bloomBlendRenderPassSpec);
 
-		s_Data.CompositeShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/SceneComposite.glsl");
-		s_Data.BloomBlurShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/BloomBlur.glsl");
-		s_Data.BloomBlendShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/BloomBlend.glsl");
-		s_Data.BRDFLUT = Texture2D::Create("C:/Development/Vanta/Editor/assets/textures/BRDF_LUT.tga");
+		s_Data.CompositeShader = Shader::Create("assets/shaders/SceneComposite.glsl");
+		s_Data.BloomBlurShader = Shader::Create("assets/shaders/BloomBlur.glsl");
+		s_Data.BloomBlendShader = Shader::Create("assets/shaders/BloomBlend.glsl");
+		s_Data.BRDFLUT = Texture2D::Create("assets/textures/BRDF_LUT.tga");
 
 		// Grid
-		auto gridShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Grid.glsl");
+		auto gridShader = Shader::Create("assets/shaders/Grid.glsl");
 		s_Data.GridMaterial = MaterialInstance::Create(Material::Create(gridShader));
 		s_Data.GridMaterial->SetFlag(MaterialFlag::TwoSided, true);
 		float gridScale = 16.025f, gridSize = 0.025f;
@@ -149,17 +149,17 @@ namespace Vanta {
 		s_Data.GridMaterial->Set("u_Res", gridSize);
 
 		// Outline
-		auto outlineShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Outline.glsl");
+		auto outlineShader = Shader::Create("assets/shaders/Outline.glsl");
 		s_Data.OutlineMaterial = MaterialInstance::Create(Material::Create(outlineShader));
 		s_Data.OutlineMaterial->SetFlag(MaterialFlag::DepthTest, false);
 
-		auto outlineAnimShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Outline_Anim.glsl");
+		auto outlineAnimShader = Shader::Create("assets/shaders/Outline_Anim.glsl");
 		s_Data.OutlineAnimMaterial = MaterialInstance::Create(Material::Create(outlineAnimShader));
 		s_Data.OutlineAnimMaterial->SetFlag(MaterialFlag::DepthTest, false);
 
 		// Shadow Map
-		s_Data.ShadowMapShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/ShadowMap.glsl");
-		s_Data.ShadowMapAnimShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/ShadowMap_Anim.glsl");
+		s_Data.ShadowMapShader = Shader::Create("assets/shaders/ShadowMap.glsl");
+		s_Data.ShadowMapAnimShader = Shader::Create("assets/shaders/ShadowMap_Anim.glsl");
 
 		FramebufferSpecification shadowMapFramebufferSpec;
 		shadowMapFramebufferSpec.Width = 4096;
@@ -239,30 +239,30 @@ namespace Vanta {
 
 		Ref<TextureCube> envUnfiltered = TextureCube::Create(TextureFormat::Float16, cubemapSize, cubemapSize);
 		if (!equirectangularConversionShader)
-			equirectangularConversionShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/EquirectangularToCubeMap.glsl");
+			equirectangularConversionShader = Shader::Create("assets/shaders/EquirectangularToCubeMap.glsl");
 		Ref<Texture2D> envEquirect = Texture2D::Create(filepath);
 		VA_CORE_ASSERT(envEquirect->GetFormat() == TextureFormat::Float16, "Texture is not HDR!");
 
 		equirectangularConversionShader->Bind();
 		envEquirect->Bind();
 		Renderer::Submit([envUnfiltered, cubemapSize, envEquirect]()
-		{
-			glBindImageTexture(0, envUnfiltered->GetRendererID(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-			glDispatchCompute(cubemapSize / 32, cubemapSize / 32, 6);
-			glGenerateTextureMipmap(envUnfiltered->GetRendererID());
-		});
+			{
+				glBindImageTexture(0, envUnfiltered->GetRendererID(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+				glDispatchCompute(cubemapSize / 32, cubemapSize / 32, 6);
+				glGenerateTextureMipmap(envUnfiltered->GetRendererID());
+			});
 
 		if (!envFilteringShader)
-			envFilteringShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/EnvironmentMipFilter.glsl");
+			envFilteringShader = Shader::Create("assets/shaders/EnvironmentMipFilter.glsl");
 
 		Ref<TextureCube> envFiltered = TextureCube::Create(TextureFormat::Float16, cubemapSize, cubemapSize);
 
 		Renderer::Submit([envUnfiltered, envFiltered]()
-		{
-			glCopyImageSubData(envUnfiltered->GetRendererID(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
-				envFiltered->GetRendererID(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
-				envFiltered->GetWidth(), envFiltered->GetHeight(), 6);
-		});
+			{
+				glCopyImageSubData(envUnfiltered->GetRendererID(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+					envFiltered->GetRendererID(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+					envFiltered->GetWidth(), envFiltered->GetHeight(), 6);
+			});
 
 		envFilteringShader->Bind();
 		envUnfiltered->Bind();
@@ -276,20 +276,20 @@ namespace Vanta {
 				glProgramUniform1f(envFilteringShader->GetRendererID(), 0, level * deltaRoughness);
 				glDispatchCompute(numGroups, numGroups, 6);
 			}
-		});
+			});
 
 		if (!envIrradianceShader)
-			envIrradianceShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/EnvironmentIrradiance.glsl");
+			envIrradianceShader = Shader::Create("assets/shaders/EnvironmentIrradiance.glsl");
 
 		Ref<TextureCube> irradianceMap = TextureCube::Create(TextureFormat::Float16, irradianceMapSize, irradianceMapSize);
 		envIrradianceShader->Bind();
 		envFiltered->Bind();
 		Renderer::Submit([irradianceMap]()
-		{
+			{
 				glBindImageTexture(0, irradianceMap->GetRendererID(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 				glDispatchCompute(irradianceMap->GetWidth() / 32, irradianceMap->GetHeight() / 32, 6);
 				glGenerateTextureMipmap(irradianceMap->GetRendererID());
-		});
+			});
 
 		return { envFiltered, irradianceMap };
 	}
@@ -327,9 +327,6 @@ namespace Vanta {
 		s_Data.SceneData.SkyboxMaterial->Set("u_SkyIntensity", s_Data.SceneData.SceneEnvironmentIntensity);
 		Renderer::SubmitFullscreenQuad(s_Data.SceneData.SkyboxMaterial);
 
-		float aspectRatio = (float)s_Data.GeoPass->GetSpecification().TargetFramebuffer->GetWidth() / (float)s_Data.GeoPass->GetSpecification().TargetFramebuffer->GetHeight();
-		float frustumSize = 2.0f * sceneCamera.Near * glm::tan(sceneCamera.FOV * 0.5f) * aspectRatio;
-
 		// Render entities
 		for (auto& dc : s_Data.DrawList)
 		{
@@ -353,8 +350,8 @@ namespace Vanta {
 			baseMaterial->Set("u_IBLContribution", s_Data.SceneData.SceneEnvironmentIntensity);
 
 			// Environment (TODO: don't do this per mesh)
-			baseMaterial->Set("u_EnvRadianceTex", s_Data.SceneData.SceneEnvironment.RadianceMap);
-			baseMaterial->Set("u_EnvIrradianceTex", s_Data.SceneData.SceneEnvironment.IrradianceMap);
+			baseMaterial->Set("u_EnvRadianceTex", s_Data.SceneData.SceneEnvironment->RadianceMap);
+			baseMaterial->Set("u_EnvIrradianceTex", s_Data.SceneData.SceneEnvironment->IrradianceMap);
 			baseMaterial->Set("u_BRDFLUTTexture", s_Data.BRDFLUT);
 
 			// Set lights (TODO: move to light environment and don't do per mesh)
@@ -388,7 +385,6 @@ namespace Vanta {
 				});
 			}
 
-
 			auto overrideMaterial = nullptr; // dc.Material;
 			Renderer::SubmitMesh(dc.Mesh, dc.Transform, overrideMaterial);
 		}
@@ -401,6 +397,7 @@ namespace Vanta {
 				glStencilMask(0xff);
 			});
 		}
+
 		for (auto& dc : s_Data.SelectedMeshDrawList)
 		{
 			auto baseMaterial = dc.Mesh->GetMaterial();
@@ -418,8 +415,8 @@ namespace Vanta {
 			baseMaterial->Set("u_IBLContribution", s_Data.SceneData.SceneEnvironmentIntensity);
 
 			// Environment (TODO: don't do this per mesh)
-			baseMaterial->Set("u_EnvRadianceTex", s_Data.SceneData.SceneEnvironment.RadianceMap);
-			baseMaterial->Set("u_EnvIrradianceTex", s_Data.SceneData.SceneEnvironment.IrradianceMap);
+			baseMaterial->Set("u_EnvRadianceTex", s_Data.SceneData.SceneEnvironment->RadianceMap);
+			baseMaterial->Set("u_EnvIrradianceTex", s_Data.SceneData.SceneEnvironment->IrradianceMap);
 			baseMaterial->Set("u_BRDFLUTTexture", s_Data.BRDFLUT);
 
 			baseMaterial->Set("u_LightMatrixCascade0", s_Data.LightMatrices[0]);
@@ -566,9 +563,9 @@ namespace Vanta {
 				auto fb = s_Data.CompositePass->GetSpecification().TargetFramebuffer;
 				auto id = fb->GetColorAttachmentRendererID(1);
 				Renderer::Submit([id]()
-				{
-					glBindTextureUnit(0, id);
-				});
+					{
+						glBindTextureUnit(0, id);
+					});
 			}
 			Renderer::SubmitFullscreenQuad(nullptr);
 			Renderer::EndRenderPass();
@@ -651,12 +648,12 @@ namespace Vanta {
 			glm::vec3 frustumCorners[8] =
 			{
 				glm::vec3(-1.0f,  1.0f, -1.0f),
-				glm::vec3( 1.0f,  1.0f, -1.0f),
-				glm::vec3( 1.0f, -1.0f, -1.0f),
+				glm::vec3(1.0f,  1.0f, -1.0f),
+				glm::vec3(1.0f, -1.0f, -1.0f),
 				glm::vec3(-1.0f, -1.0f, -1.0f),
 				glm::vec3(-1.0f,  1.0f,  1.0f),
-				glm::vec3( 1.0f,  1.0f,  1.0f),
-				glm::vec3( 1.0f, -1.0f,  1.0f),
+				glm::vec3(1.0f,  1.0f,  1.0f),
+				glm::vec3(1.0f, -1.0f,  1.0f),
 				glm::vec3(-1.0f, -1.0f,  1.0f),
 			};
 
@@ -699,6 +696,18 @@ namespace Vanta {
 			glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDir * -minExtents.z, frustumCenter, glm::vec3(0.0f, 0.0f, 1.0f));
 			glm::mat4 lightOrthoMatrix = glm::ortho(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.0f + s_Data.CascadeNearPlaneOffset, maxExtents.z - minExtents.z + s_Data.CascadeFarPlaneOffset);
 
+			// Offset to texel space to avoid shimmering (from https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
+			glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
+			const float ShadowMapResolution = 4096.0f;
+			glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
+			glm::vec4 roundedOrigin = glm::round(shadowOrigin);
+			glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
+			roundOffset = roundOffset * 2.0f / ShadowMapResolution;
+			roundOffset.z = 0.0f;
+			roundOffset.w = 0.0f;
+
+			lightOrthoMatrix[3] += roundOffset;
+
 			// Store split distance and matrix in cascade
 			cascades[i].SplitDepth = (nearClip + splitDist * clipRange) * -1.0f;
 			cascades[i].ViewProj = lightOrthoMatrix * lightViewMatrix;
@@ -727,10 +736,10 @@ namespace Vanta {
 		s_Data.LightViewMatrix = cascades[0].View;
 
 		Renderer::Submit([]()
-		{
-			glEnable(GL_CULL_FACE);
-			glCullFace(GL_BACK);
-		});
+			{
+				glEnable(GL_CULL_FACE);
+				glCullFace(GL_BACK);
+			});
 
 		for (int i = 0; i < 4; i++)
 		{
@@ -796,7 +805,7 @@ namespace Vanta {
 				s_Stats.CompositePass = s_Stats.CompositePassTimer.ElapsedMillis();
 			});
 
-		//	BloomBlurPass();
+			//	BloomBlurPass();
 		}
 
 		s_Data.DrawList.clear();

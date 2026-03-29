@@ -43,6 +43,7 @@ endif()
 
 # ==== CMake Utilities ====
 include(CmakeUtils/VantaOptimization)
+include(CmakeUtils/Vanta)
 
 add_compile_options(
 		$<$<CXX_COMPILER_ID:MSVC>:/Gy>

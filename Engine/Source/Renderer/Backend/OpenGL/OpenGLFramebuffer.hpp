@@ -28,6 +28,7 @@ namespace Vanta {
 	private:
 		FramebufferSpecification m_Specification;
 		RendererID m_RendererID = 0;
+
 		std::vector<RendererID> m_ColorAttachments;
 		RendererID m_DepthAttachment;
 

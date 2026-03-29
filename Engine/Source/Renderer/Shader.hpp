@@ -51,10 +51,10 @@ namespace Vanta
 	{
 		virtual const byte* GetBuffer() const = 0;
 		virtual const UniformDecl* GetUniforms() const = 0;
-		virtual uint32_t GetUniformCount() const = 0;
+		virtual unsigned int GetUniformCount() const = 0;
 	};
 
-	template<uint32_t N, uint32_t U>
+	template<unsigned int N, unsigned int U>
 	struct UniformBufferDeclaration : public UniformBufferBase
 	{
 		byte Buffer[N];
@@ -64,7 +64,7 @@ namespace Vanta
 
 		virtual const byte* GetBuffer() const override { return Buffer; }
 		virtual const UniformDecl* GetUniforms() const override { return Uniforms; }
-		virtual uint32_t GetUniformCount() const { return U; }
+		virtual unsigned int GetUniformCount() const { return U; }
 
 		template<typename T>
 		void Push(const std::string& name, const T& data) {}

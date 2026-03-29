@@ -9,6 +9,8 @@
 
 #include "Renderer/Renderer.hpp"
 
+#include "Utilities/StringUtils.hpp"
+
 namespace Vanta {
 
 #define UNIFORM_LOGGING 0
@@ -97,7 +99,6 @@ namespace Vanta {
 		{
 			VA_CORE_ASSERT(false, "Could not load shader!");
 		}
-
 		in.close();
 		return result;
 	}
@@ -154,42 +155,14 @@ namespace Vanta {
 		return FindToken(string.c_str(), token);
 	}
 
-	std::vector<std::string> SplitString(const std::string& string, const std::string& delimiters)
-	{
-		size_t start = 0;
-		size_t end = string.find_first_of(delimiters);
-
-		std::vector<std::string> result;
-
-		while (end <= std::string::npos)
-		{
-			std::string token = string.substr(start, end - start);
-			if (!token.empty())
-				result.push_back(token);
-
-			if (end == std::string::npos)
-				break;
-
-			start = end + 1;
-			end = string.find_first_of(delimiters, start);
-		}
-
-		return result;
-	}
-
-	std::vector<std::string> SplitString(const std::string& string, const char delimiter)
-	{
-		return SplitString(string, std::string(1, delimiter));
-	}
-
 	std::vector<std::string> Tokenize(const std::string& string)
 	{
-		return SplitString(string, " \t\n\r");
+		return Utils::SplitString(string, " \t\n\r");
 	}
 
 	std::vector<std::string> GetLines(const std::string& string)
 	{
-		return SplitString(string, "\n");
+		return Utils::SplitString(string, "\n");
 	}
 
 	std::string GetBlock(const char* str, const char** outPosition)
@@ -215,12 +188,6 @@ namespace Vanta {
 		uint32_t length = end - str + 1;
 		return std::string(str, length);
 	}
-
-	bool StartsWith(const std::string& string, const std::string& start)
-	{
-		return string.find(start) == 0;
-	}
-
 
 	void OpenGLShader::Parse()
 	{
@@ -321,7 +288,7 @@ namespace Vanta {
 				declaration = new OpenGLShaderUniformDeclaration(domain, t, name, count);
 			}
 
-			if (StartsWith(name, "r_"))
+			if (Utils::StartsWith(name, "r_"))
 			{
 				if (domain == ShaderDomain::Vertex)
 					((OpenGLShaderUniformBufferDeclaration*)m_VSRendererUniformBuffers.front())->PushUniform(declaration);
@@ -518,6 +485,7 @@ namespace Vanta {
 
 	void OpenGLShader::ValidateUniforms()
 	{
+
 	}
 
 	int32_t OpenGLShader::GetUniformLocation(const std::string& name) const
@@ -649,9 +617,9 @@ namespace Vanta {
 		uint32_t offset = uniform->GetOffset();
 		switch (uniform->GetType())
 		{
-			case OpenGLShaderUniformDeclaration::Type::BOOL:
-				UploadUniformFloat(uniform->GetLocation(), *(bool*)&buffer.Data[offset]);
-				break;
+		case OpenGLShaderUniformDeclaration::Type::BOOL:
+			UploadUniformFloat(uniform->GetLocation(), *(bool*)&buffer.Data[offset]);
+			break;
 		case OpenGLShaderUniformDeclaration::Type::FLOAT32:
 			UploadUniformFloat(uniform->GetLocation(), *(float*)&buffer.Data[offset]);
 			break;
@@ -688,9 +656,9 @@ namespace Vanta {
 		uint32_t offset = uniform->GetOffset();
 		switch (uniform->GetType())
 		{
-			case OpenGLShaderUniformDeclaration::Type::BOOL:
-				UploadUniformFloat(uniform->GetLocation(), *(bool*)&buffer.Data[offset]);
-				break;
+		case OpenGLShaderUniformDeclaration::Type::BOOL:
+			UploadUniformFloat(uniform->GetLocation(), *(bool*)&buffer.Data[offset]);
+			break;
 		case OpenGLShaderUniformDeclaration::Type::FLOAT32:
 			UploadUniformFloat(uniform->GetLocation(), *(float*)&buffer.Data[offset]);
 			break;
@@ -879,16 +847,6 @@ namespace Vanta {
 		glUniform2f(location, value.x, value.y);
 	}
 
-	void OpenGLShader::UploadUniformFloat2(const std::string& name, const glm::vec2& values)
-	{
-		glUseProgram(m_RendererID);
-		auto location = glGetUniformLocation(m_RendererID, name.c_str());
-		if (location != -1)
-			glUniform2f(location, values.x, values.y);
-		else
-			VA_LOG_UNIFORM("Uniform '{0}' not found!", name);
-	}
-
 	void OpenGLShader::UploadUniformFloat3(uint32_t location, const glm::vec3& value)
 	{
 		glUniform3f(location, value.x, value.y, value.z);
@@ -947,6 +905,17 @@ namespace Vanta {
 		else
 			VA_LOG_UNIFORM("Uniform '{0}' not found!", name);
 	}
+
+	void OpenGLShader::UploadUniformFloat2(const std::string& name, const glm::vec2& values)
+	{
+		glUseProgram(m_RendererID);
+		auto location = glGetUniformLocation(m_RendererID, name.c_str());
+		if (location != -1)
+			glUniform2f(location, values.x, values.y);
+		else
+			VA_LOG_UNIFORM("Uniform '{0}' not found!", name);
+	}
+
 
 	void OpenGLShader::UploadUniformFloat3(const std::string& name, const glm::vec3& values)
 	{

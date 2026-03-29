@@ -24,6 +24,14 @@ namespace Vanta {
 		glm::vec4 Color;
 	};
 
+	struct CircleVertex
+	{
+		glm::vec3 WorldPosition;
+		float Thickness;
+		glm::vec2 LocalPosition;
+		glm::vec4 Color;
+	};
+
 	struct Renderer2DData
 	{
 		static const uint32_t MaxQuads = 20000;
@@ -45,6 +53,13 @@ namespace Vanta {
 		uint32_t QuadIndexCount = 0;
 		QuadVertex* QuadVertexBufferBase = nullptr;
 		QuadVertex* QuadVertexBufferPtr = nullptr;
+
+		Ref<Shader> CircleShader;
+		Ref<Pipeline> CirclePipeline;
+		Ref<VertexBuffer> CircleVertexBuffer;
+		uint32_t CircleIndexCount = 0;
+		CircleVertex* CircleVertexBufferBase = nullptr;
+		CircleVertex* CircleVertexBufferPtr = nullptr;
 
 		std::array<Ref<Texture2D>, MaxTextureSlots> TextureSlots;
 		uint32_t TextureSlotIndex = 1; // 0 = white texture
@@ -112,7 +127,7 @@ namespace Vanta {
 		s_Data.WhiteTexture->GetWriteableBuffer().Write(&whiteTextureData, sizeof(uint32_t));
 		s_Data.WhiteTexture->Unlock();
 
-		s_Data.TextureShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Renderer2D.glsl");
+		s_Data.TextureShader = Shader::Create("assets/shaders/Renderer2D.glsl");
 
 		// Set all texture slots to 0
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
@@ -124,7 +139,7 @@ namespace Vanta {
 
 		// Lines
 		{
-			s_Data.LineShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Renderer2D_Line.glsl");
+			s_Data.LineShader = Shader::Create("assets/shaders/Renderer2D_Line.glsl");
 
 			PipelineSpecification pipelineSpecification;
 			pipelineSpecification.Layout = {
@@ -143,6 +158,24 @@ namespace Vanta {
 			s_Data.LineIndexBuffer = IndexBuffer::Create(lineIndices, s_Data.MaxLineIndices);
 			delete[] lineIndices;
 		}
+
+		// Circles
+		{
+			s_Data.CircleShader = Shader::Create("assets/shaders/Renderer2D_Circle.glsl");
+
+			PipelineSpecification pipelineSpecification;
+			pipelineSpecification.Layout = {
+				{ ShaderDataType::Float3, "a_WorldPosition" },
+				{ ShaderDataType::Float,  "a_Thickness" },
+				{ ShaderDataType::Float2,  "a_LocalPosition" },
+				{ ShaderDataType::Float4, "a_Color" }
+			};
+			s_Data.CirclePipeline = Pipeline::Create(pipelineSpecification);
+
+			s_Data.CircleVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(QuadVertex));
+			s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
+		}
+
 	}
 
 	void Renderer2D::Shutdown()
@@ -163,6 +196,9 @@ namespace Vanta {
 		s_Data.LineIndexCount = 0;
 		s_Data.LineVertexBufferPtr = s_Data.LineVertexBufferBase;
 
+		s_Data.CircleIndexCount = 0;
+		s_Data.CircleVertexBufferPtr = s_Data.CircleVertexBufferBase;
+
 		s_Data.TextureSlotIndex = 1;
 	}
 
@@ -179,9 +215,10 @@ namespace Vanta {
 			for (uint32_t i = 0; i < s_Data.TextureSlotIndex; i++)
 				s_Data.TextureSlots[i]->Bind(i);
 
+			s_Data.QuadVertexBuffer->Bind();
 			s_Data.QuadPipeline->Bind();
 			s_Data.QuadIndexBuffer->Bind();
-			Renderer::DrawIndexed(s_Data.QuadIndexCount, PrimitiveType::Triangles, s_Data.DepthTest);
+			Renderer::DrawIndexed(s_Data.QuadIndexCount, PrimitiveType::Triangles, s_Data.DepthTest, false);
 			s_Data.Stats.DrawCalls++;
 		}
 
@@ -193,12 +230,28 @@ namespace Vanta {
 			s_Data.LineShader->Bind();
 			s_Data.LineShader->SetMat4("u_ViewProjection", s_Data.CameraViewProj);
 
+			s_Data.LineVertexBuffer->Bind();
 			s_Data.LinePipeline->Bind();
 			s_Data.LineIndexBuffer->Bind();
 			Renderer::SetLineThickness(2.0f);
-			Renderer::DrawIndexed(s_Data.LineIndexCount, PrimitiveType::Lines, false);
+			Renderer::DrawIndexed(s_Data.LineIndexCount, PrimitiveType::Lines, false, false);
 			s_Data.Stats.DrawCalls++;
 		}
+
+		dataSize = (uint8_t*)s_Data.CircleVertexBufferPtr - (uint8_t*)s_Data.CircleVertexBufferBase;
+		if (dataSize)
+		{
+			s_Data.CircleVertexBuffer->SetData(s_Data.CircleVertexBufferBase, dataSize);
+
+			s_Data.CircleShader->Bind();
+			s_Data.CircleShader->SetMat4("u_ViewProjection", s_Data.CameraViewProj);
+
+			s_Data.CircleVertexBuffer->Bind();
+			s_Data.CirclePipeline->Bind();
+			s_Data.QuadIndexBuffer->Bind();
+			Renderer::DrawIndexed(s_Data.CircleIndexCount, PrimitiveType::Triangles, false, false);
+			s_Data.Stats.DrawCalls++;
+	}
 
 #if OLD
 		Flush();
@@ -430,7 +483,7 @@ namespace Vanta {
 		const float tilingFactor = 1.0f;
 
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
-			* glm::rotate(glm::mat4(1.0f), glm::radians(rotation), { 0.0f, 0.0f, 1.0f })
+			* glm::rotate(glm::mat4(1.0f), rotation, { 0.0f, 0.0f, 1.0f })
 			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
 
 		s_Data.QuadVertexBufferPtr->Position = transform * s_Data.QuadVertexPositions[0];
@@ -496,7 +549,7 @@ namespace Vanta {
 		}
 
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
-			* glm::rotate(glm::mat4(1.0f), glm::radians(rotation), { 0.0f, 0.0f, 1.0f })
+			* glm::rotate(glm::mat4(1.0f), rotation, { 0.0f, 0.0f, 1.0f })
 			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
 
 		s_Data.QuadVertexBufferPtr->Position = transform * s_Data.QuadVertexPositions[0];
@@ -530,6 +583,73 @@ namespace Vanta {
 		s_Data.QuadIndexCount += 6;
 
 		s_Data.Stats.QuadCount++;
+	}
+
+	void Renderer2D::DrawRotatedRect(const glm::vec2& position, const glm::vec2& size, float rotation, const glm::vec4& color)
+	{
+		DrawRotatedRect({ position.x, position.y, 0.0f }, size, rotation, color);
+	}
+
+	void Renderer2D::DrawRotatedRect(const glm::vec3& position, const glm::vec2& size, float rotation, const glm::vec4& color)
+	{
+		if (s_Data.LineIndexCount >= Renderer2DData::MaxLineIndices)
+			FlushAndResetLines();
+
+		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
+			* glm::rotate(glm::mat4(1.0f), rotation, { 0.0f, 0.0f, 1.0f })
+			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
+
+		glm::vec3 positions[4] =
+		{
+			transform * s_Data.QuadVertexPositions[0],
+			transform * s_Data.QuadVertexPositions[1],
+			transform * s_Data.QuadVertexPositions[2],
+			transform * s_Data.QuadVertexPositions[3]
+		};
+
+		for (int i = 0; i < 4; i++)
+		{
+			auto& v0 = positions[i];
+			auto& v1 = positions[(i + 1) % 4];
+
+			s_Data.LineVertexBufferPtr->Position = v0;
+			s_Data.LineVertexBufferPtr->Color = color;
+			s_Data.LineVertexBufferPtr++;
+
+			s_Data.LineVertexBufferPtr->Position = v1;
+			s_Data.LineVertexBufferPtr->Color = color;
+			s_Data.LineVertexBufferPtr++;
+
+			s_Data.LineIndexCount += 2;
+			s_Data.Stats.LineCount++;
+		}
+	}
+
+	void Renderer2D::DrawCircle(const glm::vec2& position, float radius, const glm::vec4& color, float thickness)
+	{
+		DrawCircle({ position.x, position.y, 0.0f }, radius, color, thickness);
+	}
+
+	void Renderer2D::DrawCircle(const glm::vec3& position, float radius, const glm::vec4& color, float thickness)
+	{
+		if (s_Data.CircleIndexCount >= Renderer2DData::MaxIndices)
+			FlushAndReset();
+
+		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
+			* glm::scale(glm::mat4(1.0f), { radius * 2.0f, radius * 2.0f, 1.0f });
+
+		for (int i = 0; i < 4; i++)
+		{
+			s_Data.CircleVertexBufferPtr->WorldPosition = transform * s_Data.QuadVertexPositions[i];
+			s_Data.CircleVertexBufferPtr->Thickness = thickness;
+			s_Data.CircleVertexBufferPtr->LocalPosition = s_Data.QuadVertexPositions[i] * 2.0f;
+			s_Data.CircleVertexBufferPtr->Color = color;
+			s_Data.CircleVertexBufferPtr++;
+
+			s_Data.CircleIndexCount += 6;
+			s_Data.Stats.QuadCount++;
+		}
+
 	}
 
 	void Renderer2D::DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color)

@@ -4,6 +4,8 @@
 #include "Renderer/Renderer.hpp"
 #include "Renderer/Framebuffer.hpp"
 
+#include "Asset/AssetManager.hpp"
+
 #include <imgui.h>
 #include <glad/glad.h>
 
@@ -33,6 +35,9 @@ namespace Vanta {
 
         Renderer::Init();
         Renderer::WaitAndRender();
+
+        AssetTypes::Init();
+        AssetManager::Init();
     }
 
     Application::~Application()
@@ -44,6 +49,8 @@ namespace Vanta {
             layer->OnDetach();
             delete layer;
         }
+
+        AssetManager::Shutdown();
     }
 
     void Application::PushLayer(Layer* layer)

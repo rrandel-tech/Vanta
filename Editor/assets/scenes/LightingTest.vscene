@@ -1,6 +1,6 @@
 Scene: Scene Name
 Environment:
-  AssetPath: C:/Development/Vanta/Editor/assets/env/birchwood_4k.hdr
+  AssetPath: assets\env\env\birchwood_4k.hdr
   Light:
     Direction: [-0.788999975, 0.777999997, -0.782999992]
     Radiance: [1, 0.999989986, 0.999989986]
@@ -14,7 +14,7 @@ Entities:
       Rotation: [1, 0, 0, 0]
       Scale: [1, 1, 1]
     SkyLightComponent:
-      EnvironmentAssetPath: C:/Development/Vanta/Editor/assets/env/birchwood_4k.hdr
+      EnvironmentAssetPath: assets\env\env\birchwood_4k.hdr
       Intensity: 1
       Angle: 0
   - Entity: 3370882484222092056
@@ -37,7 +37,7 @@ Entities:
       Rotation: [1, 8.88205631e-16, 2.98023224e-08, -2.64705906e-23]
       Scale: [9.14999962, 9.14999962, 9.14999962]
     MeshComponent:
-      AssetPath: C:/Development/Vanta/Editor/assets/meshes/CubeScene.fbx
+      AssetPath: assets\env\meshes\CubeScene.fbx
   - Entity: 7475399290764333888
     TagComponent:
       Tag: Sphere
@@ -46,4 +46,4 @@ Entities:
       Rotation: [1, 0, 0, 0]
       Scale: [2.6935997, 2.6935997, 2.6935997]
     MeshComponent:
-      AssetPath: C:/Development/Vanta/Editor/assets/meshes/Sphere1m.fbx
+      AssetPath: assets\env\meshes\Sphere1m.fbx

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Renderer/RendererAPI.hpp"
-
 #include <glm/glm.hpp>
+
+#include "Renderer/RendererAPI.hpp"
 
 namespace Vanta {
 
@@ -52,7 +52,7 @@ namespace Vanta {
 
 		// TODO: Temp, needs scale
 		bool NoResize = false;
-
+		
 		// SwapChainTarget = screen buffer (i.e. no framebuffer)
 		bool SwapChainTarget = false;
 	};

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "vapch.hpp"
-
 namespace Vanta {
 
 	class RenderCommandQueue

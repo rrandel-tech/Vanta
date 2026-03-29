@@ -3,6 +3,9 @@
 
 #include "Entity.hpp"
 #include "Components.hpp"
+#include "Renderer/MeshFactory.hpp"
+
+#include "Asset/AssetManager.hpp"
 
 #include "yaml-cpp/yaml.h"
 
@@ -151,7 +154,7 @@ namespace Vanta {
 	{
 	}
 
-	static std::tuple<glm::vec3, glm::quat, glm::vec3> GetTransformDecomposition(const glm::mat4& transform)
+	/*static std::tuple<glm::vec3, glm::quat, glm::vec3> GetTransformDecomposition(const glm::mat4& transform)
 	{
 		glm::vec3 scale, translation, skew;
 		glm::vec4 perspective;
@@ -159,7 +162,7 @@ namespace Vanta {
 		glm::decompose(transform, scale, orientation, translation, skew, perspective);
 
 		return { translation, orientation, scale };
-	}
+	}*/
 
 	static void SerializeEntity(YAML::Emitter& out, Entity entity)
 	{
@@ -167,6 +170,23 @@ namespace Vanta {
 		out << YAML::BeginMap; // Entity
 		out << YAML::Key << "Entity";
 		out << YAML::Value << uuid;
+
+		if (entity.HasComponent<RelationshipComponent>())
+		{
+			auto& relationshipComponent = entity.GetComponent<RelationshipComponent>();
+			out << YAML::Key << "Parent" << YAML::Value << relationshipComponent.ParentHandle;
+
+			out << YAML::Key << "Children";
+			out << YAML::Value << YAML::BeginSeq;
+
+			for (auto child : relationshipComponent.Children)
+			{
+				out << YAML::BeginMap;
+				out << YAML::Key << "Handle" << YAML::Value << child;
+				out << YAML::EndMap;
+			}
+			out << YAML::EndSeq;
+		}
 
 		if (entity.HasComponent<TagComponent>())
 		{
@@ -184,11 +204,10 @@ namespace Vanta {
 			out << YAML::Key << "TransformComponent";
 			out << YAML::BeginMap; // TransformComponent
 
-			auto& transform = entity.GetComponent<TransformComponent>().Transform;
-			auto[pos, rot, scale] = GetTransformDecomposition(transform);
-			out << YAML::Key << "Position" << YAML::Value << pos;
-			out << YAML::Key << "Rotation" << YAML::Value << rot;
-			out << YAML::Key << "Scale" << YAML::Value << scale;
+			auto& transform = entity.GetComponent<TransformComponent>();
+			out << YAML::Key << "Position" << YAML::Value << transform.Translation;
+			out << YAML::Key << "Rotation" << YAML::Value << transform.Rotation;
+			out << YAML::Key << "Scale" << YAML::Value << transform.Scale;
 
 			out << YAML::EndMap; // TransformComponent
 		}
@@ -199,7 +218,10 @@ namespace Vanta {
 			out << YAML::BeginMap; // MeshComponent
 
 			auto mesh = entity.GetComponent<MeshComponent>().Mesh;
-			out << YAML::Key << "AssetPath" << YAML::Value << mesh->GetFilePath();
+			if (mesh)
+				out << YAML::Key << "AssetID" << YAML::Value << mesh->Handle;
+			else
+				out << YAML::Key << "AssetID" << YAML::Value << 0;
 
 			out << YAML::EndMap; // MeshComponent
 		}
@@ -210,7 +232,17 @@ namespace Vanta {
 			out << YAML::BeginMap; // CameraComponent
 
 			auto& cameraComponent = entity.GetComponent<CameraComponent>();
-			out << YAML::Key << "Camera" << YAML::Value << "some camera data...";
+			auto& camera = cameraComponent.Camera;
+			out << YAML::Key << "Camera" << YAML::Value;
+			out << YAML::BeginMap; // Camera
+			out << YAML::Key << "ProjectionType" << YAML::Value << (int)camera.GetProjectionType();
+			out << YAML::Key << "PerspectiveFOV" << YAML::Value << camera.GetPerspectiveVerticalFOV();
+			out << YAML::Key << "PerspectiveNear" << YAML::Value << camera.GetPerspectiveNearClip();
+			out << YAML::Key << "PerspectiveFar" << YAML::Value << camera.GetPerspectiveFarClip();
+			out << YAML::Key << "OrthographicSize" << YAML::Value << camera.GetOrthographicSize();
+			out << YAML::Key << "OrthographicNear" << YAML::Value << camera.GetOrthographicNearClip();
+			out << YAML::Key << "OrthographicFar" << YAML::Value << camera.GetOrthographicFarClip();
+			out << YAML::EndMap; // Camera
 			out << YAML::Key << "Primary" << YAML::Value << cameraComponent.Primary;
 
 			out << YAML::EndMap; // CameraComponent
@@ -236,7 +268,7 @@ namespace Vanta {
 			out << YAML::BeginMap; // SkyLightComponent
 
 			auto& skyLightComponent = entity.GetComponent<SkyLightComponent>();
-			out << YAML::Key << "EnvironmentAssetPath" << YAML::Value << skyLightComponent.SceneEnvironment.FilePath;
+			out << YAML::Key << "EnvironmentMap" << YAML::Value << skyLightComponent.SceneEnvironment->Handle;
 			out << YAML::Key << "Intensity" << YAML::Value << skyLightComponent.Intensity;
 			out << YAML::Key << "Angle" << YAML::Value << skyLightComponent.Angle;
 
@@ -265,7 +297,7 @@ namespace Vanta {
 		out << YAML::Key << "Environment";
 		out << YAML::Value;
 		out << YAML::BeginMap; // Environment
-		out << YAML::Key << "AssetPath" << YAML::Value << scene->GetEnvironment().FilePath;
+		out << YAML::Key << "AssetHandle" << YAML::Value << scene->GetEnvironment()->Handle;
 		const auto& light = scene->GetLight();
 		out << YAML::Key << "Light" << YAML::Value;
 		out << YAML::BeginMap; // Light
@@ -276,6 +308,14 @@ namespace Vanta {
 		out << YAML::EndMap; // Environment
 	}
 
+	static bool CheckPath(const std::string& path)
+	{
+		FILE* f = fopen(path.c_str(), "rb");
+		if (f)
+			fclose(f);
+		return f != nullptr;
+	}
+
 	void SceneSerializer::Serialize(const std::string& filepath)
 	{
 		YAML::Emitter out;
@@ -283,6 +323,7 @@ namespace Vanta {
 		out << YAML::Key << "Scene";
 		out << YAML::Value << "Scene Name";
 		SerializeEnvironment(out, m_Scene);
+
 		out << YAML::Key << "Entities";
 		out << YAML::Value << YAML::BeginSeq;
 		m_Scene->m_Registry.each([&](auto entityID)
@@ -320,10 +361,19 @@ namespace Vanta {
 		std::string sceneName = data["Scene"].as<std::string>();
 		VA_CORE_INFO("Deserializing scene '{0}'", sceneName);
 
-		auto environment = data["Environment"];
+		/*auto environment = data["Environment"];
 		if (environment)
 		{
-			std::string envPath = environment["AssetPath"].as<std::string>();
+			AssetHandle assetHandle;
+			if (environment["AssetPath"])
+			{
+				std::string envPath = environment["AssetPath"].as<std::string>();
+				assetHandle = AssetManager::GetAssetIDForFile(envPath);
+			}
+			else
+			{
+				assetHandle = environment["AssetHandle"].as<uint64_t>();
+			}
 			//m_Scene->SetEnvironment(Environment::Load(envPath));
 
 			auto lightNode = environment["Light"];
@@ -334,7 +384,9 @@ namespace Vanta {
 				light.Radiance = lightNode["Radiance"].as<glm::vec3>();
 				light.Multiplier = lightNode["Multiplier"].as<float>();
 			}
-		}
+		}*/
+
+		std::vector<std::string> missingPaths;
 
 		auto entities = data["Entities"];
 		if (entities)
@@ -352,42 +404,90 @@ namespace Vanta {
 
 				Entity deserializedEntity = m_Scene->CreateEntityWithID(uuid, name);
 
+				auto& relationshipComponent = deserializedEntity.GetComponent<RelationshipComponent>();
+				uint64_t parentHandle = entity["Parent"] ? entity["Parent"].as<uint64_t>() : 0;
+				relationshipComponent.ParentHandle = parentHandle;
+
+				auto children = entity["Children"];
+				if (children)
+				{
+					for (auto child : children)
+					{
+						uint64_t childHandle = child["Handle"].as<uint64_t>();
+						relationshipComponent.Children.push_back(childHandle);
+					}
+				}
+
 				auto transformComponent = entity["TransformComponent"];
 				if (transformComponent)
 				{
 					// Entities always have transforms
-					auto& transform = deserializedEntity.GetComponent<TransformComponent>().Transform;
-					glm::vec3 translation = transformComponent["Position"].as<glm::vec3>();
-					glm::quat rotation = transformComponent["Rotation"].as<glm::quat>();
-					glm::vec3 scale = transformComponent["Scale"].as<glm::vec3>();
-
-					transform = glm::translate(glm::mat4(1.0f), translation) *
-						glm::toMat4(rotation) * glm::scale(glm::mat4(1.0f), scale);
+					auto& transform = deserializedEntity.GetComponent<TransformComponent>();
+					transform.Translation = transformComponent["Position"].as<glm::vec3>();
+					auto rotationNode = transformComponent["Rotation"];
+					// Rotations used to be stored as quaternions
+					if (rotationNode.size() == 4)
+					{
+						glm::quat rotation = transformComponent["Rotation"].as<glm::quat>();
+						transform.Rotation = glm::eulerAngles(rotation);
+					}
+					else
+					{
+						VA_CORE_ASSERT(rotationNode.size() == 3);
+						transform.Rotation = transformComponent["Rotation"].as<glm::vec3>();
+					}
+					transform.Scale = transformComponent["Scale"].as<glm::vec3>();
 
 					VA_CORE_INFO("  Entity Transform:");
-					VA_CORE_INFO("    Translation: {0}, {1}, {2}", translation.x, translation.y, translation.z);
-					VA_CORE_INFO("    Rotation: {0}, {1}, {2}, {3}", rotation.w, rotation.x, rotation.y, rotation.z);
-					VA_CORE_INFO("    Scale: {0}, {1}, {2}", scale.x, scale.y, scale.z);
+					VA_CORE_INFO("    Translation: {0}, {1}, {2}", transform.Translation.x, transform.Translation.y, transform.Translation.z);
+					VA_CORE_INFO("    Rotation: {0}, {1}, {2}", transform.Rotation.x, transform.Rotation.y, transform.Rotation.z);
+					VA_CORE_INFO("    Scale: {0}, {1}, {2}", transform.Scale.x, transform.Scale.y, transform.Scale.z);
 				}
 
 				auto meshComponent = entity["MeshComponent"];
 				if (meshComponent)
 				{
-					std::string meshPath = meshComponent["AssetPath"].as<std::string>();
-					if (!deserializedEntity.HasComponent<MeshComponent>())
-						deserializedEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshPath));
+					UUID assetID;
+					if (meshComponent["AssetPath"])
+					{
+						std::string filepath = meshComponent["AssetPath"].as<std::string>();
+						assetID = AssetManager::GetAssetHandleFromFilePath(filepath);
+					}
+					else
+					{
+						assetID = meshComponent["AssetID"].as<uint64_t>();
+					}
 
-					VA_CORE_INFO("  Mesh Asset Path: {0}", meshPath);
+					if (AssetManager::IsAssetHandleValid(assetID) && !deserializedEntity.HasComponent<MeshComponent>())
+					{
+						deserializedEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>(assetID));
+					}
 				}
 
 				auto cameraComponent = entity["CameraComponent"];
 				if (cameraComponent)
 				{
 					auto& component = deserializedEntity.AddComponent<CameraComponent>();
-					component.Camera = SceneCamera();
-					component.Primary = cameraComponent["Primary"].as<bool>();
+					auto cameraNode = cameraComponent["Camera"];
 
-					VA_CORE_INFO("  Primary Camera: {0}", component.Primary);
+					component.Camera = SceneCamera();
+					auto& camera = component.Camera;
+					if (cameraNode["ProjectionType"])
+						camera.SetProjectionType((SceneCamera::ProjectionType)cameraNode["ProjectionType"].as<int>());
+					if (cameraNode["PerspectiveFOV"])
+						camera.SetPerspectiveVerticalFOV(cameraNode["PerspectiveFOV"].as<float>());
+					if (cameraNode["PerspectiveNear"])
+						camera.SetPerspectiveNearClip(cameraNode["PerspectiveNear"].as<float>());
+					if (cameraNode["PerspectiveFar"])
+						camera.SetPerspectiveFarClip(cameraNode["PerspectiveFar"].as<float>());
+					if (cameraNode["OrthographicSize"])
+						camera.SetOrthographicSize(cameraNode["OrthographicSize"].as<float>());
+					if (cameraNode["OrthographicNear"])
+						camera.SetOrthographicNearClip(cameraNode["OrthographicNear"].as<float>());
+					if (cameraNode["OrthographicFar"])
+						camera.SetOrthographicFarClip(cameraNode["OrthographicFar"].as<float>());
+
+					component.Primary = cameraComponent["Primary"].as<bool>();
 				}
 
 				auto directionalLightComponent = entity["DirectionalLightComponent"];
@@ -403,10 +503,24 @@ namespace Vanta {
 				auto skyLightComponent = entity["SkyLightComponent"];
 				if (skyLightComponent)
 				{
-					auto& component = deserializedEntity.AddComponent<SkyLightComponent>();
-					std::string env = skyLightComponent["EnvironmentAssetPath"].as<std::string>();
-					if (!env.empty())
-						component.SceneEnvironment = Environment::Load(env);
+					auto component = deserializedEntity.AddComponent<SkyLightComponent>();
+
+					AssetHandle assetHandle;
+					if (skyLightComponent["EnvironmentAssetPath"])
+					{
+						std::string filepath = skyLightComponent["EnvironmentAssetPath"].as<std::string>();
+						assetHandle = AssetManager::GetAssetHandleFromFilePath(filepath);
+					}
+					else
+					{
+						assetHandle = skyLightComponent["EnvironmentMap"].as<uint64_t>();
+					}
+
+					if (AssetManager::IsAssetHandleValid(assetHandle))
+					{
+						component.SceneEnvironment = AssetManager::GetAsset<Environment>(assetHandle);
+					}
+
 					component.Intensity = skyLightComponent["Intensity"].as<float>();
 					component.Angle = skyLightComponent["Angle"].as<float>();
 				}
@@ -420,6 +534,18 @@ namespace Vanta {
 				}
 			}
 		}
+
+		if (missingPaths.size())
+		{
+			VA_CORE_ERROR("The following files could not be loaded:");
+			for (auto& path : missingPaths)
+			{
+				VA_CORE_ERROR("  {0}", path);
+			}
+
+			return false;
+		}
+
 		return true;
 	}
 

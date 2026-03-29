@@ -6,8 +6,6 @@
 namespace Vanta {
 
 	static FastNoise s_FastNoise;
-	static std::uniform_real_distribution<float> s_Jitters(0.f, 1.f);
-	static std::default_random_engine s_JitterGenerator(1337u);
 
 	Noise::Noise(int seed)
 	{

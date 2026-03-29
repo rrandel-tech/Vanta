@@ -9,10 +9,15 @@
 
 #include "Renderer/Renderer2D.hpp"
 
+#include "Math/Math.hpp"
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+// TEMP
+#include "Core/Input.hpp"
 
 namespace Vanta {
 
@@ -25,7 +30,7 @@ namespace Vanta {
 		UUID SceneID;
 	};
 
-	Scene::Scene(const std::string& debugName)
+	Scene::Scene(const std::string& debugName, bool isEditorScene)
 		: m_DebugName(debugName)
 	{
 		m_SceneEntity = m_Registry.create();
@@ -38,34 +43,39 @@ namespace Vanta {
 
 	Scene::~Scene()
 	{
+		m_Registry.on_destroy<ScriptComponent>().disconnect();
+
 		m_Registry.clear();
 		s_ActiveScenes.erase(m_SceneID);
 	}
 
 	void Scene::Init()
 	{
-		auto skyboxShader = Shader::Create("C:/Development/Vanta/Editor/assets/shaders/Skybox.glsl");
+		auto skyboxShader = Shader::Create("assets/shaders/Skybox.glsl");
 		m_SkyboxMaterial = MaterialInstance::Create(Material::Create(skyboxShader));
 		m_SkyboxMaterial->SetFlag(MaterialFlag::DepthTest, false);
-	}
-
-	void Scene::OnShutdown()
-	{
-	}
-
-	static std::tuple<glm::vec3, glm::quat, glm::vec3> GetTransformDecomposition(const glm::mat4& transform)
-	{
-		glm::vec3 scale, translation, skew;
-		glm::vec4 perspective;
-		glm::quat orientation;
-		glm::decompose(transform, scale, orientation, translation, skew, perspective);
-
-		return { translation, orientation, scale };
 	}
 
 	// Merge OnUpdate/Render into one function?
 	void Scene::OnUpdate(Timestep ts)
 	{
+		{
+			auto view = m_Registry.view<TransformComponent>();
+			for (auto entity : view)
+			{
+				auto& transformComponent = view.get(entity);
+				glm::mat4 transform = GetTransformRelativeToParent(Entity(entity, this));
+				glm::vec3 translation;
+				glm::vec3 rotation;
+				glm::vec3 scale;
+				Math::DecomposeTransform(transform, translation, rotation, scale);
+
+				glm::quat rotationQuat = glm::quat(rotation);
+				transformComponent.Up = glm::normalize(glm::rotate(rotationQuat, glm::vec3(0.0f, 1.0f, 0.0f)));
+				transformComponent.Right = glm::normalize(glm::rotate(rotationQuat, glm::vec3(1.0f, 0.0f, 0.0f)));
+				transformComponent.Forward = glm::normalize(glm::rotate(rotationQuat, glm::vec3(0.0f, 0.0f, -1.0f)));
+			}
+		}
 	}
 
 	void Scene::OnRenderRuntime(Timestep ts)
@@ -77,8 +87,7 @@ namespace Vanta {
 		if (!cameraEntity)
 			return;
 
-		// Process camera entity
-		glm::mat4 cameraViewMatrix = glm::inverse(cameraEntity.GetComponent<TransformComponent>().Transform);
+		glm::mat4 cameraViewMatrix = glm::inverse(GetTransformRelativeToParent(cameraEntity));
 		VA_CORE_ASSERT(cameraEntity, "Scene does not contain any cameras!");
 		SceneCamera& camera = cameraEntity.GetComponent<CameraComponent>();
 		camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
@@ -91,7 +100,7 @@ namespace Vanta {
 			for (auto entity : lights)
 			{
 				auto [transformComponent, lightComponent] = lights.get<TransformComponent, DirectionalLightComponent>(entity);
-				glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.Transform) * glm::vec3(1.0f));
+				glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.GetTransform()) * glm::vec3(1.0f));
 				m_LightEnvironment.DirectionalLights[directionalLightIndex++] =
 				{
 					direction,
@@ -104,14 +113,15 @@ namespace Vanta {
 
 		// TODO: only one sky light at the moment!
 		{
-			m_Environment = Environment();
+			m_Environment = Ref<Environment>::Create();
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);
 				m_Environment = skyLightComponent.SceneEnvironment;
 				m_EnvironmentIntensity = skyLightComponent.Intensity;
-				SetSkybox(m_Environment.RadianceMap);
+				if (m_Environment)
+					SetSkybox(m_Environment->RadianceMap);
 			}
 		}
 
@@ -125,9 +135,10 @@ namespace Vanta {
 			if (meshComponent.Mesh)
 			{
 				meshComponent.Mesh->OnUpdate(ts);
+				glm::mat4 transform = GetTransformRelativeToParent(Entity(entity, this));
 
 				// TODO: Should we render (logically)
-				SceneRenderer::SubmitMesh(meshComponent, transformComponent, nullptr);
+				SceneRenderer::SubmitMesh(meshComponent, transform);
 			}
 		}
 		SceneRenderer::EndScene();
@@ -158,7 +169,6 @@ namespace Vanta {
 		// RENDER 3D SCENE
 		/////////////////////////////////////////////////////////////////////
 
-		// Process lights
 		{
 			m_LightEnvironment = LightEnvironment();
 			auto lights = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
@@ -166,7 +176,7 @@ namespace Vanta {
 			for (auto entity : lights)
 			{
 				auto [transformComponent, lightComponent] = lights.get<TransformComponent, DirectionalLightComponent>(entity);
-				glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.Transform) * glm::vec3(1.0f));
+				glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.GetTransform()) * glm::vec3(1.0f));
 				m_LightEnvironment.DirectionalLights[directionalLightIndex++] =
 				{
 					direction,
@@ -177,16 +187,16 @@ namespace Vanta {
 			}
 		}
 
-		// TODO: only one sky light at the moment!
 		{
-			m_Environment = Environment();
+			m_Environment = Ref<Environment>::Create();
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);
 				m_Environment = skyLightComponent.SceneEnvironment;
 				m_EnvironmentIntensity = skyLightComponent.Intensity;
-				SetSkybox(m_Environment.RadianceMap);
+				if (m_Environment)
+					SetSkybox(m_Environment->RadianceMap);
 			}
 		}
 
@@ -196,19 +206,22 @@ namespace Vanta {
 		SceneRenderer::BeginScene(this, { editorCamera, editorCamera.GetViewMatrix(), 0.1f, 1000.0f, 45.0f }); // TODO: real values
 		for (auto entity : group)
 		{
-			const auto& [meshComponent, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
+			auto [meshComponent, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
 			if (meshComponent.Mesh)
 			{
 				meshComponent.Mesh->OnUpdate(ts);
 
-				// TODO: Should we render (logically)
+				// TODO: Is this any good?
+				glm::mat4 transform = GetTransformRelativeToParent(Entity{ entity, this });
 
+				// TODO: Should we render (logically)
 				if (m_SelectedEntity == entity)
-					SceneRenderer::SubmitSelectedMesh(meshComponent, transformComponent);
+					SceneRenderer::SubmitSelectedMesh(meshComponent, transform);
 				else
-					SceneRenderer::SubmitMesh(meshComponent, transformComponent);
+					SceneRenderer::SubmitMesh(meshComponent, transform);
 			}
 		}
+
 		SceneRenderer::EndScene();
 		/////////////////////////////////////////////////////////////////////
 
@@ -242,6 +255,8 @@ namespace Vanta {
 
 	void Scene::OnRuntimeStop()
 	{
+		// Input::SetCursorMode(CursorMode::Normal);
+
 		m_IsPlaying = false;
 	}
 
@@ -275,9 +290,11 @@ namespace Vanta {
 		auto& idComponent = entity.AddComponent<IDComponent>();
 		idComponent.ID = {};
 
-		entity.AddComponent<TransformComponent>(glm::mat4(1.0f));
+		entity.AddComponent<TransformComponent>();
 		if (!name.empty())
 			entity.AddComponent<TagComponent>(name);
+
+		entity.AddComponent<RelationshipComponent>();
 
 		m_EntityIDMap[idComponent.ID] = entity;
 		return entity;
@@ -289,9 +306,11 @@ namespace Vanta {
 		auto& idComponent = entity.AddComponent<IDComponent>();
 		idComponent.ID = uuid;
 
-		entity.AddComponent<TransformComponent>(glm::mat4(1.0f));
+		entity.AddComponent<TransformComponent>();
 		if (!name.empty())
 			entity.AddComponent<TagComponent>(name);
+
+		entity.AddComponent<RelationshipComponent>();
 
 		VA_CORE_ASSERT(m_EntityIDMap.find(uuid) == m_EntityIDMap.end());
 		m_EntityIDMap[uuid] = entity;
@@ -335,11 +354,11 @@ namespace Vanta {
 			newEntity = CreateEntity();
 
 		CopyComponentIfExists<TransformComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
+		CopyComponentIfExists<RelationshipComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<MeshComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<DirectionalLightComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<SkyLightComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<CameraComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
-		CopyComponentIfExists<SpriteRendererComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 	}
 
 	Entity Scene::FindEntityByTag(const std::string& tag)
@@ -354,6 +373,30 @@ namespace Vanta {
 		}
 
 		return Entity{};
+	}
+
+	Entity Scene::FindEntityByUUID(UUID id)
+	{
+		auto view = m_Registry.view<IDComponent>();
+		for (auto entity : view)
+		{
+			auto& idComponent = m_Registry.get<IDComponent>(entity);
+			if (idComponent.ID == id)
+				return Entity(entity, this);
+		}
+
+		return Entity{};
+	}
+
+	glm::mat4 Scene::GetTransformRelativeToParent(Entity entity)
+	{
+		glm::mat4 transform(1.0F);
+
+		Entity parent = FindEntityByUUID(entity.GetParentUUID());
+		if (parent)
+			transform = GetTransformRelativeToParent(parent);
+
+		return transform * entity.Transform().GetTransform();
 	}
 
 	// Copy to runtime
@@ -379,6 +422,7 @@ namespace Vanta {
 
 		CopyComponent<TagComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<TransformComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<RelationshipComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<MeshComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<DirectionalLightComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<SkyLightComponent>(target->m_Registry, m_Registry, enttMap);

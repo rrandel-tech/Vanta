@@ -1,8 +1,22 @@
 #pragma once
 
 #include "Vanta.hpp"
+
+#include "ImGui/ImGuiLayer.hpp"
 #include "Editor/EditorCamera.hpp"
+#include "imgui_internal.h"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
+
+#include <string>
+
 #include "Editor/SceneHierarchyPanel.hpp"
+#include "Editor/AssetManagerPanel.hpp"
+#include "Editor/ObjectsPanel.hpp"
 
 namespace Vanta {
 
@@ -20,6 +34,7 @@ namespace Vanta {
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 		virtual void OnUpdate(Timestep ts) override;
+
 		virtual void OnImGuiRender() override;
 		virtual void OnEvent(Event& event) override;
 		bool OnKeyPressedEvent(KeyPressedEvent& event);
@@ -66,9 +81,12 @@ namespace Vanta {
 		float GetSnapValue();
 	private:
 		Scope<SceneHierarchyPanel> m_SceneHierarchyPanel;
+		Scope<AssetManagerPanel> m_AssetManagerPanel;
+		Scope<ObjectsPanel> m_ObjectsPanel;
 
-		Ref<Scene> m_RuntimeScene, m_EditorScene;
+		Ref<Scene> m_RuntimeScene, m_EditorScene, m_CurrentScene;
 		std::string m_SceneFilePath;
+		bool m_ReloadScriptOnPlay = true;
 
 		EditorCamera m_EditorCamera;
 

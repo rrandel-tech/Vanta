@@ -20,8 +20,8 @@ namespace Vanta {
 		static void Clear(float r, float g, float b, float a = 1.0f);
 		static void SetClearColor(float r, float g, float b, float a);
 
-		static void DrawIndexed(uint32_t count, PrimitiveType type, bool depthTest = true);
-
+		static void DrawIndexed(uint32_t count, PrimitiveType type, bool depthTest = true, bool faceCulling = true);
+		
 		// For OpenGL
 		static void SetLineThickness(float thickness);
 
@@ -41,7 +41,7 @@ namespace Vanta {
 				// NOTE: Instead of destroying we could try and enforce all items to be trivally destructible
 				// however some items like uniforms which contain std::strings still exist for now
 				// static_assert(std::is_trivially_destructible_v<FuncT>, "FuncT must be trivially destructible");
-				pFunc->~FuncT();
+				//pFunc->~FuncT();
 			};
 			auto storageBuffer = GetRenderCommandQueue().Allocate(renderCmd, sizeof(func));
 			new (storageBuffer) FuncT(std::forward<FuncT>(func));

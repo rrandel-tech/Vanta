@@ -47,7 +47,7 @@ namespace Vanta {
 	{
 		return;
 		AllocateStorage();
-
+		
 		for (auto mi : m_MaterialInstances)
 			mi->OnShaderReloaded();
 	}

@@ -3,7 +3,9 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-#include "Core/TimeStep.hpp"
+#include "Core/Timestep.hpp"
+
+#include "Asset/Asset.hpp"
 
 #include "Renderer/Pipeline.hpp"
 #include "Renderer/IndexBuffer.hpp"
@@ -98,7 +100,7 @@ namespace Vanta {
 					return;
 				}
 			}
-
+			
 			// should never get here - more bones than we have space for
 			VA_CORE_ASSERT(false, "Too many bones!");
 		}
@@ -122,15 +124,17 @@ namespace Vanta {
 		uint32_t VertexCount;
 
 		glm::mat4 Transform;
+		glm::mat4 LocalTransform;
 		AABB BoundingBox;
 
 		std::string NodeName, MeshName;
 	};
 
-	class Mesh : public RefCounted
+	class Mesh : public Asset
 	{
 	public:
 		Mesh(const std::string& filename);
+		Mesh(const std::vector<Vertex>& vertices, const std::vector<Index>& indices, const glm::mat4& transform);
 		~Mesh();
 
 		void OnUpdate(Timestep ts);
@@ -165,7 +169,7 @@ namespace Vanta {
 		glm::vec3 InterpolateScale(float animationTime, const aiNodeAnim* nodeAnim);
 	private:
 		std::vector<Submesh> m_Submeshes;
-
+		
 		std::unique_ptr<Assimp::Importer> m_Importer;
 
 		glm::mat4 m_InverseTransform;

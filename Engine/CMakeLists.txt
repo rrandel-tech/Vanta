@@ -19,13 +19,16 @@ add_library(Vanta STATIC)
 
 target_sources(Vanta PRIVATE ${VANTA_ROOT_SOURCES} ${VANTA_ROOT_HEADERS} ${VANTA_THIRDPARTY_IMPL_SOURCES})
 
+add_subdirectory(${VANTA_SRC_DIR}/Asset)
 add_subdirectory(${VANTA_SRC_DIR}/Core)
 add_subdirectory(${VANTA_SRC_DIR}/Editor)
 add_subdirectory(${VANTA_SRC_DIR}/Events)
 add_subdirectory(${VANTA_SRC_DIR}/ImGui)
 add_subdirectory(${VANTA_SRC_DIR}/Math)
+add_subdirectory(${VANTA_SRC_DIR}/Platform)
 add_subdirectory(${VANTA_SRC_DIR}/Renderer)
 add_subdirectory(${VANTA_SRC_DIR}/Scene)
+add_subdirectory(${VANTA_SRC_DIR}/Utilities)
 
 target_precompile_headers(Vanta PRIVATE ${VANTA_SRC_DIR}/vapch.hpp)
 

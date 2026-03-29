@@ -3,6 +3,7 @@
 #include "Core/Base.hpp"
 #include "Core/Buffer.hpp"
 #include "RendererAPI.hpp"
+#include "Asset/Asset.hpp"
 
 namespace Vanta {
 
@@ -21,7 +22,7 @@ namespace Vanta {
 		Repeat = 2
 	};
 
-	class Texture : public RefCounted
+	class Texture : public Asset
 	{
 	public:
 		virtual ~Texture() {}

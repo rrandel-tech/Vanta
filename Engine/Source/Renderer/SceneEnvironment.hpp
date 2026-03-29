@@ -4,13 +4,16 @@
 
 namespace Vanta {
 
-	struct Environment
+	class Environment : public Asset
 	{
-		std::string FilePath;
+	public:
 		Ref<TextureCube> RadianceMap;
 		Ref<TextureCube> IrradianceMap;
 
-		static Environment Load(const std::string& filepath);
+		Environment() = default;
+		Environment(const Ref<TextureCube>& radianceMap, const Ref<TextureCube>& irradianceMap)
+			: RadianceMap(radianceMap), IrradianceMap(irradianceMap) {}
 	};
+
 
 }
