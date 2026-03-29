@@ -62,7 +62,7 @@ namespace Vanta {
         std::string OpenFile(const char* filter = "All\0*.*\0") const;
         std::string SaveFile(const char* filter = "All\0*.*\0") const;
     private:
-        void processEvents();
+        void ProcessEvents();
 
         bool OnWindowResize(WindowResizeEvent& e);
         bool OnWindowMinimize(WindowMinimizeEvent& e);

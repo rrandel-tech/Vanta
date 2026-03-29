@@ -100,7 +100,7 @@ namespace Vanta {
         OnInit();
         while (m_Running)
         {
-            processEvents();
+            ProcessEvents();
 
             if (!m_Minimized)
             {
@@ -134,7 +134,7 @@ namespace Vanta {
     {
     }
 
-    void Application::processEvents()
+    void Application::ProcessEvents()
     {
         m_Window->ProcessEvents();
     }

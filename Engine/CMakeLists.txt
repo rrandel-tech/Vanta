@@ -54,6 +54,9 @@ target_link_libraries(Vanta
         entt::entt
         fastnoise::fastnoise
         yaml-cpp::yaml-cpp
+
+        lua
+        sol2::sol2
 )
 
 vanta_enable_lto(Vanta)

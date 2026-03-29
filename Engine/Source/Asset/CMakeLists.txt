@@ -5,7 +5,7 @@ set(ASSET_SOURCES
 
 set(ASSET_HEADERS
         AssetManager.hpp
-        Assets.hpp
+        Asset.hpp
         AssetSerializer.hpp
 )
 
