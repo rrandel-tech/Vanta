@@ -410,8 +410,8 @@ namespace Vanta {
 	{
 		if (!Renderer::GetConfig().ComputeEnvironmentMaps)
 			return { Renderer::GetBlackCubeTexture(), Renderer::GetBlackCubeTexture() };
-		
-		const uint32_t cubemapSize = 2048;
+
+		const uint32_t cubemapSize = Renderer::GetConfig().EnvironmentMapResolution;
 		const uint32_t irradianceMapSize = 32;
 
 		Ref<Texture2D> envEquirect = Texture2D::Create(filepath);
@@ -419,7 +419,7 @@ namespace Vanta {
 
 		Ref<TextureCube> envUnfiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
 		Ref<TextureCube> envFiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
-		
+
 		// Convert equirectangular to cubemap
 		Ref<Shader> equirectangularConversionShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
 		Ref<VulkanComputePipeline> equirectangularConversionPipeline = Ref<VulkanComputePipeline>::Create(equirectangularConversionShader);
@@ -458,10 +458,12 @@ namespace Vanta {
 			Ref<VulkanTextureCube> envFilteredCubemap = envFiltered.As<VulkanTextureCube>();
 			VkDescriptorImageInfo imageInfo = envFilteredCubemap->GetVulkanDescriptorInfo();
 
-			std::array<VkWriteDescriptorSet, 24> writeDescriptors;
-			std::array<VkDescriptorImageInfo, 12> mipImageInfos;
+			uint32_t mipCount = Utils::CalculateMipCount(cubemapSize, cubemapSize);
+
+			std::vector<VkWriteDescriptorSet> writeDescriptors(mipCount * 2);
+			std::vector<VkDescriptorImageInfo> mipImageInfos(mipCount);
 			auto descriptorSet = shader->CreateDescriptorSets(0, 12);
-			for (uint32_t i = 0; i < 12; i++)
+			for (uint32_t i = 0; i < mipCount; i++)
 			{
 				VkDescriptorImageInfo& mipImageInfo = mipImageInfos[i];
 				mipImageInfo = imageInfo;
@@ -481,7 +483,7 @@ namespace Vanta {
 
 			environmentMipFilterPipeline->Begin(); // begin compute pass
 			const float deltaRoughness = 1.0f / glm::max((float)envFiltered->GetMipLevelCount() - 1.0f, 1.0f);
-			for (uint32_t i = 0, size = cubemapSize; i < 12; i++, size /= 2)
+			for (uint32_t i = 0, size = cubemapSize; i < mipCount; i++, size /= 2)
 			{
 				uint32_t numGroups = glm::max(1u, size / 32);
 				float roughness = i * deltaRoughness;
@@ -515,7 +517,10 @@ namespace Vanta {
 			writeDescriptors[1].pImageInfo = &envFilteredCubemap->GetVulkanDescriptorInfo();
 
 			vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, NULL);
-			environmentIrradiancePipeline->Execute(descriptorSet.DescriptorSets.data(), descriptorSet.DescriptorSets.size(), irradianceMap->GetWidth() / 32, irradianceMap->GetHeight() / 32, 6);
+			environmentIrradiancePipeline->Begin();
+			environmentIrradiancePipeline->SetPushConstants(&Renderer::GetConfig().IrradianceMapComputeSamples, sizeof(uint32_t));
+			environmentIrradiancePipeline->Dispatch(descriptorSet.DescriptorSets[0], irradianceMap->GetWidth() / 32, irradianceMap->GetHeight() / 32, 6);
+			environmentIrradiancePipeline->End();
 
 			irradianceCubemap->GenerateMips();
 		});
@@ -525,30 +530,30 @@ namespace Vanta {
 
 	Ref<TextureCube> VulkanRenderer::CreatePreethamSky(float turbidity, float azimuth, float inclination)
 	{
-		const uint32_t cubemapSize = 2048;
+		const uint32_t cubemapSize = Renderer::GetConfig().EnvironmentMapResolution;
 		const uint32_t irradianceMapSize = 32;
 
-		Ref<TextureCube> envUnfiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
+		Ref<TextureCube> environmentMap = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
 
 		Ref<Shader> preethamSkyShader = Renderer::GetShaderLibrary()->Get("PreethamSky");
 		Ref<VulkanComputePipeline> preethamSkyComputePipeline = Ref<VulkanComputePipeline>::Create(preethamSkyShader);
 
 		glm::vec3 params = { turbidity, azimuth, inclination };
-		Renderer::Submit([preethamSkyComputePipeline, envUnfiltered, cubemapSize, params]() mutable
+		Renderer::Submit([preethamSkyComputePipeline, environmentMap, cubemapSize, params]() mutable
 		{
 			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			Ref<VulkanShader> shader = preethamSkyComputePipeline->GetShader();
 
 			std::array<VkWriteDescriptorSet, 1> writeDescriptors;
 			auto descriptorSet = shader->CreateDescriptorSets();
-			Ref<VulkanTextureCube> envUnfilteredCubemap = envUnfiltered.As<VulkanTextureCube>();
+			Ref<VulkanTextureCube> envUnfilteredCubemap = environmentMap.As<VulkanTextureCube>();
 			writeDescriptors[0] = *shader->GetDescriptorSet("o_CubeMap");
 			writeDescriptors[0].dstSet = descriptorSet.DescriptorSets[0]; // Should this be set inside the shader?
 			writeDescriptors[0].pImageInfo = &envUnfilteredCubemap->GetVulkanDescriptorInfo();
 
 			vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, NULL);
 
-			preethamSkyComputePipeline->Begin(); // begin compute pass
+			preethamSkyComputePipeline->Begin();
 			preethamSkyComputePipeline->SetPushConstants(&params, sizeof(glm::vec3));
 			preethamSkyComputePipeline->Dispatch(descriptorSet.DescriptorSets[0], cubemapSize / 32, cubemapSize / 32, 6);
 			preethamSkyComputePipeline->End();
@@ -556,7 +561,7 @@ namespace Vanta {
 			envUnfilteredCubemap->GenerateMips(true);
 		});
 
-		return envUnfiltered;
+		return environmentMap;
 	}
 
 }

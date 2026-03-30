@@ -19,6 +19,10 @@ namespace Vanta::Utils {
 
 	void RetrieveDiagnosticCheckpoints()
 	{
+		bool supported = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->IsExtensionSupported(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+		if (!supported)
+			return;
+
 		{
 			const uint32_t checkpointCount = 4;
 			VkCheckpointDataNV data[checkpointCount];

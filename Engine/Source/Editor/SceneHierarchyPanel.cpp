@@ -355,9 +355,6 @@ namespace Vanta {
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
 		if (entity.HasComponent<T>())
 		{
-			// NOTE:
-			//	This fixes an issue where the first "+" button would display the "Remove" buttons for ALL components on an Entity.
-			//	This is due to ImGui::TreeNodeEx only pushing the id for it's children if it's actually open
 			ImGui::PushID((void*)typeid(T).hash_code());
 			auto& component = entity.GetComponent<T>();
 			ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();

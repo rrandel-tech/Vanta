@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "VulkanDiagnostics.hpp"
 
+#include "VulkanContext.hpp"
+
 namespace Vanta::Utils {
 
 	static std::vector<VulkanCheckpointData> s_CheckpointStorage(1024);
@@ -8,6 +10,10 @@ namespace Vanta::Utils {
 
 	void SetVulkanCheckpoint(VkCommandBuffer commandBuffer, const std::string& data)
 	{
+		bool supported = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->IsExtensionSupported(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+		if (!supported)
+			return;
+
 		s_CheckpointStorageIndex = (s_CheckpointStorageIndex + 1) % 1024;
 		VulkanCheckpointData& checkpoint = s_CheckpointStorage[s_CheckpointStorageIndex];
 		memset(checkpoint.Data, 0, sizeof(checkpoint.Data));

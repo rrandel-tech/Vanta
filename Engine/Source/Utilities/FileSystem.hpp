@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Core/Buffer.hpp"
+
 #include <functional>
 
 #include <string>
@@ -28,6 +30,8 @@ namespace Vanta {
         static std::string Rename(const std::string& filepath, const std::string& newName);
         static bool DeleteFile(const std::string& filepath);
         static bool MoveFile(const std::string& filepath, const std::string& dest);
+        static bool WriteBytes(const std::string& filepath, const Buffer& buffer);
+        static Buffer ReadBytes(const std::string& filepath);
 
     public:
         using FileSystemChangedCallbackFn = std::function<void(FileSystemChangedEvent)>;
