@@ -6,8 +6,12 @@
 
 #include "Asset/AssetManager.hpp"
 
+#include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
+
 #include <imgui.h>
 #include <glad/glad.h>
+
+extern bool g_ApplicationRunning;
 
 namespace Vanta {
 
@@ -25,18 +29,19 @@ namespace Vanta {
         m_Window = std::unique_ptr<Window>(Window::Create(windowSpec));
         m_Window->Init();
         m_Window->SetEventCallback([this](Event& e) { OnEvent(e); });
+        m_Window->SetVSync(true);
 
         m_Window->SetResizable(m_Specification.Resizable);
         if (windowSpec.Mode == WindowMode::Windowed)
             m_Window->CenterWindow();
 
-        m_ImGuiLayer = new ImGuiLayer("ImGui");
-        PushOverlay(m_ImGuiLayer);
-
+        // Init renderer and execute command queue to compile all shaders
         Renderer::Init();
         Renderer::WaitAndRender();
 
-        AssetTypes::Init();
+        m_ImGuiLayer = ImGuiLayer::Create();
+        PushOverlay(m_ImGuiLayer);
+
         AssetManager::Init();
     }
 
@@ -50,7 +55,12 @@ namespace Vanta {
             delete layer;
         }
 
+        FramebufferPool::GetGlobal()->GetAll().clear();
+
         AssetManager::Shutdown();
+
+        Renderer::WaitAndRender();
+        Renderer::Shutdown();
     }
 
     void Application::PushLayer(Layer* layer)
@@ -80,19 +90,16 @@ namespace Vanta {
     void Application::RenderImGui()
     {
         m_ImGuiLayer->Begin();
-
         ImGui::Begin("Renderer");
-        auto& caps = RendererAPI::GetCapabilities();
+        auto& caps = Renderer::GetCapabilities();
         ImGui::Text("Vendor: %s", caps.Vendor.c_str());
-        ImGui::Text("Renderer: %s", caps.Renderer.c_str());
+        ImGui::Text("Renderer: %s", caps.Device.c_str());
         ImGui::Text("Version: %s", caps.Version.c_str());
         ImGui::Text("Frame Time: %.2fms\n", m_TimeStep.GetMilliseconds());
         ImGui::End();
 
         for (Layer* layer : m_LayerStack)
             layer->OnImGuiRender();
-
-        m_ImGuiLayer->End();
     }
 
     void Application::Run()
@@ -100,17 +107,25 @@ namespace Vanta {
         OnInit();
         while (m_Running)
         {
+            static uint64_t frameCounter = 0;
+
             ProcessEvents();
 
             if (!m_Minimized)
             {
+                Renderer::BeginFrame();
+
                 for (Layer* layer : m_LayerStack)
                     layer->OnUpdate(m_TimeStep);
 
                 // Render ImGui on render thread
                 Application* app = this;
                 Renderer::Submit([app]() { app->RenderImGui(); });
+                Renderer::Submit([=]() {m_ImGuiLayer->End(); });
+                Renderer::EndFrame();
 
+                // On Render thread
+                m_Window->GetRenderContext()->BeginFrame();
                 Renderer::WaitAndRender();
 
                 m_Window->SwapBuffers();
@@ -121,6 +136,8 @@ namespace Vanta {
             m_TimeStep = (m_frametime < Timestep(0.0333f)) ? m_frametime : Timestep(0.0333f);
             m_LastFrameTime += m_frametime; // Keep total time
             // VA_CORE_TRACE("Timestep: {:.3f}ms ({:.1f} FPS)", m_TimeStep * 1000.0f, 1.0f / m_TimeStep);
+
+            frameCounter++;
         }
         OnShutdown();
     }
@@ -177,13 +194,16 @@ namespace Vanta {
             return false;
         }
         m_Minimized = false;
-        Renderer::Submit([=]() { glViewport(0, 0, width, height); });
+
+        m_Window->GetRenderContext()->OnResize(width, height);
+
         auto& fbs = FramebufferPool::GetGlobal()->GetAll();
         for (auto& fb : fbs)
         {
             if (!fb->GetSpecification().NoResize)
                 fb->Resize(width, height);
         }
+
         return false;
     }
 

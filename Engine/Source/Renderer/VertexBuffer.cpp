@@ -4,6 +4,9 @@
 #include "Renderer.hpp"
 
 #include "Renderer/Backend/OpenGL/OpenGLVertexBuffer.hpp"
+#include "Renderer/Backend/Vulkan/VulkanVertexBuffer.hpp"
+
+#include "Renderer/RendererAPI.hpp"
 
 namespace Vanta {
 
@@ -13,6 +16,7 @@ namespace Vanta {
 		{
 			case RendererAPIType::None:    return nullptr;
 			case RendererAPIType::OpenGL:  return Ref<OpenGLVertexBuffer>::Create(data, size, usage);
+			case RendererAPIType::Vulkan:  return Ref<VulkanVertexBuffer>::Create(data, size, usage);
 		}
 		VA_CORE_ASSERT(false, "Unknown RendererAPI");
 		return nullptr;
@@ -24,6 +28,7 @@ namespace Vanta {
 		{
 			case RendererAPIType::None:    return nullptr;
 			case RendererAPIType::OpenGL:  return Ref<OpenGLVertexBuffer>::Create(size, usage);
+			case RendererAPIType::Vulkan:  return Ref<VulkanVertexBuffer>::Create(size, usage);
 		}
 		VA_CORE_ASSERT(false, "Unknown RendererAPI");
 		return nullptr;

@@ -2,6 +2,8 @@
 
 #include "Events/Event.hpp"
 
+#include "Renderer/RendererContext.hpp"
+
 #include <SDL3/SDL.h>
 
 #include <functional>
@@ -57,7 +59,7 @@ namespace Vanta {
 
         SDL_Window* GetNativeWindow() const { return m_Window; }
 
-        SDL_GLContext GetGLContext() const { return m_GLContext; }
+        Ref<RendererContext> GetRenderContext() { return m_RendererContext; }
 
         static Window* Create(const WindowSpecification& specification = WindowSpecification());
     private:
@@ -65,7 +67,6 @@ namespace Vanta {
         void Shutdown();
     private:
         SDL_Window* m_Window = nullptr;
-        SDL_GLContext m_GLContext = nullptr;
         SDL_Event m_Event {};
 
         WindowSpecification m_specification;
@@ -76,6 +77,8 @@ namespace Vanta {
 
             EventCallbackFn eventCallback;
         }; WindowData m_data;
+
+        Ref<RendererContext> m_RendererContext;
     };
 
 }

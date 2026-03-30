@@ -13,6 +13,7 @@ namespace Vanta {
 		virtual void SetAsset(const Ref<Asset>& asset) override { m_Asset = (Ref<Texture>)asset; }
 
 	private:
+		virtual void OnClose() override;
 		virtual void Render() override;
 
 	private:

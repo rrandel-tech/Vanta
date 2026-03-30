@@ -2,12 +2,15 @@ set(OPENGL_SOURCES
 		OpenGLFramebuffer.cpp
 		OpenGLIndexBuffer.cpp
 		OpenGLPipeline.cpp
-		OpenGLRendererAPI.cpp
 		OpenGLRenderPass.cpp
 		OpenGLShader.cpp
-		OpenGLShaderUniform.cpp
 		OpenGLTexture.cpp
 		OpenGLVertexBuffer.cpp
+		OpenGLContext.cpp
+		OpenGLImage.cpp
+		OpenGLImGuiLayer.cpp
+		OpenGLMaterial.cpp
+		OpenGLRenderer.cpp
 )
 
 set(OPENGL_HEADERS
@@ -16,9 +19,13 @@ set(OPENGL_HEADERS
 		OpenGLPipeline.hpp
 		OpenGLRenderPass.hpp
 		OpenGLShader.hpp
-		OpenGLShaderUniform.hpp
 		OpenGLTexture.hpp
 		OpenGLVertexBuffer.hpp
+		OpenGLContext.hpp
+		OpenGLImage.hpp
+		OpenGLImGuiLayer.hpp
+		OpenGLMaterial.hpp
+		OpenGLRenderer.hpp
 )
 
 target_sources(Vanta

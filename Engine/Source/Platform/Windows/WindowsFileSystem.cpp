@@ -9,7 +9,7 @@ namespace Vanta {
 
 	FileSystem::FileSystemChangedCallbackFn FileSystem::s_Callback;
 
-	static bool s_Watching = true;
+	static bool s_Watching = false;
 	static bool s_IgnoreNextChange = false;
 	static HANDLE s_WatcherThread;
 
@@ -112,7 +112,8 @@ namespace Vanta {
 	unsigned long FileSystem::Watch(void* param)
 	{
 		LPCWSTR	filepath = L"assets";
-		BYTE* buffer = new BYTE[10 * 1024]; // 1 MB
+		std::vector<BYTE> buffer;
+		buffer.resize(10 * 1024);
 		OVERLAPPED overlapped = { 0 };
 		HANDLE handle = NULL;
 		DWORD bytesReturned = 0;
@@ -144,8 +145,8 @@ namespace Vanta {
 		{
 			DWORD status = ReadDirectoryChangesW(
 				handle,
-				buffer,
-				10 * 1024 * sizeof(BYTE),
+				&buffer[0],
+				buffer.size(),
 				TRUE,
 				FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME,
 				&bytesReturned,
@@ -166,11 +167,12 @@ namespace Vanta {
 			std::string oldName;
 			char fileName[MAX_PATH * 10] = "";
 
-			FILE_NOTIFY_INFORMATION* current = (FILE_NOTIFY_INFORMATION*)buffer;
+			BYTE* buf = buffer.data();
 			for (;;)
 			{
+				FILE_NOTIFY_INFORMATION& fni = *(FILE_NOTIFY_INFORMATION*)buf;
 				ZeroMemory(fileName, sizeof(fileName));
-				WideCharToMultiByte(CP_ACP, 0, current->FileName, current->FileNameLength / sizeof(WCHAR), fileName, sizeof(fileName), NULL, NULL);
+				WideCharToMultiByte(CP_ACP, 0, fni.FileName, fni.FileNameLength / sizeof(WCHAR), fileName, sizeof(fileName), NULL, NULL);
 				std::filesystem::path filepath = "assets/" + std::string(fileName);
 
 				FileSystemChangedEvent e;
@@ -179,7 +181,7 @@ namespace Vanta {
 				e.OldName = filepath.filename().string();
 				e.IsDirectory = std::filesystem::is_directory(filepath);
 
-				switch (current->Action)
+				switch (fni.Action)
 				{
 				case FILE_ACTION_ADDED:
 				{
@@ -214,10 +216,10 @@ namespace Vanta {
 				}
 				}
 
-				if (!current->NextEntryOffset)
+				if (!fni.NextEntryOffset)
 					break;
 
-				current += current->NextEntryOffset;
+				buf += fni.NextEntryOffset;
 			}
 		}
 

@@ -2,6 +2,9 @@
 #include "Framebuffer.hpp"
 
 #include "Renderer/Backend/OpenGL/OpenGLFramebuffer.hpp"
+#include "Renderer/Backend/Vulkan/VulkanFramebuffer.hpp"
+
+#include "Renderer/RendererAPI.hpp"
 
 namespace Vanta {
 
@@ -12,7 +15,8 @@ namespace Vanta {
 		switch (RendererAPI::Current())
 		{
 			case RendererAPIType::None:		return nullptr;
-			case RendererAPIType::OpenGL:	result = Ref<OpenGLFramebuffer>::Create(spec);
+			case RendererAPIType::OpenGL:	result = Ref<OpenGLFramebuffer>::Create(spec); break;
+			case RendererAPIType::Vulkan:	result = Ref<VulkanFramebuffer>::Create(spec); break;
 		}
 		FramebufferPool::GetGlobal()->Add(result);
 		return result;
@@ -26,6 +30,7 @@ namespace Vanta {
 
 	FramebufferPool::~FramebufferPool()
 	{
+		
 	}
 
 	std::weak_ptr<Framebuffer> FramebufferPool::AllocateBuffer()

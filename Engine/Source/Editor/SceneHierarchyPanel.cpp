@@ -49,6 +49,9 @@ namespace Vanta {
 	void SceneHierarchyPanel::SetSelected(Entity entity)
 	{
 		m_SelectionContext = entity;
+
+		if (m_SelectionChangedCallback)
+			m_SelectionChangedCallback(m_SelectionContext);
 	}
 
 	void SceneHierarchyPanel::OnImGuiRender()
@@ -103,11 +106,45 @@ namespace Vanta {
 						auto newEntity = m_Context->CreateEntity("Empty Entity");
 						SetSelected(newEntity);
 					}
-					if (ImGui::MenuItem("Mesh"))
+					if (ImGui::MenuItem("Camera"))
 					{
-						auto newEntity = m_Context->CreateEntity("Mesh");
-						newEntity.AddComponent<MeshComponent>();
+						auto newEntity = m_Context->CreateEntity("Camera");
+						newEntity.AddComponent<CameraComponent>();
 						SetSelected(newEntity);
+					}
+					if (ImGui::BeginMenu("Mesh"))
+					{
+						if (ImGui::MenuItem("Empty Mesh"))
+						{
+							auto newEntity = m_Context->CreateEntity("Empty Mesh");
+							newEntity.AddComponent<MeshComponent>();
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Cube"))
+						{
+							auto newEntity = m_Context->CreateEntity("Cube");
+							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Cube.fbx"));
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Sphere"))
+						{
+							auto newEntity = m_Context->CreateEntity("Sphere");
+							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Sphere.fbx"));
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Capsule"))
+						{
+							auto newEntity = m_Context->CreateEntity("Capsule");
+							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Capsule.fbx"));
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Plane"))
+						{
+							auto newEntity = m_Context->CreateEntity("Plane");
+							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Plane.fbx"));
+							SetSelected(newEntity);
+						}
+						ImGui::EndMenu();
 					}
 					ImGui::Separator();
 					if (ImGui::MenuItem("Directional Light"))
@@ -169,13 +206,21 @@ namespace Vanta {
 		if (entity.Children().empty())
 			flags |= ImGuiTreeNodeFlags_Leaf;
 
-		bool opened = ImGui::TreeNodeEx((void*)(uintptr_t)(uint32_t)entity, flags, name);
+		// TODO: This should probably be a function that checks that the entities components are valid
+		bool missingMesh = entity.HasComponent<MeshComponent>() && (entity.GetComponent<MeshComponent>().Mesh && entity.GetComponent<MeshComponent>().Mesh->Type == AssetType::Missing);
+		if (missingMesh)
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.4f, 0.3f, 1.0f));
+
+		bool opened = ImGui::TreeNodeEx((void*)(uint32_t)entity, flags, name);
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectionContext = entity;
 			if (m_SelectionChangedCallback)
 				m_SelectionChangedCallback(m_SelectionContext);
 		}
+
+		if (missingMesh)
+			ImGui::PopStyleColor();
 
 		bool entityDeleted = false;
 		if (ImGui::BeginPopupContextItem())
@@ -221,6 +266,7 @@ namespace Vanta {
 					e.SetParentUUID(entity.GetUUID());
 					entity.Children().push_back(droppedHandle);
 				}
+
 			}
 
 			ImGui::EndDragDropTarget();
@@ -303,7 +349,7 @@ namespace Vanta {
 	}
 
 	template<typename T, typename UIFunction>
-	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
+	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction, bool canBeRemoved = true)
 	{
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
 		if (entity.HasComponent<T>())
@@ -319,18 +365,28 @@ namespace Vanta {
 			float lineHeight = ImGui::GetFontSize() + GImGui->Style.FramePadding.y * 2.0f;
 			ImGui::Separator();
 			bool open = ImGui::TreeNodeEx("##dummy_id", treeNodeFlags, name.c_str());
+			bool right_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
 			ImGui::PopStyleVar();
+
+			bool resetValues = false;
+			bool removeComponent = false;
+
 			ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
-			if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
+			if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }) || right_clicked)
 			{
 				ImGui::OpenPopup("ComponentSettings");
 			}
 
-			bool removeComponent = false;
 			if (ImGui::BeginPopup("ComponentSettings"))
 			{
-				if (ImGui::MenuItem("Remove component"))
-					removeComponent = true;
+				if (ImGui::MenuItem("Reset"))
+					resetValues = true;
+
+				if (canBeRemoved)
+				{
+					if (ImGui::MenuItem("Remove component"))
+						removeComponent = true;
+				}
 
 				ImGui::EndPopup();
 			}
@@ -341,8 +397,11 @@ namespace Vanta {
 				ImGui::TreePop();
 			}
 
-			if (removeComponent)
+			if (removeComponent || resetValues)
 				entity.RemoveComponent<T>();
+
+			if (resetValues)
+				entity.AddComponent<T>();
 
 			ImGui::PopID();
 		}
@@ -352,7 +411,7 @@ namespace Vanta {
 	{
 		bool modified = false;
 
-		ImGuiIO& io = ImGui::GetIO();
+		const ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.Fonts->Fonts[0];
 
 		ImGui::PushID(label.c_str());
@@ -495,6 +554,9 @@ namespace Vanta {
 					ImGui::CloseCurrentPopup();
 				}
 			}
+			if (!m_SelectionContext.HasComponent<ScriptComponent>())
+			{
+			}
 			if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
 			{
 				if (ImGui::Button("Sprite Renderer"))
@@ -513,9 +575,9 @@ namespace Vanta {
 			DrawVec3Control("Rotation", rotation);
 			component.Rotation = glm::radians(rotation);
 			DrawVec3Control("Scale", component.Scale, 1.0f);
-		});
+		}, false);
 
-		DrawComponent<MeshComponent>("Mesh", entity, [](MeshComponent& mc)
+		DrawComponent<MeshComponent>("Mesh", entity, [&](MeshComponent& mc)
 		{
 			UI::BeginPropertyGrid();
 			UI::PropertyAssetReference("Mesh", mc.Mesh, AssetType::Mesh);
@@ -524,26 +586,16 @@ namespace Vanta {
 
 		DrawComponent<CameraComponent>("Camera", entity, [](CameraComponent& cc)
 		{
+			UI::BeginPropertyGrid();
+
 			// Projection Type
 			const char* projTypeStrings[] = { "Perspective", "Orthographic" };
-			const char* currentProj = projTypeStrings[(int)cc.Camera.GetProjectionType()];
-			if (ImGui::BeginCombo("Projection", currentProj))
+			int currentProj = (int)cc.Camera.GetProjectionType();
+			if (UI::PropertyDropdown("Projection", projTypeStrings, 2, &currentProj))
 			{
-				for (int type = 0; type < 2; type++)
-				{
-					bool is_selected = (currentProj == projTypeStrings[type]);
-					if (ImGui::Selectable(projTypeStrings[type], is_selected))
-					{
-						currentProj = projTypeStrings[type];
-						cc.Camera.SetProjectionType((SceneCamera::ProjectionType)type);
-					}
-					if (is_selected)
-						ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
+				cc.Camera.SetProjectionType((SceneCamera::ProjectionType)currentProj);
 			}
 
-			UI::BeginPropertyGrid();
 			// Perspective parameters
 			if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Perspective)
 			{
@@ -600,6 +652,10 @@ namespace Vanta {
 			UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment, AssetType::EnvMap);
 			UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
 			UI::EndPropertyGrid();
+		});
+
+		DrawComponent<ScriptComponent>("Script", entity, [=](ScriptComponent& sc) mutable
+		{
 		});
 
 	}

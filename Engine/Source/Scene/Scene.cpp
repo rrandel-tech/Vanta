@@ -5,6 +5,7 @@
 
 #include "Components.hpp"
 
+#include "Renderer/Renderer.hpp"
 #include "Renderer/SceneRenderer.hpp"
 
 #include "Renderer/Renderer2D.hpp"
@@ -51,9 +52,9 @@ namespace Vanta {
 
 	void Scene::Init()
 	{
-		auto skyboxShader = Shader::Create("assets/shaders/Skybox.glsl");
-		m_SkyboxMaterial = MaterialInstance::Create(Material::Create(skyboxShader));
-		m_SkyboxMaterial->SetFlag(MaterialFlag::DepthTest, false);
+		auto skyboxShader = Renderer::GetShaderLibrary()->Get("Skybox");
+		m_SkyboxMaterial = Material::Create(skyboxShader);
+		m_SkyboxMaterial->SetFlag(MaterialFlag::DepthTest);
 	}
 
 	// Merge OnUpdate/Render into one function?
@@ -113,7 +114,7 @@ namespace Vanta {
 
 		// TODO: only one sky light at the moment!
 		{
-			m_Environment = Ref<Environment>::Create();
+			// m_Environment = Ref<Environment>::Create();
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			for (auto entity : lights)
 			{
@@ -125,14 +126,14 @@ namespace Vanta {
 			}
 		}
 
-		m_SkyboxMaterial->Set("u_TextureLod", m_SkyboxLod);
+		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SkyboxLod);
 
 		auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
 		SceneRenderer::BeginScene(this, { camera, cameraViewMatrix });
 		for (auto entity : group)
 		{
 			auto [transformComponent, meshComponent] = group.get<TransformComponent, MeshComponent>(entity);
-			if (meshComponent.Mesh)
+			if (meshComponent.Mesh && meshComponent.Mesh->Type == AssetType::Mesh)
 			{
 				meshComponent.Mesh->OnUpdate(ts);
 				glm::mat4 transform = GetTransformRelativeToParent(Entity(entity, this));
@@ -188,7 +189,7 @@ namespace Vanta {
 		}
 
 		{
-			m_Environment = Ref<Environment>::Create();
+			// m_Environment = Ref<Environment>::Create();
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			for (auto entity : lights)
 			{
@@ -200,14 +201,14 @@ namespace Vanta {
 			}
 		}
 
-		m_SkyboxMaterial->Set("u_TextureLod", m_SkyboxLod);
+		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SkyboxLod);
 
 		auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
 		SceneRenderer::BeginScene(this, { editorCamera, editorCamera.GetViewMatrix(), 0.1f, 1000.0f, 45.0f }); // TODO: real values
 		for (auto entity : group)
 		{
 			auto [meshComponent, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
-			if (meshComponent.Mesh)
+			if (meshComponent.Mesh && meshComponent.Mesh->Type == AssetType::Mesh)
 			{
 				meshComponent.Mesh->OnUpdate(ts);
 

@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.25...4.0 FATAL_ERROR)
 project(Vanta  LANGUAGES C CXX)
 
+find_package(Vulkan REQUIRED)
+
+message(STATUS "Vulkan SDK: $ENV{VULKAN_SDK}")
+message(STATUS "Vulkan include: ${Vulkan_INCLUDE_DIRS}")
+message(STATUS "Vulkan lib: ${Vulkan_LIBRARIES}")
+
 if (MSVC)
 	add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
 endif()

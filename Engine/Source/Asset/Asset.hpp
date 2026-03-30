@@ -4,11 +4,9 @@
 
 #include <entt/entt.hpp>
 
-#include <string>
-
 namespace Vanta {
 
-    enum class AssetType
+    enum class AssetType : int8_t
     {
         Scene,
         Mesh,
@@ -18,7 +16,8 @@ namespace Vanta {
         Script,
         Directory,
         Other,
-        None
+        None,
+        Missing
     };
 
     using AssetHandle = UUID;
@@ -35,6 +34,15 @@ namespace Vanta {
         AssetHandle ParentDirectory;
         bool IsDataLoaded = false;
 
+        virtual bool operator==(const Asset& other) const
+        {
+            return Handle == other.Handle;
+        }
+
+        virtual bool operator!=(const Asset& other) const
+        {
+            return !(*this == other);
+        }
         virtual ~Asset() {}
     };
 

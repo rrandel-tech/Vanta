@@ -30,6 +30,7 @@ add_library(imgui STATIC
 
         # Backends
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
         ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
 )
 
@@ -38,7 +39,7 @@ target_include_directories(imgui PUBLIC
         ${IMGUI_DIR}/backends
 )
 
-target_link_libraries(imgui PUBLIC SDL3::SDL3-static glad)
+target_link_libraries(imgui PUBLIC SDL3::SDL3-static Vulkan::Vulkan glad)
 
 target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS IMGUI_IMPL_OPENGL_LOADER_GLAD)
 
@@ -142,3 +143,92 @@ target_include_directories(sol2 INTERFACE
 )
 
 add_library(sol2::sol2 ALIAS sol2)
+
+# ==== Vulkan ====
+find_package(Vulkan REQUIRED)
+
+add_library(shaderc INTERFACE)
+target_include_directories(shaderc INTERFACE "$ENV{VULKAN_SDK}/Include")
+
+if (CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_CONFIGURATION_TYPES MATCHES Debug)
+    find_library(SHADERC_LIB
+            NAMES shaderc_combinedd shaderc_combinedd.lib
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+else()
+    find_library(SHADERC_LIB
+            NAMES shaderc_combined shaderc_combined.lib
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+endif()
+
+target_link_libraries(shaderc INTERFACE ${SHADERC_LIB})
+add_library(shaderc::shaderc ALIAS shaderc)
+
+# --- SPIRV-Cross ---
+add_library(spirv-cross INTERFACE)
+target_include_directories(spirv-cross INTERFACE "$ENV{VULKAN_SDK}/Include")
+
+if (CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_CONFIGURATION_TYPES MATCHES Debug)
+    find_library(SPIRV_CROSS_CORE_LIB
+            NAMES spirv-cross-cored
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+    find_library(SPIRV_CROSS_GLSL_LIB
+            NAMES spirv-cross-glsld
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+    find_library(SPIRV_CROSS_REFLECT_LIB
+            NAMES spirv-cross-reflectd
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+else()
+    find_library(SPIRV_CROSS_CORE_LIB
+            NAMES spirv-cross-core
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+    find_library(SPIRV_CROSS_GLSL_LIB
+            NAMES spirv-cross-glsl
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+    find_library(SPIRV_CROSS_REFLECT_LIB
+            NAMES spirv-cross-reflect
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+endif()
+
+target_link_libraries(spirv-cross INTERFACE
+        ${SPIRV_CROSS_CORE_LIB}
+        ${SPIRV_CROSS_GLSL_LIB}
+        ${SPIRV_CROSS_REFLECT_LIB}
+)
+add_library(spirv-cross::spirv-cross ALIAS spirv-cross)
+
+# --- SPIRV-Tools ---
+add_library(spirv-tools INTERFACE)
+target_include_directories(spirv-tools INTERFACE "$ENV{VULKAN_SDK}/Include")
+
+if (CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_CONFIGURATION_TYPES MATCHES Debug)
+    find_library(SPIRV_TOOLS_LIB
+            NAMES SPIRV-Toolsd SPIRV-Toolsd.lib
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+else()
+    find_library(SPIRV_TOOLS_LIB
+            NAMES SPIRV-Tools SPIRV-Tools.lib
+            HINTS "$ENV{VULKAN_SDK}/Lib" "$ENV{VULKAN_SDK}/lib"
+            REQUIRED
+    )
+endif()
+
+target_link_libraries(spirv-tools INTERFACE ${SPIRV_TOOLS_LIB})
+add_library(spirv-tools::spirv-tools ALIAS spirv-tools)

@@ -15,7 +15,7 @@
 #include <string>
 
 #include "Editor/SceneHierarchyPanel.hpp"
-#include "Editor/AssetManagerPanel.hpp"
+#include "Editor/ContentBrowserPanel.hpp"
 #include "Editor/ObjectsPanel.hpp"
 
 namespace Vanta {
@@ -36,19 +36,9 @@ namespace Vanta {
 		virtual void OnUpdate(Timestep ts) override;
 
 		virtual void OnImGuiRender() override;
-		virtual void OnEvent(Event& event) override;
-		bool OnKeyPressedEvent(KeyPressedEvent& event);
-		bool OnMouseButtonPressed(MouseButtonPressedEvent& event);
-
-		// ImGui UI helpers
-		bool Property(const std::string& name, bool& value);
-		bool Property(const std::string& name, float& value, float min = -1.0f, float max = 1.0f, PropertyFlag flags = PropertyFlag::None);
-		bool Property(const std::string& name, glm::vec2& value, PropertyFlag flags);
-		bool Property(const std::string& name, glm::vec2& value, float min = -1.0f, float max = 1.0f, PropertyFlag flags = PropertyFlag::None);
-		bool Property(const std::string& name, glm::vec3& value, PropertyFlag flags);
-		bool Property(const std::string& name, glm::vec3& value, float min = -1.0f, float max = 1.0f, PropertyFlag flags = PropertyFlag::None);
-		bool Property(const std::string& name, glm::vec4& value, PropertyFlag flags);
-		bool Property(const std::string& name, glm::vec4& value, float min = -1.0f, float max = 1.0f, PropertyFlag flags = PropertyFlag::None);
+		virtual void OnEvent(Event& e) override;
+		bool OnKeyPressedEvent(KeyPressedEvent& e);
+		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
 		void ShowBoundingBoxes(bool show, bool onTop = false);
 		void SelectEntity(Entity entity);
@@ -81,7 +71,7 @@ namespace Vanta {
 		float GetSnapValue();
 	private:
 		Scope<SceneHierarchyPanel> m_SceneHierarchyPanel;
-		Scope<AssetManagerPanel> m_AssetManagerPanel;
+		Scope<ContentBrowserPanel> m_ContentBrowserPanel;
 		Scope<ObjectsPanel> m_ObjectsPanel;
 
 		Ref<Scene> m_RuntimeScene, m_EditorScene, m_CurrentScene;
@@ -92,10 +82,6 @@ namespace Vanta {
 
 		Ref<Shader> m_BrushShader;
 		Ref<Material> m_SphereBaseMaterial;
-
-		Ref<Material> m_MeshMaterial;
-		std::vector<Ref<MaterialInstance>> m_MetalSphereMaterialInstances;
-		std::vector<Ref<MaterialInstance>> m_DielectricSphereMaterialInstances;
 
 		struct AlbedoInput
 		{
@@ -142,7 +128,7 @@ namespace Vanta {
 
 		// Editor resources
 		Ref<Texture2D> m_CheckerboardTex;
-		Ref<Texture2D> m_PlayButtonTex;
+		Ref<Texture2D> m_PlayButtonTex, m_StopButtonTex, m_PauseButtonTex;
 
 		glm::vec2 m_ViewportBounds[2];
 		int m_GizmoType = -1; // -1 = no gizmo
@@ -156,6 +142,8 @@ namespace Vanta {
 
 		bool m_ViewportPanelMouseOver = false;
 		bool m_ViewportPanelFocused = false;
+
+		bool m_ShowWelcomePopup = true;
 
 		enum class SceneState
 		{

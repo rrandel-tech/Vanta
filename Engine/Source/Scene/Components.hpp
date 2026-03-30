@@ -80,6 +80,7 @@ namespace Vanta {
 	struct ScriptComponent
 	{
 		// TODO: Find a language
+		std::string ClassName;
 	};
 
 	struct CameraComponent

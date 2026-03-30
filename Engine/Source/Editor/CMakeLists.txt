@@ -2,7 +2,7 @@ set(EDITOR_SOURCES
 		EditorCamera.cpp
 		SceneHierarchyPanel.cpp
 		AssetEditorPanel.cpp
-		AssetManagerPanel.cpp
+		ContentBrowserPanel.cpp
 		DefaultAssetEditors.cpp
 		ObjectsPanel.cpp
 )
@@ -11,7 +11,7 @@ set(EDITOR_HEADERS
 		EditorCamera.hpp
 		SceneHierarchyPanel.hpp
 		AssetEditorPanel.hpp
-		AssetManagerPanel.hpp
+		ContentBrowserPanel.hpp
 		DefaultAssetEditors.hpp
 		ObjectsPanel.hpp
 )

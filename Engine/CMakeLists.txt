@@ -57,6 +57,11 @@ target_link_libraries(Vanta
 
         lua
         sol2::sol2
+
+        Vulkan::Vulkan
+        shaderc::shaderc
+        spirv-cross::spirv-cross
+        spirv-tools::spirv-tools
 )
 
 vanta_enable_lto(Vanta)

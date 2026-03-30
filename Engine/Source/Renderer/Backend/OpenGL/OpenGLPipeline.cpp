@@ -31,6 +31,8 @@ namespace Vanta {
 	OpenGLPipeline::OpenGLPipeline(const PipelineSpecification& spec)
 		: m_Specification(spec)
 	{
+		VA_CORE_ASSERT(spec.Shader);
+		VA_CORE_ASSERT(spec.RenderPass);
 		Invalidate();
 	}
 

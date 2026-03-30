@@ -1,0 +1,47 @@
+set(VULKAN_SOURCES
+		Vulkan.cpp
+		VulkanAllocator.cpp
+		VulkanComputePipeline.cpp
+		VulkanContext.cpp
+		VulkanDevice.cpp
+		VulkanDiagnostics.cpp
+		VulkanFramebuffer.cpp
+		VulkanImage.cpp
+		VulkanImGuiLayer.cpp
+		VulkanIndexBuffer.cpp
+		VulkanMaterial.cpp
+		VulkanPipeline.cpp
+		VulkanRenderer.cpp
+		VulkanRenderPass.cpp
+		VulkanShader.cpp
+		VulkanSwapChain.cpp
+		VulkanTexture.cpp
+		VulkanVertexBuffer.cpp
+)
+
+set(VULKAN_HEADERS
+		Vulkan.hpp
+		VulkanAllocator.hpp
+		VulkanComputePipeline.hpp
+		VulkanContext.hpp
+		VulkanDevice.hpp
+		VulkanDiagnostics.hpp
+		VulkanFramebuffer.hpp
+		VulkanImage.hpp
+		VulkanImGuiLayer.hpp
+		VulkanIndexBuffer.hpp
+		VulkanMaterial.hpp
+		VulkanPipeline.hpp
+		VulkanRenderer.hpp
+		VulkanRenderPass.hpp
+		VulkanShader.hpp
+		VulkanSwapChain.hpp
+		VulkanTexture.hpp
+		VulkanVertexBuffer.hpp
+)
+
+target_sources(Vanta
+		PRIVATE
+		${VULKAN_SOURCES}
+		${VULKAN_HEADERS}
+)

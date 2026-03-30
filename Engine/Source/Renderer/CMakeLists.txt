@@ -14,6 +14,8 @@ set(RENDERER_SOURCES
 		Shader.cpp
 		Texture.cpp
 		VertexBuffer.cpp
+		Image.cpp
+		RendererContext.cpp
 )
 
 set(RENDERER_HEADERS
@@ -34,6 +36,10 @@ set(RENDERER_HEADERS
 		ShaderUniform.hpp
 		Texture.hpp
 		VertexBuffer.hpp
+		Image.hpp
+		RendererCapabilities.hpp
+		RendererContext.hpp
+		RendererTypes.hpp
 )
 
 target_sources(Vanta
@@ -43,3 +49,4 @@ target_sources(Vanta
 )
 
 add_subdirectory(Backend/OpenGL)
+add_subdirectory(Backend/Vulkan)

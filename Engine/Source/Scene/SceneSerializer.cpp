@@ -212,6 +212,10 @@ namespace Vanta {
 			out << YAML::EndMap; // TransformComponent
 		}
 
+		if (entity.HasComponent<ScriptComponent>())
+		{
+		}
+
 		if (entity.HasComponent<MeshComponent>())
 		{
 			out << YAML::Key << "MeshComponent";
@@ -308,21 +312,15 @@ namespace Vanta {
 		out << YAML::EndMap; // Environment
 	}
 
-	static bool CheckPath(const std::string& path)
-	{
-		FILE* f = fopen(path.c_str(), "rb");
-		if (f)
-			fclose(f);
-		return f != nullptr;
-	}
-
 	void SceneSerializer::Serialize(const std::string& filepath)
 	{
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "Scene";
 		out << YAML::Value << "Scene Name";
-		SerializeEnvironment(out, m_Scene);
+
+		if (m_Scene->GetEnvironment())
+			SerializeEnvironment(out, m_Scene);
 
 		out << YAML::Key << "Entities";
 		out << YAML::Value << YAML::BeginSeq;
@@ -351,6 +349,7 @@ namespace Vanta {
 	bool SceneSerializer::Deserialize(const std::string& filepath)
 	{
 		std::ifstream stream(filepath);
+		VA_CORE_ASSERT(stream);
 		std::stringstream strStream;
 		strStream << stream.rdbuf();
 
@@ -360,33 +359,6 @@ namespace Vanta {
 
 		std::string sceneName = data["Scene"].as<std::string>();
 		VA_CORE_INFO("Deserializing scene '{0}'", sceneName);
-
-		/*auto environment = data["Environment"];
-		if (environment)
-		{
-			AssetHandle assetHandle;
-			if (environment["AssetPath"])
-			{
-				std::string envPath = environment["AssetPath"].as<std::string>();
-				assetHandle = AssetManager::GetAssetIDForFile(envPath);
-			}
-			else
-			{
-				assetHandle = environment["AssetHandle"].as<uint64_t>();
-			}
-			//m_Scene->SetEnvironment(Environment::Load(envPath));
-
-			auto lightNode = environment["Light"];
-			if (lightNode)
-			{
-				auto& light = m_Scene->GetLight();
-				light.Direction = lightNode["Direction"].as<glm::vec3>();
-				light.Radiance = lightNode["Radiance"].as<glm::vec3>();
-				light.Multiplier = lightNode["Multiplier"].as<float>();
-			}
-		}*/
-
-		std::vector<std::string> missingPaths;
 
 		auto entities = data["Entities"];
 		if (entities)
@@ -424,7 +396,7 @@ namespace Vanta {
 					// Entities always have transforms
 					auto& transform = deserializedEntity.GetComponent<TransformComponent>();
 					transform.Translation = transformComponent["Position"].as<glm::vec3>();
-					auto rotationNode = transformComponent["Rotation"];
+					const auto& rotationNode = transformComponent["Rotation"];
 					// Rotations used to be stored as quaternions
 					if (rotationNode.size() == 4)
 					{
@@ -444,23 +416,36 @@ namespace Vanta {
 					VA_CORE_INFO("    Scale: {0}, {1}, {2}", transform.Scale.x, transform.Scale.y, transform.Scale.z);
 				}
 
+				auto scriptComponent = entity["ScriptComponent"];
+				if (scriptComponent)
+				{
+				}
+
 				auto meshComponent = entity["MeshComponent"];
 				if (meshComponent)
 				{
-					UUID assetID;
+					auto& component = deserializedEntity.AddComponent<MeshComponent>();
+
+					AssetHandle assetHandle = 0;
 					if (meshComponent["AssetPath"])
+						assetHandle = AssetManager::GetAssetHandleFromFilePath(meshComponent["AssetPath"].as<std::string>());
+					else
+						assetHandle = meshComponent["AssetID"].as<uint64_t>();
+
+					if (AssetManager::IsAssetHandleValid(assetHandle))
 					{
-						std::string filepath = meshComponent["AssetPath"].as<std::string>();
-						assetID = AssetManager::GetAssetHandleFromFilePath(filepath);
+						component.Mesh = AssetManager::GetAsset<Mesh>(assetHandle);
 					}
 					else
 					{
-						assetID = meshComponent["AssetID"].as<uint64_t>();
-					}
+						component.Mesh = Ref<Asset>::Create().As<Mesh>();
+						component.Mesh->Type = AssetType::Missing;
 
-					if (AssetManager::IsAssetHandleValid(assetID) && !deserializedEntity.HasComponent<MeshComponent>())
-					{
-						deserializedEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>(assetID));
+						std::string filepath = meshComponent["AssetPath"] ? meshComponent["AssetPath"].as<std::string>() : "";
+						if (filepath.empty())
+							VA_CORE_ERROR("Tried to load non-existent mesh in Entity: {0}", (uint64_t)deserializedEntity.GetUUID());
+						else
+							VA_CORE_ERROR("Tried to load invalid mesh '{0}' in Entity {1}", filepath, (uint64_t)deserializedEntity.GetUUID());
 					}
 				}
 
@@ -468,7 +453,7 @@ namespace Vanta {
 				if (cameraComponent)
 				{
 					auto& component = deserializedEntity.AddComponent<CameraComponent>();
-					auto cameraNode = cameraComponent["Camera"];
+					const auto& cameraNode = cameraComponent["Camera"];
 
 					component.Camera = SceneCamera();
 					auto& camera = component.Camera;
@@ -503,22 +488,25 @@ namespace Vanta {
 				auto skyLightComponent = entity["SkyLightComponent"];
 				if (skyLightComponent)
 				{
-					auto component = deserializedEntity.AddComponent<SkyLightComponent>();
+					auto& component = deserializedEntity.AddComponent<SkyLightComponent>();
 
-					AssetHandle assetHandle;
+					AssetHandle assetHandle = 0;
 					if (skyLightComponent["EnvironmentAssetPath"])
-					{
-						std::string filepath = skyLightComponent["EnvironmentAssetPath"].as<std::string>();
-						assetHandle = AssetManager::GetAssetHandleFromFilePath(filepath);
-					}
+						assetHandle = AssetManager::GetAssetHandleFromFilePath(skyLightComponent["EnvironmentAssetPath"].as<std::string>());
 					else
-					{
 						assetHandle = skyLightComponent["EnvironmentMap"].as<uint64_t>();
-					}
 
 					if (AssetManager::IsAssetHandleValid(assetHandle))
 					{
 						component.SceneEnvironment = AssetManager::GetAsset<Environment>(assetHandle);
+					}
+					else
+					{
+						std::string filepath = meshComponent["EnvironmentAssetPath"] ? meshComponent["EnvironmentAssetPath"].as<std::string>() : "";
+						if (filepath.empty())
+							VA_CORE_ERROR("Tried to load non-existent environment map in Entity: {0}", (uint64_t)deserializedEntity.GetUUID());
+						else
+							VA_CORE_ERROR("Tried to load invalid environment map '{0}' in Entity {1}", filepath, (uint64_t)deserializedEntity.GetUUID());
 					}
 
 					component.Intensity = skyLightComponent["Intensity"].as<float>();
@@ -533,17 +521,6 @@ namespace Vanta {
 					component.TilingFactor = spriteRendererComponent["TilingFactor"].as<float>();
 				}
 			}
-		}
-
-		if (missingPaths.size())
-		{
-			VA_CORE_ERROR("The following files could not be loaded:");
-			for (auto& path : missingPaths)
-			{
-				VA_CORE_ERROR("  {0}", path);
-			}
-
-			return false;
 		}
 
 		return true;

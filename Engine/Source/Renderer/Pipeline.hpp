@@ -4,13 +4,17 @@
 
 #include "Renderer/VertexBuffer.hpp"
 #include "Renderer/Shader.hpp"
+#include "Renderer/RenderPass.hpp"
 
 namespace Vanta {
 
 	struct PipelineSpecification
 	{
-		Ref<Vanta::Shader> Shader;
+		Ref<Shader> Shader;
 		VertexBufferLayout Layout;
+		Ref<RenderPass> RenderPass;
+
+		std::string DebugName;
 	};
 
 	class Pipeline : public RefCounted
