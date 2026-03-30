@@ -21,6 +21,7 @@ namespace Vanta {
 
 		virtual void SetSceneEnvironment(Ref<Environment> environment, Ref<Image2D> shadow) override;
 		virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(const std::string& filepath) override;
+		virtual Ref<TextureCube> CreatePreethamSky(float turbidity, float azimuth, float inclination) override { VA_CORE_ASSERT(false); return nullptr; }
 
 		virtual void RenderMesh(Ref<Pipeline> pipeline, Ref<Mesh> mesh, const glm::mat4& transform) override;
 		virtual void RenderMeshWithoutMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, const glm::mat4& transform) override;

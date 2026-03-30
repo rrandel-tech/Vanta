@@ -19,6 +19,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "ImGui/ImGui.hpp"
+#include "Renderer/Renderer.hpp"
 
 // TODO:
 // - Eventually change imgui node IDs to be entity/asset GUID
@@ -651,6 +652,19 @@ namespace Vanta {
 			UI::BeginPropertyGrid();
 			UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment, AssetType::EnvMap);
 			UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
+			ImGui::Separator();
+			UI::Property("Dynamic Sky", slc.DynamicSky);
+			if (slc.DynamicSky)
+			{
+				bool changed = UI::Property("Turbidity", slc.TurbidityAzimuthInclination.x, 0.01f);
+				changed |= UI::Property("Azimuth", slc.TurbidityAzimuthInclination.y, 0.01f);
+				changed |= UI::Property("Inclination", slc.TurbidityAzimuthInclination.z, 0.01f);
+				if (changed)
+				{
+					Ref<TextureCube> preethamEnv = Renderer::CreatePreethamSky(slc.TurbidityAzimuthInclination.x, slc.TurbidityAzimuthInclination.y, slc.TurbidityAzimuthInclination.z);
+					slc.SceneEnvironment = Ref<Environment>::Create(preethamEnv, preethamEnv);
+				}
+			}
 			UI::EndPropertyGrid();
 		});
 

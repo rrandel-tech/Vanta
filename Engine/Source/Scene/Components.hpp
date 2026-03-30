@@ -124,5 +124,8 @@ namespace Vanta {
 		Ref<Environment> SceneEnvironment;
 		float Intensity = 1.0f;
 		float Angle = 0.0f;
+
+		bool DynamicSky = false;
+		glm::vec3 TurbidityAzimuthInclination = { 2.0, 0.0, 0.0 };
 	};
 }

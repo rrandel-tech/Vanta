@@ -176,7 +176,6 @@ namespace Vanta {
 	void VulkanComputePipeline::SetPushConstants(const void* data, uint32_t size)
 	{
 		vkCmdPushConstants(m_ActiveComputeCommandBuffer, m_ComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, size, data);
-
 	}
 
 }

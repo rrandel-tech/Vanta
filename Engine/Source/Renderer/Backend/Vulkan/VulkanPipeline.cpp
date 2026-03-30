@@ -228,28 +228,31 @@ namespace Vanta {
 			// vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
 			// vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
 
-			// Write default descriptor set... this overlaps materials somewhat, definitely requires more thought
-			instance->m_DescriptorSet = vulkanShader->CreateDescriptorSets();
-			std::vector<VkWriteDescriptorSet> writeDescriptors;
-
 			const auto& shaderDescriptorSets = vulkanShader->GetShaderDescriptorSets();
-			for (auto&& [set, shaderDescriptorSet] : shaderDescriptorSets)
+			if (!shaderDescriptorSets.empty())
 			{
-				for (auto&& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
+				// Write default descriptor set... this overlaps materials somewhat, definitely requires more thought
+				instance->m_DescriptorSet = vulkanShader->CreateDescriptorSets();
+				std::vector<VkWriteDescriptorSet> writeDescriptors;
+
+				for (auto&& [set, shaderDescriptorSet] : shaderDescriptorSets)
 				{
-					VkWriteDescriptorSet writeDescriptorSet = {};
-					writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-					writeDescriptorSet.descriptorCount = 1;
-					writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-					writeDescriptorSet.pBufferInfo = &uniformBuffer->Descriptor;
-					writeDescriptorSet.dstBinding = binding;
-					writeDescriptorSet.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
-					writeDescriptors.push_back(writeDescriptorSet);
+					for (auto&& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
+					{
+						VkWriteDescriptorSet writeDescriptorSet = {};
+						writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+						writeDescriptorSet.descriptorCount = 1;
+						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						writeDescriptorSet.pBufferInfo = &uniformBuffer->Descriptor;
+						writeDescriptorSet.dstBinding = binding;
+						writeDescriptorSet.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
+						writeDescriptors.push_back(writeDescriptorSet);
+					}
 				}
+
+				VA_CORE_WARN("VulkanPipeline - Updating {0} descriptor sets", writeDescriptors.size());
+				vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
 			}
-			
-			VA_CORE_WARN("VulkanPipeline - Updating {0} descriptor sets", writeDescriptors.size());
-			vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
 		});
 	}
 
