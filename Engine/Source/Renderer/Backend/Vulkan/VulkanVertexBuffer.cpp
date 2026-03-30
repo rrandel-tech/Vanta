@@ -23,26 +23,18 @@ namespace Vanta {
 			// TODO: Use staging
 			auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-			// Index buffer
-			VkBufferCreateInfo indexbufferInfo = {};
-			indexbufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			indexbufferInfo.size = instance->m_Size;
-			indexbufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-			// Copy index data to a buffer visible to the host
-			VK_CHECK_RESULT(vkCreateBuffer(device, &indexbufferInfo, nullptr, &instance->m_VulkanBuffer));
-			VkMemoryRequirements memoryRequirements;
-			vkGetBufferMemoryRequirements(device, instance->m_VulkanBuffer, &memoryRequirements);
+			// Vertex buffer
+			VkBufferCreateInfo vertexBufferCreateInfo = {};
+			vertexBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			vertexBufferCreateInfo.size = instance->m_Size;
+			vertexBufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
 			VulkanAllocator allocator("VertexBuffer");
-			allocator.Allocate(memoryRequirements, &instance->m_DeviceMemory, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			auto bufferAlloc = allocator.AllocateBuffer(vertexBufferCreateInfo, VMA_MEMORY_USAGE_CPU_ONLY, instance->m_VulkanBuffer);
 
-			void* dstBuffer;
-			VK_CHECK_RESULT(vkMapMemory(device, instance->m_DeviceMemory, 0, instance->m_Size, 0, &dstBuffer));
+			void* dstBuffer = allocator.MapMemory<void>(bufferAlloc);
 			memcpy(dstBuffer, instance->m_LocalData.Data, instance->m_Size);
-			vkUnmapMemory(device, instance->m_DeviceMemory);
-
-			VK_CHECK_RESULT(vkBindBufferMemory(device, instance->m_VulkanBuffer, instance->m_DeviceMemory, 0));
+			allocator.UnmapMemory(bufferAlloc);
 		});
 	}
 

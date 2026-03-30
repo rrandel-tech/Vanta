@@ -62,7 +62,6 @@ namespace Vanta {
 	private:
 		VkInstance m_Instance;
 		Ref<VulkanDevice> m_Device;
-		VulkanAllocator m_Allocator;
 
 		VkFormat m_ColorFormat;
 		VkColorSpaceKHR m_ColorSpace;
@@ -81,7 +80,7 @@ namespace Vanta {
 		struct
 		{
 			VkImage Image;
-			VkDeviceMemory DeviceMemory;
+			VmaAllocation MemoryAlloc;
 			VkImageView ImageView;
 		} m_DepthStencil;
 

@@ -49,7 +49,7 @@ namespace Vanta::Utils {
 				VA_CORE_ERROR("Checkpoint: {0} (stage: {1})", checkpoint->Data, StageToString(data[i].stage));
 			}
 		}
-		__debugbreak();
+		// __debugbreak();
 	}
 
 }

@@ -4,6 +4,8 @@
 
 #include "Vulkan.hpp"
 
+#include "vk_mem_alloc.h"
+
 namespace Vanta {
 
 	class VulkanShader : public Shader
@@ -11,7 +13,7 @@ namespace Vanta {
 	public:
 		struct UniformBuffer
 		{
-			VkDeviceMemory Memory = nullptr;
+			VmaAllocation MemoryAlloc = nullptr;
 			VkBuffer Buffer;
 			VkDescriptorBufferInfo Descriptor;
 			uint32_t Size = 0;

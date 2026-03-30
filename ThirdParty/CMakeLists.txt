@@ -232,3 +232,12 @@ endif()
 
 target_link_libraries(spirv-tools INTERFACE ${SPIRV_TOOLS_LIB})
 add_library(spirv-tools::spirv-tools ALIAS spirv-tools)
+
+# ==== Vulkan Memory Allocator (VMA) ====
+add_library(VulkanMemoryAllocator INTERFACE)
+
+target_include_directories(VulkanMemoryAllocator INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/VulkanMemoryAllocator
+)
+
+add_library(VulkanMemoryAllocator::VulkanMemoryAllocator ALIAS VulkanMemoryAllocator)

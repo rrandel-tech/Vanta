@@ -52,7 +52,6 @@ namespace Vanta {
 	{
 		m_Instance = instance;
 		m_Device = device;
-		m_Allocator = VulkanAllocator(device, "SwapChain");
 
 		VkDevice vulkanDevice = m_Device->GetVulkanDevice();
 		GET_DEVICE_PROC_ADDR(vulkanDevice, CreateSwapchainKHR);
@@ -419,6 +418,7 @@ namespace Vanta {
 
 	void VulkanSwapChain::CreateDepthStencil()
 	{
+		VkDevice device = m_Device->GetVulkanDevice();
 		VkFormat depthFormat = m_Device->GetPhysicalDevice()->GetDepthFormat();
 
 		VkImageCreateInfo imageCI{};
@@ -432,13 +432,9 @@ namespace Vanta {
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-		VkDevice device = m_Device->GetVulkanDevice();
-		VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &m_DepthStencil.Image));
-		VkMemoryRequirements memReqs{};
-		vkGetImageMemoryRequirements(device, m_DepthStencil.Image, &memReqs);
-		m_Allocator.Allocate(memReqs, &m_DepthStencil.DeviceMemory);
-		VK_CHECK_RESULT(vkBindImageMemory(device, m_DepthStencil.Image, m_DepthStencil.DeviceMemory, 0));
-
+		VulkanAllocator allocator("SwapChain");
+		m_DepthStencil.MemoryAlloc = allocator.AllocateImage(imageCI, VMA_MEMORY_USAGE_GPU_ONLY, m_DepthStencil.Image);
+	
 		VkImageViewCreateInfo imageViewCI{};
 		imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -513,8 +509,8 @@ namespace Vanta {
 		Create(&width, &height);
 		// Recreate the frame buffers
 		vkDestroyImageView(device, m_DepthStencil.ImageView, nullptr);
-		vkDestroyImage(device, m_DepthStencil.Image, nullptr);
-		vkFreeMemory(device, m_DepthStencil.DeviceMemory, nullptr);
+		VulkanAllocator allocator("SwapChain");
+		allocator.DestroyImage(m_DepthStencil.Image, m_DepthStencil.MemoryAlloc);
 		CreateDepthStencil();
 
 		for (auto& framebuffer : m_Framebuffers)

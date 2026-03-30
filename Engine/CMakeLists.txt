@@ -13,6 +13,7 @@ set(VANTA_ROOT_HEADERS
 # ==== Third-party implementation files ====
 set(VANTA_THIRDPARTY_IMPL_SOURCES
         ${VANTA_SRC_DIR}/ThirdParty/stb_impl.cpp
+        ${VANTA_SRC_DIR}/ThirdParty/vma_impl.cpp
 )
 
 add_library(Vanta STATIC)
@@ -62,6 +63,7 @@ target_link_libraries(Vanta
         shaderc::shaderc
         spirv-cross::spirv-cross
         spirv-tools::spirv-tools
+        VulkanMemoryAllocator::VulkanMemoryAllocator
 )
 
 vanta_enable_lto(Vanta)

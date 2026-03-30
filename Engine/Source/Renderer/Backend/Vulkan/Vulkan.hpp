@@ -62,7 +62,9 @@ namespace Vanta::Utils {
 			VA_CORE_ERROR("VkResult is '{0}' in {1}:{2}", ::Vanta::Utils::VKResultToString(result), __FILE__, __LINE__);
 			if (result == VK_ERROR_DEVICE_LOST)
 			{
-				::Vanta::Utils::RetrieveDiagnosticCheckpoints();
+				using namespace std::chrono_literals;
+				std::this_thread::sleep_for(3s);
+				//::Vanta::Utils::RetrieveDiagnosticCheckpoints();
 				::Vanta::Utils::DumpGPUInfo();
 			}
 			VA_CORE_ASSERT(result == VK_SUCCESS);

@@ -7,6 +7,7 @@
 #include "Asset/AssetManager.hpp"
 
 #include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
+#include "Renderer/Backend/Vulkan/VulkanAllocator.hpp"
 
 #include <imgui.h>
 #include <glad/glad.h>
@@ -95,7 +96,18 @@ namespace Vanta {
         ImGui::Text("Vendor: %s", caps.Vendor.c_str());
         ImGui::Text("Renderer: %s", caps.Device.c_str());
         ImGui::Text("Version: %s", caps.Version.c_str());
+        ImGui::Separator();
         ImGui::Text("Frame Time: %.2fms\n", m_TimeStep.GetMilliseconds());
+
+        if (RendererAPI::Current() == RendererAPIType::Vulkan)
+        {
+            GPUMemoryStats memoryStats = VulkanAllocator::GetStats();
+            std::string used = Utils::BytesToString(memoryStats.Used);
+            std::string free = Utils::BytesToString(memoryStats.Free);
+            ImGui::Text("Used VRAM: %s", used.c_str());
+            ImGui::Text("Free VRAM: %s", free.c_str());
+        }
+
         ImGui::End();
 
         for (Layer* layer : m_LayerStack)

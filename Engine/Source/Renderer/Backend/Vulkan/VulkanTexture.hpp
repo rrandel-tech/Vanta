@@ -81,7 +81,7 @@ namespace Vanta {
 		bool m_MipsGenerated = false;
 
 		Buffer m_LocalStorage;
-		VkDeviceMemory m_DeviceMemory;
+		VmaAllocation m_MemoryAlloc;
 		VkImage m_Image;
 		VkDescriptorImageInfo m_DescriptorImageInfo = {};
 	};

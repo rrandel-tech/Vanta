@@ -22,9 +22,10 @@ namespace Vanta {
 	{
 		auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		vkDestroyImageView(vulkanDevice, m_Info.ImageView, nullptr);
-		vkDestroyImage(vulkanDevice, m_Info.Image, nullptr);
 		vkDestroySampler(vulkanDevice, m_Info.Sampler, nullptr);
-		vkFreeMemory(vulkanDevice, m_Info.Memory, nullptr);
+
+		VulkanAllocator allocator("VulkanImage2D");
+		allocator.DestroyImage(m_Info.Image, m_Info.MemoryAlloc);
 
 		VA_CORE_WARN("VulkanImage2D::Release ImageView = {0}", (const void*)m_Info.ImageView);
 	}

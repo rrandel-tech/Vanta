@@ -4,6 +4,8 @@
 
 #include "vulkan/vulkan.h"
 
+#include "vk_mem_alloc.h"
+
 namespace Vanta {
 
 	struct VulkanImageInfo
@@ -11,7 +13,7 @@ namespace Vanta {
 		VkImage Image;
 		VkImageView ImageView;
 		VkSampler Sampler;
-		VkDeviceMemory Memory;
+		VmaAllocation MemoryAlloc = nullptr;
 	};
 
 	class VulkanImage2D : public Image2D
