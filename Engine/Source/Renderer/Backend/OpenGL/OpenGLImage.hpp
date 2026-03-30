@@ -30,6 +30,8 @@ namespace Vanta {
 		RendererID& GetSamplerRendererID() { return m_SamplerRendererID; }
 		RendererID GetSamplerRendererID() const { return m_SamplerRendererID; }
 
+		void CreateSampler(TextureProperties properties);
+
 		virtual uint64_t GetHash() const override { return (uint64_t)m_RendererID; }
 	private:
 		RendererID m_RendererID = 0;
@@ -83,6 +85,29 @@ namespace Vanta {
 				case ImageFormat::RGBA32F: return GL_FLOAT;
 			}
 			VA_CORE_ASSERT(false, "Unknown image format");
+			return 0;
+		}
+
+		inline GLenum OpenGLSamplerWrap(TextureWrap wrap)
+		{
+			switch (wrap)
+			{
+				case TextureWrap::Clamp:   return GL_CLAMP_TO_EDGE;
+				case TextureWrap::Repeat:  return GL_REPEAT;
+			}
+			VA_CORE_ASSERT(false, "Unknown wrap mode");
+			return 0;
+		}
+
+		// Note: should always be called with mipmap = false for magnification filtering
+		inline GLenum OpenGLSamplerFilter(TextureFilter filter, bool mipmap)
+		{
+			switch (filter)
+			{
+				case TextureFilter::Linear:   return mipmap ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
+				case TextureFilter::Nearest:  return mipmap ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST;
+			}
+			VA_CORE_ASSERT(false, "Unknown filter");
 			return 0;
 		}
 

@@ -25,6 +25,35 @@ namespace Vanta {
 		Depth = DEPTH24STENCIL8
 	};
 
+	enum class TextureWrap
+	{
+		None = 0,
+		Clamp,
+		Repeat
+	};
+
+	enum class TextureFilter
+	{
+		None = 0,
+		Linear,
+		Nearest
+	};
+
+	enum class TextureType
+	{
+		None = 0,
+		Texture2D,
+		TextureCube
+	};
+
+	struct TextureProperties
+	{
+		TextureWrap SamplerWrap = TextureWrap::Repeat;
+		TextureFilter SamplerFilter = TextureFilter::Linear;
+		bool GenerateMips = true;
+		bool SRGB = false;
+	};
+
 	class Image : public RefCounted
 	{
 	public:

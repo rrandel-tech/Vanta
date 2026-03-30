@@ -240,10 +240,10 @@ namespace Vanta {
 
 	void AssetManager::LoadAssetRegistry()
 	{
-		if (!FileSystem::Exists("DataCache/AssetRegistryCache.var"))
+		if (!FileSystem::Exists("assets/cache/AssetRegistryCache.var"))
 			return;
 
-		std::ifstream stream("DataCache/AssetRegistryCache.var");
+		std::ifstream stream("assets/cache/AssetRegistryCache.var");
 		VA_CORE_ASSERT(stream);
 		std::stringstream strStream;
 		strStream << stream.rdbuf();
@@ -418,7 +418,7 @@ namespace Vanta {
 		out << YAML::EndSeq;
 		out << YAML::EndMap;
 
-		std::ofstream fout("DataCache/AssetRegistryCache.var");
+		std::ofstream fout("assets/cache/AssetRegistryCache.var");
 		fout << out.c_str();
 	}
 

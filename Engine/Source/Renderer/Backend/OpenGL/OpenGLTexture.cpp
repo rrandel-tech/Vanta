@@ -16,8 +16,8 @@ namespace Vanta {
 	// Texture2D
 	//////////////////////////////////////////////////////////////////////////////////
 
-	OpenGLTexture2D::OpenGLTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data)
-		: m_Width(width), m_Height(height)
+	OpenGLTexture2D::OpenGLTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties)
+		: m_Width(width), m_Height(height), m_Properties(properties)
 	{
 		m_Image = Image2D::Create(format, width, height, data);
 		Renderer::Submit([=]()
@@ -26,13 +26,13 @@ namespace Vanta {
 		});
 	}
 
-	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, bool srgb)
-		: m_FilePath(path)
+	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureProperties properties)
+		: m_FilePath(path), m_Properties(properties)
 	{
 		int width, height, channels;
 		if (stbi_is_hdr(path.c_str()))
 		{
-			VA_CORE_INFO("Loading HDR texture {0}, srgb={1}", path, srgb);
+			VA_CORE_INFO("Loading HDR texture {0}, srgb={1}", path, properties.SRGB);
 
 			float* imageData = stbi_loadf(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			VA_CORE_ASSERT(imageData);
@@ -41,15 +41,17 @@ namespace Vanta {
 		}
 		else
 		{
-			VA_CORE_INFO("Loading texture {0}, srgb={1}", path, srgb);
+			VA_CORE_INFO("Loading texture {0}, srgb={1}", path, properties.SRGB);
 
-			stbi_uc* imageData = stbi_load(path.c_str(), &width, &height, &channels, srgb ? STBI_rgb : STBI_rgb_alpha);
+			stbi_uc* imageData = stbi_load(path.c_str(), &width, &height, &channels, properties.SRGB ? STBI_rgb : STBI_rgb_alpha);
 			VA_CORE_ASSERT(imageData);
 			//ImageFormat format = channels == 4 ? ImageFormat::RGBA : ImageFormat::RGB;
-			ImageFormat format = srgb ? ImageFormat::RGB : ImageFormat::RGBA;
+			ImageFormat format = properties.SRGB ? ImageFormat::RGB : ImageFormat::RGBA;
 			Buffer buffer(imageData, Utils::GetImageMemorySize(format, width, height));
 			m_Image = Image2D::Create(format, width, height, buffer);
 		}
+
+		m_Image.As<OpenGLImage2D>()->CreateSampler(m_Properties);
 
 		m_Width = width;
 		m_Height = height;
@@ -113,12 +115,9 @@ namespace Vanta {
 	// TextureCube
 	//////////////////////////////////////////////////////////////////////////////////
 
-	OpenGLTextureCube::OpenGLTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data)
+	OpenGLTextureCube::OpenGLTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties)
+		: m_Width(width), m_Height(height), m_Format(format), m_Properties(properties)
 	{
-		m_Width = width;
-		m_Height = height;
-		m_Format = format;
-
 		if (data)
 		{
 			uint32_t size = width * height * 4 * 6; // six layers
@@ -134,16 +133,16 @@ namespace Vanta {
 			if (instance->m_LocalStorage.Data)
 				glTextureSubImage3D(instance->m_RendererID, 0, 0, 0, 0, instance->m_Width, instance->m_Height, 6, Utils::OpenGLImageFormat(instance->m_Format), Utils::OpenGLFormatDataType(instance->m_Format), instance->m_LocalStorage.Data);
 
-			glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MIN_FILTER, levels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-			glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_REPEAT);
+			glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MIN_FILTER, Utils::OpenGLSamplerFilter(instance->m_Properties.SamplerFilter, instance->m_Properties.GenerateMips));
+			glTextureParameteri(instance->m_RendererID, GL_TEXTURE_MAG_FILTER, Utils::OpenGLSamplerFilter(instance->m_Properties.SamplerFilter, false));
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, Utils::OpenGLSamplerWrap(instance->m_Properties.SamplerWrap));
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, Utils::OpenGLSamplerWrap(instance->m_Properties.SamplerWrap));
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, Utils::OpenGLSamplerWrap(instance->m_Properties.SamplerWrap));
 		});
 	}
 
-	OpenGLTextureCube::OpenGLTextureCube(const std::string& path)
-		: m_FilePath(path)
+	OpenGLTextureCube::OpenGLTextureCube(const std::string& path, TextureProperties properties)
+		: m_FilePath(path), m_Properties(properties)
 	{
 		VA_CORE_ASSERT(false);
 #if 0

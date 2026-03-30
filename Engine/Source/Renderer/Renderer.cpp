@@ -95,7 +95,7 @@ namespace Vanta {
 		Renderer::GetShaderLibrary()->Load("assets/shaders/EnvironmentMipFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/EquirectangularToCubeMap.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/EnvironmentIrradiance.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/PreethamSky.glsl", true);
+		Renderer::GetShaderLibrary()->Load("assets/shaders/PreethamSky.glsl");
 
 		Renderer::GetShaderLibrary()->Load("assets/shaders/Grid.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/SceneComposite.glsl");

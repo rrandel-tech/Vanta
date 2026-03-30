@@ -11,8 +11,8 @@ namespace Vanta {
 	class VulkanTexture2D : public Texture2D
 	{
 	public:
-		VulkanTexture2D(const std::string& path, bool srgb = false);
-		VulkanTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureWrap wrap = TextureWrap::Clamp);
+		VulkanTexture2D(const std::string& path, TextureProperties properties);
+		VulkanTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
 		virtual ~VulkanTexture2D();
 
 		void Invalidate();
@@ -41,6 +41,7 @@ namespace Vanta {
 		std::string m_Path;
 		uint32_t m_Width;
 		uint32_t m_Height;
+		TextureProperties m_Properties;
 
 		Buffer m_ImageData;
 
@@ -52,8 +53,8 @@ namespace Vanta {
 	class VulkanTextureCube : public TextureCube
 	{
 	public:
-		VulkanTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data = nullptr);
-		VulkanTextureCube(const std::string& path);
+		VulkanTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
+		VulkanTextureCube(const std::string& path, TextureProperties properties);
 		virtual ~VulkanTextureCube();
 
 		virtual const std::string& GetPath() const override { return ""; }
@@ -77,6 +78,7 @@ namespace Vanta {
 	private:
 		ImageFormat m_Format = ImageFormat::None;
 		uint32_t m_Width = 0, m_Height = 0;
+		TextureProperties m_Properties;
 
 		bool m_MipsGenerated = false;
 

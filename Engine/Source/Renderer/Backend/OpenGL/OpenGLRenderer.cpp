@@ -162,7 +162,11 @@ namespace Vanta {
 		uint32_t indices[6] = { 0, 1, 2, 2, 3, 0, };
 		s_Data->m_FullscreenQuadIndexBuffer = IndexBuffer::Create(indices, 6 * sizeof(uint32_t));
 
-		s_Data->BRDFLut = Texture2D::Create("assets/textures/BRDF_LUT.tga");
+		{
+			TextureProperties props;
+			props.SamplerWrap = TextureWrap::Clamp;
+			s_Data->BRDFLut = Texture2D::Create("assets/textures/BRDF_LUT.tga", props);
+		}
 	}
 
 	void OpenGLRenderer::Shutdown()

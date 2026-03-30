@@ -8,14 +8,14 @@ namespace Vanta {
 	class OpenGLTexture2D : public Texture2D
 	{
 	public:
-		OpenGLTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data);
-		OpenGLTexture2D(const std::string& path, bool srgb);
+		OpenGLTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
+		OpenGLTexture2D(const std::string& path, TextureProperties properties);
 		virtual ~OpenGLTexture2D();
 
 		virtual void Bind(uint32_t slot = 0) const;
 
 		virtual Ref<Image2D> GetImage() const override { return m_Image; }
-		
+
 		virtual ImageFormat GetFormat() const override { return m_Image->GetFormat(); }
 		virtual uint32_t GetWidth() const override { return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
@@ -35,7 +35,7 @@ namespace Vanta {
 		virtual uint64_t GetHash() const { return m_Image->GetHash(); }
 	private:
 		Ref<Image2D> m_Image;
-		TextureWrap m_Wrap = TextureWrap::Clamp;
+		TextureProperties m_Properties;
 		uint32_t m_Width, m_Height;
 
 		bool m_IsHDR = false;
@@ -49,8 +49,8 @@ namespace Vanta {
 	class OpenGLTextureCube : public TextureCube
 	{
 	public:
-		OpenGLTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data = nullptr);
-		OpenGLTextureCube(const std::string& path);
+		OpenGLTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
+		OpenGLTextureCube(const std::string& path, TextureProperties properties);
 		virtual ~OpenGLTextureCube();
 
 		virtual void Bind(uint32_t slot = 0) const;
@@ -71,6 +71,8 @@ namespace Vanta {
 		RendererID m_RendererID;
 		ImageFormat m_Format;
 		uint32_t m_Width, m_Height;
+
+		TextureProperties m_Properties;
 
 		Buffer m_LocalStorage;
 
