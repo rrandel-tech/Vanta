@@ -215,12 +215,13 @@ namespace Vanta {
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
-			Ref<VulkanVertexBuffer> vulkanMeshVB = mesh->GetVertexBuffer().As<VulkanVertexBuffer>();
+			Ref<MeshAsset> meshAsset = mesh->GetMeshAsset();
+			Ref<VulkanVertexBuffer> vulkanMeshVB = meshAsset->GetVertexBuffer().As<VulkanVertexBuffer>();
 			VkBuffer vbMeshBuffer = vulkanMeshVB->GetVulkanBuffer();
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vbMeshBuffer, offsets);
 
-			auto vulkanMeshIB = Ref<VulkanIndexBuffer>(mesh->GetIndexBuffer());
+			auto vulkanMeshIB = Ref<VulkanIndexBuffer>(meshAsset->GetIndexBuffer());
 			VkBuffer ibBuffer = vulkanMeshIB->GetVulkanBuffer();
 			vkCmdBindIndexBuffer(commandBuffer, ibBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -238,9 +239,11 @@ namespace Vanta {
 				vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
 			}
 
+			const auto& meshAssetSubmeshes = meshAsset->GetSubmeshes();
 			auto& submeshes = mesh->GetSubmeshes();
-			for (Submesh& submesh : submeshes)
+			for (uint32_t submeshIndex : submeshes)
 			{
+				const Submesh& submesh = meshAssetSubmeshes[submeshIndex];
 				auto material = mesh->GetMaterials()[submesh.MaterialIndex].As<VulkanMaterial>();
 				VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
 				VkDescriptorSet descriptorSet = material->GetDescriptorSet(frameIndex);
@@ -278,12 +281,13 @@ namespace Vanta {
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
-			auto vulkanMeshVB = mesh->GetVertexBuffer().As<VulkanVertexBuffer>();
+			Ref<MeshAsset> meshAsset = mesh->GetMeshAsset();
+			auto vulkanMeshVB = meshAsset->GetVertexBuffer().As<VulkanVertexBuffer>();
 			VkBuffer vbMeshBuffer = vulkanMeshVB->GetVulkanBuffer();
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vbMeshBuffer, offsets);
 
-			auto vulkanMeshIB = Ref<VulkanIndexBuffer>(mesh->GetIndexBuffer());
+			auto vulkanMeshIB = Ref<VulkanIndexBuffer>(meshAsset->GetIndexBuffer());
 			VkBuffer ibBuffer = vulkanMeshIB->GetVulkanBuffer();
 			vkCmdBindIndexBuffer(commandBuffer, ibBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -300,9 +304,11 @@ namespace Vanta {
 			if (descriptorSet)
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
+			const auto& meshAssetSubmeshes = meshAsset->GetSubmeshes();
 			auto& submeshes = mesh->GetSubmeshes();
-			for (Submesh& submesh : submeshes)
+			for (uint32_t submeshIndex : submeshes)
 			{
+				const Submesh& submesh = meshAssetSubmeshes[submeshIndex];
 				glm::mat4 worldTransform = transform * submesh.Transform;
 				pushConstantBuffer.Write(&worldTransform, sizeof(glm::mat4));
 				vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, pushConstantBuffer.Size, pushConstantBuffer.Data);

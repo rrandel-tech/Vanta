@@ -42,8 +42,8 @@ namespace Vanta {
 		{
 			ImGui::BeginChild("##objects_window");
 			DrawObject("Cube", CubeHandle);
-			DrawObject("Capsule", CapsuleHandle);
 			DrawObject("Sphere", SphereHandle);
+			DrawObject("Capsule", CapsuleHandle);
 			DrawObject("Cylinder", CylinderHandle);
 			DrawObject("Torus", TorusHandle);
 			DrawObject("Plane", PlaneHandle);

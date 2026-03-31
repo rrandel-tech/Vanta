@@ -35,11 +35,11 @@ namespace Vanta {
 
 	VulkanRenderCommandBuffer::~VulkanRenderCommandBuffer()
 	{
-		Renderer::SubmitResourceFree([=]()
+		VkCommandPool commandPool = m_CommandPool;
+		Renderer::SubmitResourceFree([commandPool]()
 		{
 			auto device = VulkanContext::GetCurrentDevice();
-			vkFreeCommandBuffers(device->GetVulkanDevice(), m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
-			vkDestroyCommandPool(device->GetVulkanDevice(), m_CommandPool, nullptr);
+			vkDestroyCommandPool(device->GetVulkanDevice(), commandPool, nullptr);
 		});
 	}
 

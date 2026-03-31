@@ -2,6 +2,7 @@ set(ASSET_SOURCES
         AssetManager.cpp
         AssetSerializer.cpp
         AssetImporter.cpp
+        MeshSerializer.cpp
 )
 
 set(ASSET_HEADERS
@@ -9,6 +10,9 @@ set(ASSET_HEADERS
         Asset.hpp
         AssetSerializer.hpp
         AssetImporter.hpp
+        MeshSerializer.hpp
+        AssetMetadata.hpp
+        AssetTypes.hpp
 )
 
 target_sources(Vanta

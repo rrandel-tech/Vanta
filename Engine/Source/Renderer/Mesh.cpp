@@ -69,7 +69,7 @@ namespace Vanta {
 		}
 	};
 
-	Mesh::Mesh(const std::string& filename)
+	MeshAsset::MeshAsset(const std::string& filename)
 		: m_FilePath(filename)
 	{
 		LogStream::Initialize();
@@ -522,7 +522,7 @@ namespace Vanta {
 		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), m_Indices.size() * sizeof(Index));
 	}
 
-	Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<Index>& indices, const glm::mat4& transform)
+	MeshAsset::MeshAsset(const std::vector<Vertex>& vertices, const std::vector<Index>& indices, const glm::mat4& transform)
 		: m_StaticVertices(vertices), m_Indices(indices), m_IsAnimated(false)
 	{
 		Submesh submesh;
@@ -543,26 +543,9 @@ namespace Vanta {
 		};
 	}
 
-	Mesh::~Mesh()
+
+	MeshAsset::~MeshAsset()
 	{
-	}
-
-	void Mesh::OnUpdate(Timestep ts)
-	{
-		if (m_IsAnimated)
-		{
-			if (m_AnimationPlaying)
-			{
-				m_WorldTime += ts;
-
-				float ticksPerSecond = (float)(m_Scene->mAnimations[0]->mTicksPerSecond != 0 ? m_Scene->mAnimations[0]->mTicksPerSecond : 25.0f) * m_TimeMultiplier;
-				m_AnimationTime += ts * ticksPerSecond;
-				m_AnimationTime = fmod(m_AnimationTime, (float)m_Scene->mAnimations[0]->mDuration);
-			}
-
-			// TODO: We only need to recalc bones if rendering has been requested at the current animation frame
-			BoneTransform(m_AnimationTime);
-		}
 	}
 
 	static std::string LevelToSpaces(uint32_t level)
@@ -573,7 +556,7 @@ namespace Vanta {
 		return result;
 	}
 
-	void Mesh::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
+	void MeshAsset::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
 	{
 		glm::mat4 transform = parentTransform * Mat4FromAssimpMat4(node->mTransformation);
 		for (uint32_t i = 0; i < node->mNumMeshes; i++)
@@ -590,7 +573,7 @@ namespace Vanta {
 			TraverseNodes(node->mChildren[i], transform, level + 1);
 	}
 
-	uint32_t Mesh::FindPosition(float AnimationTime, const aiNodeAnim* pNodeAnim)
+	uint32_t MeshAsset::FindPosition(float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
 		for (uint32_t i = 0; i < pNodeAnim->mNumPositionKeys - 1; i++)
 		{
@@ -601,8 +584,7 @@ namespace Vanta {
 		return 0;
 	}
 
-
-	uint32_t Mesh::FindRotation(float AnimationTime, const aiNodeAnim* pNodeAnim)
+	uint32_t MeshAsset::FindRotation(float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
 		VA_CORE_ASSERT(pNodeAnim->mNumRotationKeys > 0);
 
@@ -615,8 +597,7 @@ namespace Vanta {
 		return 0;
 	}
 
-
-	uint32_t Mesh::FindScaling(float AnimationTime, const aiNodeAnim* pNodeAnim)
+	uint32_t MeshAsset::FindScaling(float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
 		VA_CORE_ASSERT(pNodeAnim->mNumScalingKeys > 0);
 
@@ -629,8 +610,7 @@ namespace Vanta {
 		return 0;
 	}
 
-
-	glm::vec3 Mesh::InterpolateTranslation(float animationTime, const aiNodeAnim* nodeAnim)
+	glm::vec3 MeshAsset::InterpolateTranslation(float animationTime, const aiNodeAnim* nodeAnim)
 	{
 		if (nodeAnim->mNumPositionKeys == 1)
 		{
@@ -653,8 +633,7 @@ namespace Vanta {
 		return { aiVec.x, aiVec.y, aiVec.z };
 	}
 
-
-	glm::quat Mesh::InterpolateRotation(float animationTime, const aiNodeAnim* nodeAnim)
+	glm::quat MeshAsset::InterpolateRotation(float animationTime, const aiNodeAnim* nodeAnim)
 	{
 		if (nodeAnim->mNumRotationKeys == 1)
 		{
@@ -678,8 +657,7 @@ namespace Vanta {
 		return glm::quat(q.w, q.x, q.y, q.z);
 	}
 
-
-	glm::vec3 Mesh::InterpolateScale(float animationTime, const aiNodeAnim* nodeAnim)
+	glm::vec3 MeshAsset::InterpolateScale(float animationTime, const aiNodeAnim* nodeAnim)
 	{
 		if (nodeAnim->mNumScalingKeys == 1)
 		{
@@ -702,7 +680,7 @@ namespace Vanta {
 		return { aiVec.x, aiVec.y, aiVec.z };
 	}
 
-	void Mesh::ReadNodeHierarchy(float AnimationTime, const aiNode* pNode, const glm::mat4& parentTransform)
+	void MeshAsset::ReadNodeHierarchy(float AnimationTime, const aiNode* pNode, const glm::mat4& parentTransform)
 	{
 		std::string name(pNode->mName.data);
 		const aiAnimation* animation = m_Scene->mAnimations[0];
@@ -735,7 +713,7 @@ namespace Vanta {
 			ReadNodeHierarchy(AnimationTime, pNode->mChildren[i], transform);
 	}
 
-	const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* animation, const std::string& nodeName)
+	const aiNodeAnim* MeshAsset::FindNodeAnim(const aiAnimation* animation, const std::string& nodeName)
 	{
 		for (uint32_t i = 0; i < animation->mNumChannels; i++)
 		{
@@ -746,7 +724,7 @@ namespace Vanta {
 		return nullptr;
 	} 
 
-	void Mesh::BoneTransform(float time)
+	void MeshAsset::BoneTransform(float time)
 	{
 		ReadNodeHierarchy(time, m_Scene->mRootNode, glm::mat4(1.0f));
 		m_BoneTransforms.resize(m_BoneCount);
@@ -754,7 +732,7 @@ namespace Vanta {
 			m_BoneTransforms[i] = m_BoneInfo[i].FinalTransformation;
 	}
 
-	void Mesh::DumpVertexBuffer()
+	void MeshAsset::DumpVertexBuffer()
 	{
 		// TODO: Convert to ImGui
 		VA_MESH_LOG("------------------------------------------------------");
@@ -789,6 +767,52 @@ namespace Vanta {
 			}
 		}
 		VA_MESH_LOG("------------------------------------------------------");
+	}
+
+	Mesh::Mesh(Ref<MeshAsset> meshAsset)
+		: m_MeshAsset(meshAsset)
+	{
+		const auto& assetSubmeshes = m_MeshAsset->GetSubmeshes();
+		m_Submeshes.resize(assetSubmeshes.size());
+		for (size_t i = 0; i < assetSubmeshes.size(); i++)
+			m_Submeshes[i] = i;
+
+		// TODO: we should actually copy materials in most cases
+		for (const auto& material : meshAsset->GetMaterials())
+			m_Materials.push_back(material);
+
+	}
+
+	Mesh::Mesh(Ref<MeshAsset> meshAsset, const std::vector<uint32_t>& submeshes)
+		: m_MeshAsset(meshAsset), m_Submeshes(submeshes)
+	{
+		// TODO: we should actually copy materials in most cases
+		for (const auto& material : meshAsset->GetMaterials())
+			m_Materials.push_back(material);
+	}
+
+	Mesh::~Mesh()
+	{
+	}
+
+	void Mesh::OnUpdate(Timestep ts)
+	{
+#if 0
+		if (m_IsAnimated)
+		{
+			if (m_AnimationPlaying)
+			{
+				m_WorldTime += ts;
+
+				float ticksPerSecond = (float)(m_Scene->mAnimations[0]->mTicksPerSecond != 0 ? m_Scene->mAnimations[0]->mTicksPerSecond : 25.0f) * m_TimeMultiplier;
+				m_AnimationTime += ts * ticksPerSecond;
+				m_AnimationTime = fmod(m_AnimationTime, (float)m_Scene->mAnimations[0]->mDuration);
+			}
+
+			// TODO: We only need to recalc bones if rendering has been requested at the current animation frame
+			BoneTransform(m_AnimationTime);
+		}
+#endif
 	}
 
 }

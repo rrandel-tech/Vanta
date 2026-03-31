@@ -9,6 +9,7 @@ set(CORE_SOURCES
         Window.cpp
         UUID.cpp
         Ref.cpp
+        Hash.cpp
 )
 
 set(CORE_HEADERS
@@ -26,6 +27,7 @@ set(CORE_HEADERS
         Ref.hpp
         Timer.hpp
         UUID.hpp
+        Hash.hpp
 )
 
 target_sources(Vanta

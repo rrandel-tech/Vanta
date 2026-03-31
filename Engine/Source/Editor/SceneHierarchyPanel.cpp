@@ -78,21 +78,7 @@ namespace Vanta {
 				{
 					UUID droppedHandle = *((UUID*)payload->Data);
 					Entity e = m_Context->FindEntityByUUID(droppedHandle);
-					Entity previousParent = m_Context->FindEntityByUUID(e.GetParentUUID());
-
-					if (previousParent)
-					{
-						auto& children = previousParent.Children();
-						children.erase(std::remove(children.begin(), children.end(), droppedHandle), children.end());
-
-						glm::mat4 parentTransform = m_Context->GetTransformRelativeToParent(previousParent);
-						glm::vec3 parentTranslation, parentRotation, parentScale;
-						Math::DecomposeTransform(parentTransform, parentTranslation, parentRotation, parentScale);
-
-						e.Transform().Translation = e.Transform().Translation + parentTranslation;
-					}
-
-					e.SetParentUUID(0);
+					m_Context->UnparentEntity(e);
 				}
 
 				ImGui::EndDragDropTarget();
@@ -113,36 +99,55 @@ namespace Vanta {
 						newEntity.AddComponent<CameraComponent>();
 						SetSelected(newEntity);
 					}
-					if (ImGui::BeginMenu("Mesh"))
+					if (ImGui::BeginMenu("3D"))
 					{
-						if (ImGui::MenuItem("Empty Mesh"))
-						{
-							auto newEntity = m_Context->CreateEntity("Empty Mesh");
-							newEntity.AddComponent<MeshComponent>();
-							SetSelected(newEntity);
-						}
 						if (ImGui::MenuItem("Cube"))
 						{
 							auto newEntity = m_Context->CreateEntity("Cube");
-							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Cube.fbx"));
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Cube.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
 							SetSelected(newEntity);
 						}
 						if (ImGui::MenuItem("Sphere"))
 						{
 							auto newEntity = m_Context->CreateEntity("Sphere");
-							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Sphere.fbx"));
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Sphere.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
 							SetSelected(newEntity);
 						}
 						if (ImGui::MenuItem("Capsule"))
 						{
 							auto newEntity = m_Context->CreateEntity("Capsule");
-							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Capsule.fbx"));
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Capsule.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Cylinder"))
+						{
+							auto newEntity = m_Context->CreateEntity("Cylinder");
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Cylinder.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Torus"))
+						{
+							auto newEntity = m_Context->CreateEntity("Torus");
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Torus.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
 							SetSelected(newEntity);
 						}
 						if (ImGui::MenuItem("Plane"))
 						{
 							auto newEntity = m_Context->CreateEntity("Plane");
-							newEntity.AddComponent<MeshComponent>(AssetManager::GetAsset<Mesh>("assets/meshes/Default/Plane.fbx"));
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Plane.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
+							SetSelected(newEntity);
+						}
+						if (ImGui::MenuItem("Cone"))
+						{
+							auto newEntity = m_Context->CreateEntity("Cone");
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>("assets/meshes/Default/Cone.fbx");
+							newEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(meshAsset));
 							SetSelected(newEntity);
 						}
 						ImGui::EndMenu();
@@ -208,7 +213,7 @@ namespace Vanta {
 			flags |= ImGuiTreeNodeFlags_Leaf;
 
 		// TODO: This should probably be a function that checks that the entities components are valid
-		bool missingMesh = entity.HasComponent<MeshComponent>() && (entity.GetComponent<MeshComponent>().Mesh && entity.GetComponent<MeshComponent>().Mesh->Type == AssetType::Missing);
+		bool missingMesh = entity.HasComponent<MeshComponent>() && (entity.GetComponent<MeshComponent>().Mesh && entity.GetComponent<MeshComponent>().Mesh->IsFlagSet(AssetFlag::Missing));
 		if (missingMesh)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.4f, 0.3f, 1.0f));
 
@@ -248,26 +253,7 @@ namespace Vanta {
 			{
 				UUID droppedHandle = *((UUID*)payload->Data);
 				Entity e = m_Context->FindEntityByUUID(droppedHandle);
-
-				if (!entity.IsDescendantOf(e))
-				{
-					// Remove from previous parent
-					Entity previousParent = m_Context->FindEntityByUUID(e.GetParentUUID());
-					if (previousParent)
-					{
-						auto& parentChildren = previousParent.Children();
-						parentChildren.erase(std::remove(parentChildren.begin(), parentChildren.end(), droppedHandle), parentChildren.end());
-					}
-
-					glm::mat4 parentTransform = m_Context->GetTransformRelativeToParent(entity);
-					glm::vec3 parentTranslation, parentRotation, parentScale;
-					Math::DecomposeTransform(parentTransform, parentTranslation, parentRotation, parentScale);
-
-					e.Transform().Translation = e.Transform().Translation - parentTranslation;
-					e.SetParentUUID(entity.GetUUID());
-					entity.Children().push_back(droppedHandle);
-				}
-
+				m_Context->ParentEntity(e, entity);
 			}
 
 			ImGui::EndDragDropTarget();
@@ -296,12 +282,17 @@ namespace Vanta {
 		}
 	}
 
+
+
 	template<typename T, typename UIFunction>
 	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction, bool canBeRemoved = true)
 	{
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
 		if (entity.HasComponent<T>())
 		{
+			// NOTE:
+			//	This fixes an issue where the first "+" button would display the "Remove" buttons for ALL components on an Entity.
+			//	This is due to ImGui::TreeNodeEx only pushing the id for it's children if it's actually open
 			ImGui::PushID((void*)typeid(T).hash_code());
 			auto& component = entity.GetComponent<T>();
 			ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
@@ -501,6 +492,11 @@ namespace Vanta {
 			}
 			if (!m_SelectionContext.HasComponent<ScriptComponent>())
 			{
+				if (ImGui::Button("Script"))
+				{
+					m_SelectionContext.AddComponent<ScriptComponent>();
+					ImGui::CloseCurrentPopup();
+				}
 			}
 			if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
 			{
@@ -525,7 +521,7 @@ namespace Vanta {
 		DrawComponent<MeshComponent>("Mesh", entity, [&](MeshComponent& mc)
 		{
 			UI::BeginPropertyGrid();
-			UI::PropertyAssetReference("Mesh", mc.Mesh, AssetType::Mesh);
+			UI::PropertyAssetReference("Mesh", mc.Mesh);
 			UI::EndPropertyGrid();
 		});
 
@@ -594,7 +590,7 @@ namespace Vanta {
 		DrawComponent<SkyLightComponent>("Sky Light", entity, [](SkyLightComponent& slc)
 		{
 			UI::BeginPropertyGrid();
-			UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment, AssetType::EnvMap);
+			UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment);
 			UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
 			ImGui::Separator();
 			UI::Property("Dynamic Sky", slc.DynamicSky);

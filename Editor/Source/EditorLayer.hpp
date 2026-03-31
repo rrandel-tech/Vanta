@@ -69,6 +69,8 @@ namespace Vanta {
 		void UpdateWindowTitle(const std::string& sceneName);
 
 		float GetSnapValue();
+
+		void DeleteEntity(Entity entity);
 	private:
 		Scope<SceneHierarchyPanel> m_SceneHierarchyPanel;
 		Scope<ContentBrowserPanel> m_ContentBrowserPanel;
@@ -77,6 +79,7 @@ namespace Vanta {
 		Ref<Scene> m_RuntimeScene, m_EditorScene, m_CurrentScene;
 		Ref<SceneRenderer> m_ViewportRenderer;
 		Ref<SceneRenderer> m_SecondViewportRenderer;
+		Ref<SceneRenderer> m_FocusedRenderer;
 		std::string m_SceneFilePath;
 
 		EditorCamera m_EditorCamera;

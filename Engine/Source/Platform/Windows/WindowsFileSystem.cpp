@@ -88,6 +88,7 @@ namespace Vanta {
 
 	void FileSystem::StartWatching()
 	{
+		s_Watching = true;
 		DWORD threadId;
 		s_WatcherThread = CreateThread(NULL, 0, Watch, 0, 0, &threadId);
 		VA_CORE_ASSERT(s_WatcherThread != NULL);
@@ -100,6 +101,16 @@ namespace Vanta {
 		if (result == WAIT_TIMEOUT)
 			TerminateThread(s_WatcherThread, 0);
 		CloseHandle(s_WatcherThread);
+	}
+
+	bool FileSystem::IsDirectory(const std::string& filepath)
+	{
+		bool result = std::filesystem::is_directory(filepath);
+
+		if (!result)
+			result = Utils::GetExtension(filepath).empty();
+
+		return result;
 	}
 
 	static std::string wchar_to_string(wchar_t* input)
@@ -179,7 +190,7 @@ namespace Vanta {
 				e.FilePath = filepath.string();
 				e.NewName = filepath.filename().string();
 				e.OldName = filepath.filename().string();
-				e.IsDirectory = std::filesystem::is_directory(filepath);
+				e.IsDirectory = IsDirectory(e.FilePath);
 
 				switch (fni.Action)
 				{
@@ -191,7 +202,6 @@ namespace Vanta {
 				}
 				case FILE_ACTION_REMOVED:
 				{
-					e.IsDirectory = AssetManager::IsDirectory(e.FilePath);
 					e.Action = FileSystemAction::Delete;
 					s_Callback(e);
 					break;
@@ -224,41 +234,6 @@ namespace Vanta {
 		}
 
 		return 0;
-	}
-
-	bool FileSystem::WriteBytes(const std::string& filepath, const Buffer& buffer)
-	{
-		FILE* f = fopen(filepath.c_str(), "wb");
-		if (f)
-		{
-			fwrite(buffer.Data, sizeof(byte), buffer.Size / sizeof(byte), f);
-			fclose(f);
-			return true;
-		}
-
-		return false;
-	}
-
-	Buffer FileSystem::ReadBytes(const std::string& filepath)
-	{
-		Buffer buffer;
-
-		FILE* f = fopen(filepath.c_str(), "rb");
-		uint32_t size = 0;
-
-		if (f)
-		{
-			fseek(f, 0, SEEK_END);
-			size = ftell(f);
-			fseek(f, 0, SEEK_SET);
-
-			buffer.Allocate(size);
-			fread(buffer.Data, sizeof(byte), size / sizeof(byte), f);
-
-			fclose(f);
-		}
-
-		return buffer;
 	}
 
 }

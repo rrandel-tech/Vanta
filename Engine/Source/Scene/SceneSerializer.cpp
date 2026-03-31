@@ -223,7 +223,10 @@ namespace Vanta {
 
 			auto mesh = entity.GetComponent<MeshComponent>().Mesh;
 			if (mesh)
-				out << YAML::Key << "AssetID" << YAML::Value << mesh->Handle;
+			{
+				auto meshAsset = mesh->GetMeshAsset();
+				out << YAML::Key << "AssetID" << YAML::Value << meshAsset->Handle;
+			}
 			else
 				out << YAML::Key << "AssetID" << YAML::Value << 0;
 
@@ -434,18 +437,23 @@ namespace Vanta {
 
 					if (AssetManager::IsAssetHandleValid(assetHandle))
 					{
-						component.Mesh = AssetManager::GetAsset<Mesh>(assetHandle);
+						component.Mesh = Ref<Mesh>::Create(AssetManager::GetAsset<MeshAsset>(assetHandle));
 					}
 					else
 					{
 						component.Mesh = Ref<Asset>::Create().As<Mesh>();
-						component.Mesh->Type = AssetType::Missing;
+						component.Mesh->SetFlag(AssetFlag::Missing, true);
 
 						std::string filepath = meshComponent["AssetPath"] ? meshComponent["AssetPath"].as<std::string>() : "";
 						if (filepath.empty())
+						{
 							VA_CORE_ERROR("Tried to load non-existent mesh in Entity: {0}", (uint64_t)deserializedEntity.GetUUID());
+						}
 						else
+						{
 							VA_CORE_ERROR("Tried to load invalid mesh '{0}' in Entity {1}", filepath, (uint64_t)deserializedEntity.GetUUID());
+							component.Mesh->SetFlag(AssetFlag::Invalid, true);
+						}
 					}
 				}
 
@@ -457,20 +465,24 @@ namespace Vanta {
 
 					component.Camera = SceneCamera();
 					auto& camera = component.Camera;
-					if (cameraNode["ProjectionType"])
-						camera.SetProjectionType((SceneCamera::ProjectionType)cameraNode["ProjectionType"].as<int>());
-					if (cameraNode["PerspectiveFOV"])
-						camera.SetPerspectiveVerticalFOV(cameraNode["PerspectiveFOV"].as<float>());
-					if (cameraNode["PerspectiveNear"])
-						camera.SetPerspectiveNearClip(cameraNode["PerspectiveNear"].as<float>());
-					if (cameraNode["PerspectiveFar"])
-						camera.SetPerspectiveFarClip(cameraNode["PerspectiveFar"].as<float>());
-					if (cameraNode["OrthographicSize"])
-						camera.SetOrthographicSize(cameraNode["OrthographicSize"].as<float>());
-					if (cameraNode["OrthographicNear"])
-						camera.SetOrthographicNearClip(cameraNode["OrthographicNear"].as<float>());
-					if (cameraNode["OrthographicFar"])
-						camera.SetOrthographicFarClip(cameraNode["OrthographicFar"].as<float>());
+
+					if (cameraNode.IsMap())
+					{
+						if (cameraNode["ProjectionType"])
+							camera.SetProjectionType((SceneCamera::ProjectionType)cameraNode["ProjectionType"].as<int>());
+						if (cameraNode["PerspectiveFOV"])
+							camera.SetPerspectiveVerticalFOV(cameraNode["PerspectiveFOV"].as<float>());
+						if (cameraNode["PerspectiveNear"])
+							camera.SetPerspectiveNearClip(cameraNode["PerspectiveNear"].as<float>());
+						if (cameraNode["PerspectiveFar"])
+							camera.SetPerspectiveFarClip(cameraNode["PerspectiveFar"].as<float>());
+						if (cameraNode["OrthographicSize"])
+							camera.SetOrthographicSize(cameraNode["OrthographicSize"].as<float>());
+						if (cameraNode["OrthographicNear"])
+							camera.SetOrthographicNearClip(cameraNode["OrthographicNear"].as<float>());
+						if (cameraNode["OrthographicFar"])
+							camera.SetOrthographicFarClip(cameraNode["OrthographicFar"].as<float>());
+					}
 
 					component.Primary = cameraComponent["Primary"].as<bool>();
 				}

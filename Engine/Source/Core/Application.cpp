@@ -45,8 +45,11 @@ namespace Vanta {
         Renderer::Init();
         Renderer::WaitAndRender();
 
-        m_ImGuiLayer = ImGuiLayer::Create();
-        PushOverlay(m_ImGuiLayer);
+        if (m_EnableImGui)
+        {
+            m_ImGuiLayer = ImGuiLayer::Create();
+            PushOverlay(m_ImGuiLayer);
+        }
 
         AssetManager::Init();
     }
@@ -66,6 +69,13 @@ namespace Vanta {
         AssetManager::Shutdown();
 
         Renderer::WaitAndRender();
+
+        for (uint32_t i = 0; i < Renderer::GetConfig().FramesInFlight; i++)
+        {
+            auto& queue = Renderer::GetRenderResourceReleaseQueue(i);
+            queue.Execute();
+        }
+
         Renderer::Shutdown();
 
         delete m_Profiler;
@@ -151,8 +161,11 @@ namespace Vanta {
 
                 // Render ImGui on render thread
                 Application* app = this;
-                Renderer::Submit([app]() { app->RenderImGui(); });
-                Renderer::Submit([=]() {m_ImGuiLayer->End(); });
+                if (m_EnableImGui)
+                {
+                    Renderer::Submit([app]() { app->RenderImGui(); });
+                    Renderer::Submit([=]() {m_ImGuiLayer->End(); });
+                }
                 Renderer::EndFrame();
 
                 // On Render thread

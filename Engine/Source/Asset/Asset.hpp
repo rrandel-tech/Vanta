@@ -2,23 +2,9 @@
 
 #include "Core/UUID.hpp"
 
-#include <entt/entt.hpp>
+#include "Asset/AssetTypes.hpp"
 
 namespace Vanta {
-
-    enum class AssetType : int8_t
-    {
-        Scene,
-        Mesh,
-        Texture,
-        EnvMap,
-        Audio,
-        Script,
-        Directory,
-        Other,
-        None,
-        Missing
-    };
 
     using AssetHandle = UUID;
 
@@ -26,13 +12,13 @@ namespace Vanta {
     {
     public:
         AssetHandle Handle;
-        AssetType Type = AssetType::None;
+        uint16_t Flags = (uint16_t)AssetFlag::None;
 
-        std::string FilePath;
-        std::string FileName;
-        std::string Extension;
-        AssetHandle ParentDirectory;
-        bool IsDataLoaded = false;
+        virtual ~Asset() {}
+
+        virtual AssetType GetAssetType() const { return AssetType::None; }
+
+        bool IsValid() const { return ((Flags & (uint16_t)AssetFlag::Missing) | (Flags & (uint16_t)AssetFlag::Invalid)) == 0; }
 
         virtual bool operator==(const Asset& other) const
         {
@@ -43,15 +29,14 @@ namespace Vanta {
         {
             return !(*this == other);
         }
-        virtual ~Asset() {}
-    };
 
-    // Treating directories as assets simplifies the asset manager window rendering by a lot
-    class Directory : public Asset
-    {
-    public:
-        std::vector<AssetHandle> ChildDirectories;
-
-        Directory() = default;
+        bool IsFlagSet(AssetFlag flag) const { return (uint16_t)flag & Flags; }
+        void SetFlag(AssetFlag flag, bool value)
+        {
+            if (value)
+                Flags |= (uint16_t)flag;
+            else
+                Flags &= ~(uint16_t)flag;
+        }
     };
 }

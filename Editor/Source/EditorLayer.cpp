@@ -64,6 +64,7 @@ namespace Vanta {
 		NewScene();
 		m_ViewportRenderer = Ref<SceneRenderer>::Create(m_CurrentScene);
 		m_SecondViewportRenderer = Ref<SceneRenderer>::Create(m_CurrentScene);
+		m_FocusedRenderer = m_ViewportRenderer;
 
 		AssetEditorPanel::RegisterDefaultEditors();
 		FileSystem::StartWatching();
@@ -118,6 +119,15 @@ namespace Vanta {
 			case  ImGuizmo::OPERATION::SCALE: return 0.5f;
 		}
 		return 0.0f;
+	}
+
+	void EditorLayer::DeleteEntity(Entity entity)
+	{
+		for (auto childId : entity.Children())
+			DeleteEntity(m_EditorScene->FindEntityByUUID(childId));
+
+		m_EditorScene->UnparentEntity(entity);
+		m_EditorScene->DestroyEntity(entity);
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
@@ -221,6 +231,8 @@ namespace Vanta {
 		}
 
 		AssetEditorPanel::OnUpdate(ts);
+
+		SceneRenderer::WaitForThreads();
 	}
 
 	void EditorLayer::ShowBoundingBoxes(bool show, bool onTop)
@@ -241,9 +253,9 @@ namespace Vanta {
 		{
 			auto& meshComp = entity.GetComponent<MeshComponent>();
 
-			if (meshComp.Mesh && meshComp.Mesh->Type == AssetType::Mesh)
+			if (meshComp.Mesh && !meshComp.Mesh->IsFlagSet(AssetFlag::Missing))
 			{
-				selection.Mesh = &meshComp.Mesh->GetSubmeshes()[0];
+				selection.Mesh = &meshComp.Mesh->GetMeshAsset()->GetSubmeshes()[0];
 			}
 		}
 		selection.Entity = entity;
@@ -425,7 +437,7 @@ namespace Vanta {
 			UI::EndPropertyGrid();
 		}
 		ImGui::End();
-		
+
 		m_ContentBrowserPanel->OnImGuiRender();
 		m_ObjectsPanel->OnImGuiRender();
 
@@ -528,22 +540,26 @@ namespace Vanta {
 
 				if (ImGuizmo::IsUsing())
 				{
-					glm::vec3 translation, rotation, scale;
-					Math::DecomposeTransform(transform, translation, rotation, scale);
-
 					Entity parent = m_CurrentScene->FindEntityByUUID(selection.Entity.GetParentUUID());
+
 					if (parent)
 					{
-						glm::vec3 parentTranslation, parentRotation, parentScale;
-						Math::DecomposeTransform(m_CurrentScene->GetTransformRelativeToParent(parent), parentTranslation, parentRotation, parentScale);
+						glm::mat4 parentTransform = m_CurrentScene->GetTransformRelativeToParent(parent);
+						transform = glm::inverse(parentTransform) * transform;
 
-						glm::vec3 deltaRotation = (rotation - parentRotation) - entityTransform.Rotation;
-						entityTransform.Translation = translation - parentTranslation;
+						glm::vec3 translation, rotation, scale;
+						Math::DecomposeTransform(transform, translation, rotation, scale);
+
+						glm::vec3 deltaRotation = rotation - entityTransform.Rotation;
+						entityTransform.Translation = translation;
 						entityTransform.Rotation += deltaRotation;
 						entityTransform.Scale = scale;
 					}
 					else
 					{
+						glm::vec3 translation, rotation, scale;
+						Math::DecomposeTransform(transform, translation, rotation, scale);
+
 						glm::vec3 deltaRotation = rotation - entityTransform.Rotation;
 						entityTransform.Translation = translation;
 						entityTransform.Rotation += deltaRotation;
@@ -576,18 +592,20 @@ namespace Vanta {
 				for (int i = 0; i < count; i++)
 				{
 					AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
-					Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
+					const auto& assetData = AssetManager::GetMetadata(assetHandle);
 
 					// We can't really support dragging and dropping scenes when we're dropping multiple assets
-					if (count == 1 && asset->Type == AssetType::Scene)
+					if (count == 1 && assetData.Type == AssetType::Scene)
 					{
-						OpenScene(asset->FilePath);
+						OpenScene(assetData.FilePath);
+						break;
 					}
 
-					if (asset->Type == AssetType::Mesh)
+					Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
+					if (asset->GetAssetType() == AssetType::MeshAsset)
 					{
-						Entity entity = m_EditorScene->CreateEntity(asset->FileName);
-						entity.AddComponent<MeshComponent>(Ref<Mesh>(asset));
+						Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
+						entity.AddComponent<MeshComponent>(Ref<Mesh>::Create(asset.As<MeshAsset>()));
 						SelectEntity(entity);
 					}
 				}
@@ -705,18 +723,20 @@ namespace Vanta {
 						for (int i = 0; i < count; i++)
 						{
 							AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
-							Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
+							const auto& assetData = AssetManager::GetMetadata(assetHandle);
 
 							// We can't really support dragging and dropping scenes when we're dropping multiple assets
-							if (count == 1 && asset->Type == AssetType::Scene)
+							if (count == 1 && assetData.Type == AssetType::Scene)
 							{
-								OpenScene(asset->FilePath);
+								OpenScene(assetData.FilePath);
+								break;
 							}
 
-							if (asset->Type == AssetType::Mesh)
+							Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
+							if (asset->GetAssetType() == AssetType::Mesh)
 							{
-								Entity entity = m_EditorScene->CreateEntity(asset->FileName);
-								entity.AddComponent<MeshComponent>(Ref<Mesh>(asset));
+								Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
+								entity.AddComponent<MeshComponent>(asset.As<Mesh>());
 								SelectEntity(entity);
 							}
 						}
@@ -767,7 +787,7 @@ namespace Vanta {
 		}
 
 		m_SceneHierarchyPanel->OnImGuiRender();
-		
+
 		ImGui::Begin("Materials");
 		if (m_SelectionContext.size())
 		{
@@ -775,7 +795,7 @@ namespace Vanta {
 			if (selectedEntity.HasComponent<MeshComponent>())
 			{
 				Ref<Mesh> mesh = selectedEntity.GetComponent<MeshComponent>().Mesh;
-				if (mesh && mesh->Type == AssetType::Mesh)
+				if (mesh && mesh->GetAssetType() == AssetType::Mesh)
 				{
 					auto& materials = mesh->GetMaterials();
 					static uint32_t selectedMaterialIndex = 0;
@@ -828,7 +848,7 @@ namespace Vanta {
 
 											AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
 											Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
-											if (asset->Type != AssetType::Texture)
+											if (asset->GetAssetType() != AssetType::Texture)
 												break;
 
 											albedoMap = asset.As<Texture2D>();
@@ -902,7 +922,7 @@ namespace Vanta {
 
 											AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
 											Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
-											if (asset->Type != AssetType::Texture)
+											if (asset->GetAssetType() != AssetType::Texture)
 												break;
 
 											normalMap = asset.As<Texture2D>();
@@ -965,7 +985,7 @@ namespace Vanta {
 
 											AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
 											Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
-											if (asset->Type != AssetType::Texture)
+											if (asset->GetAssetType() != AssetType::Texture)
 												break;
 
 											metalnessMap = asset.As<Texture2D>();
@@ -1030,7 +1050,7 @@ namespace Vanta {
 
 											AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
 											Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
-											if (asset->Type != AssetType::Texture)
+											if (asset->GetAssetType() != AssetType::Texture)
 												break;
 
 											roughnessMap = asset.As<Texture2D>();
@@ -1077,7 +1097,11 @@ namespace Vanta {
 		}
 		ImGui::End();
 
-		m_ViewportRenderer->OnImGuiRender();
+		if (m_ViewportPanelFocused)
+			m_FocusedRenderer = m_ViewportRenderer;
+		else if (m_ViewportPanel2Focused)
+			m_FocusedRenderer = m_SecondViewportRenderer;
+		m_FocusedRenderer->OnImGuiRender();
 
 		ImGui::End();
 
@@ -1092,7 +1116,7 @@ namespace Vanta {
 		ImGui::SetNextWindowSize(ImVec2{ 400,0 });
 		if (ImGui::BeginPopupModal("Welcome", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 		{
-			ImGui::Text("Welcome to Vanta!");
+			ImGui::Text("Welcome to Hazel!");
 			ImGui::Separator();
 			ImGui::TextWrapped("Environment maps are currently disabled because they're a little unstable on certain GPU drivers.");
 
@@ -1164,7 +1188,7 @@ namespace Vanta {
 	{
 		if (GImGui->ActiveId == 0)
 		{
-			if (m_ViewportPanelMouseOver)
+			if (m_ViewportPanelMouseOver || m_ViewportPanel2MouseOver)
 			{
 				switch (event.GetKeyCode())
 				{
@@ -1205,8 +1229,7 @@ namespace Vanta {
 			case KeyCode::Delete: // TODO: this should be in the scene hierarchy panel
 				if (m_SelectionContext.size())
 				{
-					Entity selectedEntity = m_SelectionContext[0].Entity;
-					m_EditorScene->DestroyEntity(selectedEntity);
+					DeleteEntity(m_SelectionContext[0].Entity);
 					m_SelectionContext.clear();
 					m_EditorScene->SetSelectedEntity({});
 					m_SceneHierarchyPanel->SetSelected({});
@@ -1278,10 +1301,10 @@ namespace Vanta {
 				{
 					Entity entity = { e, m_EditorScene.Raw() };
 					auto mesh = entity.GetComponent<MeshComponent>().Mesh;
-					if (!mesh || mesh->Type == AssetType::Missing)
+					if (!mesh || mesh->IsFlagSet(AssetFlag::Missing))
 						continue;
 
-					auto& submeshes = mesh->GetSubmeshes();
+					auto& submeshes = mesh->GetMeshAsset()->GetSubmeshes();
 					float lastT = std::numeric_limits<float>::max();
 					for (uint32_t i = 0; i < submeshes.size(); i++)
 					{
@@ -1296,7 +1319,7 @@ namespace Vanta {
 						bool intersects = ray.IntersectsAABB(submesh.BoundingBox, t);
 						if (intersects)
 						{
-							const auto& triangleCache = mesh->GetTriangleCache(i);
+							const auto& triangleCache = mesh->GetMeshAsset()->GetTriangleCache(i);
 							for (const auto& triangle : triangleCache)
 							{
 								if (ray.IntersectsTriangle(triangle.V0.Position, triangle.V1.Position, triangle.V2.Position, t))

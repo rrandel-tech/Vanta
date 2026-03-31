@@ -2,6 +2,7 @@
 #include "VulkanShader.hpp"
 
 #include "Renderer/Renderer.hpp"
+#include "Core/Hash.hpp"
 
 #include "Renderer/Backend/Vulkan/VulkanContext.hpp"
 #include <shaderc/shaderc.hpp>
@@ -113,6 +114,11 @@ namespace Vanta {
 
 			// Vertex and Fragment for now
 			std::string source = ReadShaderFromFile(instance->m_AssetPath);
+
+			// TODO: save shader hashes in asset registry so we know
+			//            when to re-compile out-of-date shaders
+			uint32_t hash = Hash::GenerateFNVHash(source.c_str());
+
 			instance->m_ShaderSource = instance->PreProcess(source);
 			std::unordered_map<VkShaderStageFlagBits, std::vector<uint32_t>> shaderData;
 			instance->CompileOrGetVulkanBinary(shaderData, forceCompile);
@@ -676,7 +682,7 @@ namespace Vanta {
 					if (module.GetCompilationStatus() != shaderc_compilation_status_success)
 					{
 						VA_CORE_ERROR(module.GetErrorMessage());
-						VA_CORE_ASSERT(false);
+						VA_CORE_VERIFY(false);
 					}
 
 					const uint8_t* begin = (const uint8_t*)module.cbegin();

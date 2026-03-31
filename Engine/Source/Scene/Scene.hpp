@@ -43,7 +43,9 @@ namespace Vanta {
 	class Entity;
 	using EntityMap = std::unordered_map<UUID, Entity>;
 
-	class Scene : public RefCounted
+	struct TransformComponent;
+
+	class Scene : public Asset
 	{
 	public:
 		Scene(const std::string& debugName = "Scene", bool isEditorScene = false);
@@ -88,8 +90,14 @@ namespace Vanta {
 		Entity FindEntityByTag(const std::string& tag);
 		Entity FindEntityByUUID(UUID id);
 
+		void ConvertToLocalSpace(Entity entity);
+		void ConvertToWorldSpace(Entity entity);
 		glm::mat4 GetTransformRelativeToParent(Entity entity);
-		glm::mat4 GetWorldSpaceTransform(Entity entity);
+		glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
+		TransformComponent GetWorldSpaceTransform(Entity entity);
+
+		void ParentEntity(Entity entity, Entity parent);
+		void UnparentEntity(Entity entity);
 
 		const EntityMap& GetEntityMap() const { return m_EntityIDMap; }
 		void CopyTo(Ref<Scene>& target);
@@ -100,6 +108,9 @@ namespace Vanta {
 
 		// Editor-specific
 		void SetSelectedEntity(entt::entity entity) { m_SelectedEntity = entity; }
+
+		static AssetType GetStaticType() { return AssetType::Scene; }
+		virtual AssetType GetAssetType() const override { return GetStaticType(); }
 	private:
 		UUID m_SceneID;
 		entt::entity m_SceneEntity;

@@ -346,6 +346,7 @@ namespace Vanta {
 
 	void OpenGLRenderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
 	{
+#if 0
 		mesh->m_VertexBuffer->Bind();
 		pipeline->Bind();
 		mesh->m_IndexBuffer->Bind();
@@ -382,10 +383,12 @@ namespace Vanta {
 				glDrawElementsBaseVertex(GL_TRIANGLES, submesh.IndexCount, GL_UNSIGNED_INT, (void*)(sizeof(uint32_t) * submesh.BaseIndex), submesh.BaseVertex);
 			});
 		}
+#endif
 	}
 
 	void OpenGLRenderer::RenderMeshWithMaterial(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
 	{
+#if 0
 		mesh->m_VertexBuffer->Bind();
 		pipeline->Bind();
 		mesh->m_IndexBuffer->Bind();
@@ -414,6 +417,7 @@ namespace Vanta {
 				glDrawElementsBaseVertex(GL_TRIANGLES, submesh.IndexCount, GL_UNSIGNED_INT, (void*)(sizeof(uint32_t) * submesh.BaseIndex), submesh.BaseVertex);
 			});
 		}
+#endif
 	}
 
 	void OpenGLRenderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, const glm::mat4& transform)

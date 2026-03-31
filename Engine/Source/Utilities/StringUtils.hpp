@@ -11,5 +11,6 @@ namespace Vanta::Utils {
     bool StartsWith(const std::string& string, const std::string& start);
     std::vector<std::string> SplitString(const std::string& string, const std::string& delimiters);
     std::vector<std::string> SplitString(const std::string& string, const char delimiter);
+    std::string ToLower(const std::string& string);
 
 }

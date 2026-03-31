@@ -31,3 +31,17 @@
     #define VA_ASSERT(...)
     #define VA_CORE_ASSERT(...)
 #endif
+
+#ifdef VA_ENABLE_VERIFY
+    #define VA_VERIFY_NO_MESSAGE(condition) { if(!(condition)) { VA_ERROR("Verify Failed"); __debugbreak(); } }
+    #define VA_VERIFY_MESSAGE(condition, ...) { if(!(condition)) { VA_ERROR("Verify Failed: {0}", __VA_ARGS__); __debugbreak(); } }
+
+    #define VA_VERIFY_RESOLVE(arg1, arg2, macro, ...) macro
+    #define VA_GET_VERIFY_MACRO(...) VA_EXPAND_VARGS(VA_VERIFY_RESOLVE(__VA_ARGS__, VA_VERIFY_MESSAGE, VA_VERIFY_NO_MESSAGE))
+
+    #define VA_VERIFY(...) VA_EXPAND_VARGS( VA_GET_VERIFY_MACRO(__VA_ARGS__)(__VA_ARGS__) )
+    #define VA_CORE_VERIFY(...) VA_EXPAND_VARGS( VA_GET_VERIFY_MACRO(__VA_ARGS__)(__VA_ARGS__) )
+#else
+    #define VA_VERIFY(...)
+    #define VA_CORE_VERIFY(...)
+#endif

@@ -56,7 +56,7 @@ namespace Vanta {
 	void AssetEditorPanel::RegisterDefaultEditors()
 	{
 		RegisterEditor<TextureViewer>(AssetType::Texture);
-		RegisterEditor<MeshViewerPanel>(AssetType::Mesh);
+		RegisterEditor<MeshViewerPanel>(AssetType::MeshAsset);
 	}
 
 	void AssetEditorPanel::UnregisterAllEditors()
@@ -84,14 +84,11 @@ namespace Vanta {
 
 	void AssetEditorPanel::OpenEditor(const Ref<Asset>& asset)
 	{
-		if (s_Editors.find(asset->Type) == s_Editors.end())
-		{
-			VA_CORE_WARN("No editor registered for {0} assets", asset->Extension);
+		if (s_Editors.find(asset->GetAssetType()) == s_Editors.end())
 			return;
-		}
 
-		s_Editors[asset->Type]->SetOpen(true);
-		s_Editors[asset->Type]->SetAsset(AssetManager::GetAsset<Asset>(asset->Handle));
+		s_Editors[asset->GetAssetType()]->SetOpen(true);
+		s_Editors[asset->GetAssetType()]->SetAsset(AssetManager::GetAsset<Asset>(asset->Handle));
 	}
 
 	std::unordered_map<AssetType, Scope<AssetEditor>> AssetEditorPanel::s_Editors;

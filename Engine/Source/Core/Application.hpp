@@ -74,6 +74,7 @@ namespace Vanta {
         std::unique_ptr<Window> m_Window;
         ApplicationSpecification m_Specification;
         bool m_Running = true, m_Minimized = false;
+        bool m_EnableImGui = true;
         LayerStack m_LayerStack;
         ImGuiLayer* m_ImGuiLayer;
         Timestep m_TimeStep;

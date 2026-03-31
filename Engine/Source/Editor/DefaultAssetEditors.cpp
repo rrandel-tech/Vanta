@@ -1,6 +1,7 @@
 #include "vapch.hpp"
 #include "DefaultAssetEditors.hpp"
 #include "Asset/AssetImporter.hpp"
+#include "Asset/AssetManager.hpp"
 
 namespace Vanta {
 
