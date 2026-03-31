@@ -56,13 +56,13 @@ namespace Vanta {
 		}
 	}
 
-	uint32_t Renderer::GetCurrentImageIndex()
+	uint32_t Renderer::GetCurrentFrameIndex()
 	{
 		return VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
 	}
 
 	void RendererAPI::SetAPI(RendererAPIType api)
-	{	
+	{
 		// TODO: make sure this is called at a valid time
 		s_CurrentRendererAPI = api;
 	}
@@ -76,7 +76,7 @@ namespace Vanta {
 		Ref<Texture2D> WhiteTexture;
 		Ref<TextureCube> BlackCubeTexture;
 		Ref<Environment> EmptyEnvironment;
-		std::map<uint32_t, std::map<uint32_t, Ref<UniformBuffer>>> UniformBuffers;
+		std::map<uint32_t, std::map<uint32_t, std::map<uint32_t, Ref<UniformBuffer>>>> UniformBuffers; // frame->set->binding
 	};
 
 	static RendererData* s_Data = nullptr;
@@ -93,11 +93,12 @@ namespace Vanta {
 		VA_CORE_ASSERT(false, "Unknown RendererAPI");
 		return nullptr;
 	}
-	
+
 	void Renderer::Init()
 	{
 		s_Data = new RendererData();
 		s_CommandQueue = new RenderCommandQueue();
+
 		s_RendererAPI = InitRendererAPI();
 
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
@@ -110,7 +111,7 @@ namespace Vanta {
 
 		Renderer::GetShaderLibrary()->Load("assets/shaders/Grid.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/SceneComposite.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl", true);
+		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl");
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Anim.glsl");
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/Outline.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/Skybox.glsl");
@@ -121,7 +122,7 @@ namespace Vanta {
 
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data->WhiteTexture = Texture2D::Create(ImageFormat::RGBA, 1, 1, &whiteTextureData);
-		
+
 		uint32_t blackTextureData[6] = { 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000 };
 		s_Data->BlackCubeTexture = TextureCube::Create(ImageFormat::RGBA, 1, 1, &blackTextureData);
 
@@ -320,17 +321,18 @@ namespace Vanta {
 		return s_Data->EmptyEnvironment;
 	}
 
-	void Renderer::SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t set)
+	void Renderer::SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t frame, uint32_t set)
 	{
-		s_Data->UniformBuffers[set][uniformBuffer->GetBinding()] = uniformBuffer;
+		s_Data->UniformBuffers[frame][set][uniformBuffer->GetBinding()] = uniformBuffer;
 	}
 
-	Ref<UniformBuffer> Renderer::GetUniformBuffer(uint32_t binding, uint32_t set)
+	Ref<UniformBuffer> Renderer::GetUniformBuffer(uint32_t frame, uint32_t binding, uint32_t set)
 	{
-		VA_CORE_ASSERT(s_Data->UniformBuffers.find(set) != s_Data->UniformBuffers.end());
-		VA_CORE_ASSERT(s_Data->UniformBuffers.at(set).find(binding) != s_Data->UniformBuffers.at(set).end());
+		VA_CORE_ASSERT(s_Data->UniformBuffers.find(frame) != s_Data->UniformBuffers.end());
+		VA_CORE_ASSERT(s_Data->UniformBuffers.at(frame).find(set) != s_Data->UniformBuffers.at(frame).end());
+		VA_CORE_ASSERT(s_Data->UniformBuffers.at(frame).at(set).find(binding) != s_Data->UniformBuffers.at(frame).at(set).end());
 
-		return s_Data->UniformBuffers.at(set).at(binding);
+		return s_Data->UniformBuffers.at(frame).at(set).at(binding);
 	}
 
 	RenderCommandQueue& Renderer::GetRenderCommandQueue()

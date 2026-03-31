@@ -61,7 +61,6 @@ namespace Vanta {
 		m_ObjectsPanel = CreateScope<ObjectsPanel>();
 
 		NewScene();
-		//OpenScene("assets/scenes/ShadowTest.vscene");
 
 		AssetEditorPanel::RegisterDefaultEditors();
 		FileSystem::StartWatching();
@@ -1103,7 +1102,7 @@ namespace Vanta {
 				{
 					Entity entity = { e, m_EditorScene.Raw() };
 					auto mesh = entity.GetComponent<MeshComponent>().Mesh;
-					if (!mesh)
+					if (!mesh || mesh->Type == AssetType::Missing)
 						continue;
 
 					auto& submeshes = mesh->GetSubmeshes();

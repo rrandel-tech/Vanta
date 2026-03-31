@@ -10,9 +10,11 @@
 #include "Renderer/Backend/Vulkan/VulkanAllocator.hpp"
 
 #include <imgui.h>
+#include "imgui_internal.h"
 #include <glad/glad.h>
 
 extern bool g_ApplicationRunning;
+extern ImGuiContext* GImGui;
 
 namespace Vanta {
 
@@ -32,7 +34,7 @@ namespace Vanta {
         m_Window = std::unique_ptr<Window>(Window::Create(windowSpec));
         m_Window->Init();
         m_Window->SetEventCallback([this](Event& e) { OnEvent(e); });
-        m_Window->SetVSync(true);
+        m_Window->SetVSync(false);
 
         m_Window->SetResizable(m_Specification.Resizable);
         if (windowSpec.Mode == WindowMode::Windowed)
@@ -116,8 +118,6 @@ namespace Vanta {
         ImGui::End();
 
         ImGui::Begin("Performance");
-        //VA_CORE_WARN("Spent {0}ms updating materials", g_MaterialUpdateTimer);
-        //VA_CORE_WARN("Spent {0}ms rendering meshes (CPU)", g_MeshRenderTimer);
         ImGui::Text("Frame Time: %.2fms\n", m_TimeStep.GetMilliseconds());
         const auto& perFrameData = m_Profiler->GetPerFrameData();
         for (auto&& [name, time] : perFrameData)

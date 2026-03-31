@@ -17,8 +17,10 @@ namespace Vanta {
 
 	struct RendererConfig
 	{
+		uint32_t FramesInFlight = 3;
+
 		// "Experimental" features
-		bool ComputeEnvironmentMaps = false;
+		bool ComputeEnvironmentMaps = true;
 
 		// Tiering settings
 		uint32_t EnvironmentMapResolution = 1024;
@@ -71,10 +73,12 @@ namespace Vanta {
 				pFunc->~FuncT();
 			};
 
-			uint32_t index = Renderer::GetCurrentImageIndex();
-			index = (index + 2) % 3;
-			auto storageBuffer = GetRenderResourceReleaseQueue(index).Allocate(renderCmd, sizeof(func));
-			new (storageBuffer) FuncT(std::forward<FuncT>(func));
+			Submit([renderCmd, func]()
+			{
+				uint32_t index = Renderer::GetCurrentFrameIndex();
+				auto storageBuffer = GetRenderResourceReleaseQueue(index).Allocate(renderCmd, sizeof(func));
+				new (storageBuffer) FuncT(std::forward<FuncT>((FuncT&&)func));
+			});
 		}
 
 		/*static void* Submit(RenderCommandFn fn, unsigned int size)
@@ -110,14 +114,14 @@ namespace Vanta {
 		static Ref<TextureCube> GetBlackCubeTexture();
 		static Ref<Environment> GetEmptyEnvironment();
 
-		static void SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t set);
-		static Ref<UniformBuffer> GetUniformBuffer(uint32_t binding, uint32_t set = 0);
+		static void SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t frame, uint32_t set);
+		static Ref<UniformBuffer> GetUniformBuffer(uint32_t frame, uint32_t binding, uint32_t set = 0);
 
 		static void RegisterShaderDependency(Ref<Shader> shader, Ref<Pipeline> pipeline);
 		static void RegisterShaderDependency(Ref<Shader> shader, Ref<Material> material);
 		static void OnShaderReloaded(size_t hash);
 
-		static uint32_t GetCurrentImageIndex();
+		static uint32_t GetCurrentFrameIndex();
 
 		static RendererConfig& GetConfig();
 

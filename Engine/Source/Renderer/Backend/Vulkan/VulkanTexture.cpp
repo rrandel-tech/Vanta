@@ -126,11 +126,8 @@ namespace Vanta {
 
 	VulkanTexture2D::~VulkanTexture2D()
 	{
-		Ref<Image2D> image = m_Image;
-		Renderer::Submit([image]() mutable
-		{
-			image->Release();
-		});
+		if (m_Image)
+			m_Image->Release();
 	}
 
 	void VulkanTexture2D::Invalidate()
@@ -334,11 +331,6 @@ namespace Vanta {
 	Buffer VulkanTexture2D::GetWriteableBuffer()
 	{
 		return m_ImageData;
-	}
-
-	bool VulkanTexture2D::Loaded() const
-	{
-		return true;
 	}
 
 	const std::string& VulkanTexture2D::GetPath() const
@@ -557,7 +549,7 @@ namespace Vanta {
 		VkSampler sampler = m_DescriptorImageInfo.sampler;
 		VkImage image = m_Image;
 		VmaAllocation allocation = m_MemoryAlloc;
-		Renderer::Submit([imageView, sampler, image, allocation]()
+		Renderer::SubmitResourceFree([imageView, sampler, image, allocation]()
 		{
 			VA_CORE_TRACE("Destroying VulkanTextureCube");
 			auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();

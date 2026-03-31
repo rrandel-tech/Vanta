@@ -117,26 +117,7 @@ namespace Vanta {
 								}
 							}
 
-							if (ImGui::MenuItem("Scene"))
-							{
-								VA_CORE_INFO("Creating Scene...");
-							}
-
-							if (ImGui::MenuItem("Script"))
-							{
-								VA_CORE_INFO("Creating Script...");
-							}
-
-							if (ImGui::MenuItem("Prefab"))
-							{
-								VA_CORE_INFO("Creating Prefab...");
-							}
-
 							ImGui::EndMenu();
-						}
-
-						if (ImGui::MenuItem("Import"))
-						{
 						}
 
 						if (ImGui::MenuItem("Refresh"))
@@ -230,7 +211,7 @@ namespace Vanta {
 				}
 				else if (asset->Type == AssetType::Scene)
 				{
-					// SceneManager::OpenScene(asset);
+					// TODO: Open scene in viewport
 				}
 				else
 				{
@@ -465,7 +446,6 @@ namespace Vanta {
 			ImGui::SetKeyboardFocusHere();
 			if (ImGui::InputText("##rename_dummy", m_RenameBuffer, MAX_INPUT_BUFFER_LENGTH, ImGuiInputTextFlags_EnterReturnsTrue))
 			{
-				VA_CORE_INFO("Renaming to {0}", m_RenameBuffer);
 				AssetManager::Rename(asset->Handle, m_RenameBuffer);
 				m_RenamingSelected = false;
 				m_SelectedAssets.Clear();

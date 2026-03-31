@@ -93,10 +93,17 @@ namespace Vanta::UI {
         {
             Ref<VulkanImage2D> vulkanImage = image.As<VulkanImage2D>();
             const auto& imageInfo = vulkanImage->GetImageInfo();
+
             if (!imageInfo.ImageView)
                 return false;
+
             ImTextureID textureID = GetVulkanTextureID(vulkanImage->GetDescriptor());
-            return ImGui::ImageButton("##imgbtn", textureID, size, uv0, uv1, bg_col, tint_col);
+
+            ImGui::PushID((void*)imageInfo.ImageView);
+            bool pressed = ImGui::ImageButton("##imgbtn", textureID, size, uv0, uv1, bg_col, tint_col);
+            ImGui::PopID();
+
+            return pressed;
         }
     }
 
@@ -111,8 +118,14 @@ namespace Vanta::UI {
         {
             Ref<VulkanTexture2D> vulkanTexture = texture.As<VulkanTexture2D>();
             const VkDescriptorImageInfo& imageInfo = vulkanTexture->GetVulkanDescriptorInfo();
+
             ImTextureID textureID = GetVulkanTextureID(imageInfo);
-            return ImGui::ImageButton("##imgbtn", textureID, size, uv0, uv1, bg_col, tint_col);
+
+            ImGui::PushID((void*)imageInfo.imageView);
+            bool pressed = ImGui::ImageButton("##imgbtn", textureID, size, uv0, uv1, bg_col, tint_col);
+            ImGui::PopID();
+
+            return pressed;
         }
     }
 

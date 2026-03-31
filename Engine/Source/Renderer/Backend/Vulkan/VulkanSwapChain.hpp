@@ -20,7 +20,7 @@ namespace Vanta {
 		void Init(VkInstance instance, const Ref<VulkanDevice>& device);
 		void InitSurface(SDL_Window* windowHandle);
 		void Create(uint32_t* width, uint32_t* height, bool vsync = false);
-		
+
 		void OnResize(uint32_t width, uint32_t height);
 
 		void BeginFrame();
@@ -33,8 +33,8 @@ namespace Vanta {
 
 		VkRenderPass GetRenderPass() { return m_RenderPass; }
 
-		VkFramebuffer GetCurrentFramebuffer() { return GetFramebuffer(m_CurrentBufferIndex); }
-		VkCommandBuffer GetCurrentDrawCommandBuffer() { return GetDrawCommandBuffer(m_CurrentBufferIndex); }
+		VkFramebuffer GetCurrentFramebuffer() { return GetFramebuffer(m_CurrentImageIndex); }
+		VkCommandBuffer GetCurrentDrawCommandBuffer() { return GetDrawCommandBuffer(m_CurrentImageIndex); }
 
 		VkFormat GetColorFormat() { return m_ColorFormat; }
 
@@ -101,6 +101,7 @@ namespace Vanta {
 
 		VkRenderPass m_RenderPass;
 		uint32_t m_CurrentBufferIndex = 0;
+		uint32_t m_CurrentImageIndex = 0;
 
 		uint32_t m_QueueNodeIndex = UINT32_MAX;
 		uint32_t m_Width = 0, m_Height = 0;

@@ -41,21 +41,20 @@ namespace Vanta {
 	void VulkanImage2D::Release()
 	{
 		Ref<VulkanImage2D> instance = this;
-		Renderer::SubmitResourceFree([instance]() mutable
+		VulkanImageInfo info = m_Info;
+		Renderer::SubmitResourceFree([info]() mutable
 		{
 			auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-			vkDestroyImageView(vulkanDevice, instance->m_Info.ImageView, nullptr);
-			vkDestroySampler(vulkanDevice, instance->m_Info.Sampler, nullptr);
+			VA_CORE_WARN("VulkanImage2D::Release ImageView = {0}", (const void*)info.ImageView);
+			vkDestroyImageView(vulkanDevice, info.ImageView, nullptr);
+			vkDestroySampler(vulkanDevice, info.Sampler, nullptr);
 
 			VulkanAllocator allocator("VulkanImage2D");
-			allocator.DestroyImage(instance->m_Info.Image, instance->m_Info.MemoryAlloc);
-
-			VA_CORE_WARN("VulkanImage2D::Release ImageView = {0}", (const void*)instance->m_Info.ImageView);
-
-			instance->m_Info.Image = nullptr;
-				instance->m_Info.ImageView = nullptr;
-				instance->m_Info.Sampler = nullptr;
-			});
+			allocator.DestroyImage(info.Image, info.MemoryAlloc);
+		});
+		m_Info.Image = nullptr;
+		m_Info.ImageView = nullptr;
+		m_Info.Sampler = nullptr;
 	}
 
 	void VulkanImage2D::RT_Invalidate()
@@ -180,7 +179,7 @@ namespace Vanta {
 		m_DescriptorImageInfo.imageView = m_Info.ImageView;
 		m_DescriptorImageInfo.sampler = m_Info.Sampler;
 
-		VA_CORE_WARN("VulkanImage2D::UpdateDescriptor to ImageView = {0}", (const void*)m_Info.ImageView);
+		//VA_CORE_WARN("VulkanImage2D::UpdateDescriptor to ImageView = {0}", (const void*)m_Info.ImageView);
 	}
 
 }

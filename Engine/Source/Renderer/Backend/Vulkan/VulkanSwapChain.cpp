@@ -199,8 +199,6 @@ namespace Vanta {
 			}
 		}
 
-		swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-
 		// Determine the number of images
 		uint32_t desiredNumberOfSwapchainImages = surfCaps.minImageCount + 1;
 		if ((surfCaps.maxImageCount > 0) && (desiredNumberOfSwapchainImages > surfCaps.maxImageCount))
@@ -434,7 +432,7 @@ namespace Vanta {
 
 		VulkanAllocator allocator("SwapChain");
 		m_DepthStencil.MemoryAlloc = allocator.AllocateImage(imageCI, VMA_MEMORY_USAGE_GPU_ONLY, m_DepthStencil.Image);
-	
+
 		VkImageViewCreateInfo imageViewCI{};
 		imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -530,13 +528,16 @@ namespace Vanta {
 	{
 		VA_SCOPE_PERF("VulkanSwapChain::BeginFrame");
 
-		VK_CHECK_RESULT(vkWaitForFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex], VK_TRUE, UINT64_MAX));
-		uint32_t imageIndex;
-		VK_CHECK_RESULT(AcquireNextImage(m_Semaphores.PresentComplete, &imageIndex));
+		// Make sure the frame we're requesting has finished rendering
+		//VK_CHECK_RESULT(vkWaitForFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[(m_CurrentBufferIndex + 2) % 3], VK_TRUE, UINT64_MAX));
+
+		// Resource release queue
+		auto& queue = Renderer::GetRenderResourceReleaseQueue(m_CurrentBufferIndex);
+		queue.Execute();
+
 		//VK_CHECK_RESULT(vkWaitForFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex], VK_TRUE, UINT64_MAX));
 		//VK_CHECK_RESULT(vkResetCommandPool(m_Device->GetVulkanDevice(), m_CommandPool, 0));
-
-		VA_CORE_WARN("Staring frame {0} (image {1})", m_CurrentBufferIndex, imageIndex);
+		VK_CHECK_RESULT(AcquireNextImage(m_Semaphores.PresentComplete, &m_CurrentImageIndex));
 	}
 
 	void VulkanSwapChain::Present()
@@ -555,7 +556,7 @@ namespace Vanta {
 		submitInfo.waitSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &m_Semaphores.RenderComplete;
 		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pCommandBuffers = &m_DrawCommandBuffers[m_CurrentBufferIndex];
+		submitInfo.pCommandBuffers = &m_DrawCommandBuffers[m_CurrentImageIndex];
 		submitInfo.commandBufferCount = 1;
 
 		// Submit to the graphics queue passing a wait fence
@@ -568,7 +569,7 @@ namespace Vanta {
 		VkResult result;
 		{
 			VA_SCOPE_PERF("VulkanSwapChain::Present - QueuePresent");
-			result = QueuePresent(m_Device->GetQueue(), m_CurrentBufferIndex, m_Semaphores.RenderComplete);
+			result = QueuePresent(m_Device->GetQueue(), m_CurrentImageIndex, m_Semaphores.RenderComplete);
 		}
 
 		if (result != VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
@@ -592,15 +593,10 @@ namespace Vanta {
 		// TODO: Do we need this anywhere?
 		//vkResetCommandPool(m_Device->GetVulkanDevice(), m_CommandPool, 0);
 
-		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % 3;
-
-		// Resource release queue
-		uint32_t index = m_CurrentBufferIndex;
-		Renderer::Submit([index]()
-		{
-			auto& queue = Renderer::GetRenderResourceReleaseQueue(index);
-			queue.Execute();
-		});
+		const auto& config = Renderer::GetConfig();
+		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % config.FramesInFlight;
+		// Make sure the frame we're requesting has finished rendering
+		VK_CHECK_RESULT(vkWaitForFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex], VK_TRUE, UINT64_MAX));
 	}
 
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore presentCompleteSemaphore, uint32_t* imageIndex)

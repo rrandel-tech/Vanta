@@ -35,11 +35,14 @@ namespace Vanta {
 
 		VkCommandBuffer ActiveCommandBuffer = nullptr;
 		Ref<Texture2D> BRDFLut;
-		VulkanShader::ShaderMaterialDescriptorSet RendererDescriptorSet;
 
 		Ref<VertexBuffer> QuadVertexBuffer;
 		Ref<IndexBuffer> QuadIndexBuffer;
 		VulkanShader::ShaderMaterialDescriptorSet QuadDescriptorSet;
+
+		std::vector<VulkanShader::ShaderMaterialDescriptorSet> RendererDescriptorSet;
+		std::vector<VkDescriptorPool> DescriptorPools;
+		std::vector<uint32_t> DescriptorPoolAllocationCount;
 	};
 
 	static VulkanRendererData* s_Data = nullptr;
@@ -63,6 +66,10 @@ namespace Vanta {
 	void VulkanRenderer::Init()
 	{
 		s_Data = new VulkanRendererData();
+		const auto& config = Renderer::GetConfig();
+		s_Data->RendererDescriptorSet.resize(config.FramesInFlight);
+		s_Data->DescriptorPools.resize(config.FramesInFlight);
+		s_Data->DescriptorPoolAllocationCount.resize(config.FramesInFlight);
 
 		auto& caps = s_Data->RenderCaps;
 		auto& properties = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetProperties();
@@ -71,6 +78,40 @@ namespace Vanta {
 		caps.Version = std::to_string(properties.driverVersion);
 
 		Utils::DumpGPUInfo();
+
+		// Create descriptor pools
+		Renderer::Submit([]() mutable
+		{
+			// Create Descriptor Pool
+			VkDescriptorPoolSize pool_sizes[] =
+			{
+				{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+				{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+			};
+			VkDescriptorPoolCreateInfo pool_info = {};
+			pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+			pool_info.maxSets = 10000;
+			pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+			pool_info.pPoolSizes = pool_sizes;
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+			for (int i = 0; i < framesInFlight; i++)
+			{
+				VK_CHECK_RESULT(vkCreateDescriptorPool(device, &pool_info, nullptr, &s_Data->DescriptorPools[i]));
+				s_Data->DescriptorPoolAllocationCount[i] = 0;
+			}
+
+		});
 
 		// Create fullscreen quad
 		float x = -1;
@@ -84,16 +125,16 @@ namespace Vanta {
 
 		QuadVertex* data = new QuadVertex[4];
 
-		data[0].Position = glm::vec3(x, y, 0.1f);
+		data[0].Position = glm::vec3(x, y, 0.0f);
 		data[0].TexCoord = glm::vec2(0, 0);
 
-		data[1].Position = glm::vec3(x + width, y, 0.1f);
+		data[1].Position = glm::vec3(x + width, y, 0.0f);
 		data[1].TexCoord = glm::vec2(1, 0);
 
-		data[2].Position = glm::vec3(x + width, y + height, 0.1f);
+		data[2].Position = glm::vec3(x + width, y + height, 0.0f);
 		data[2].TexCoord = glm::vec2(1, 1);
 
-		data[3].Position = glm::vec3(x, y + height, 0.1f);
+		data[3].Position = glm::vec3(x, y + height, 0.0f);
 		data[3].TexCoord = glm::vec2(0, 1);
 
 		s_Data->QuadVertexBuffer = VertexBuffer::Create(data, 4 * sizeof(QuadVertex));
@@ -110,7 +151,9 @@ namespace Vanta {
 		{
 			auto shader = Renderer::GetShaderLibrary()->Get("VantaPBR_Static");
 			Ref<VulkanShader> pbrShader = shader.As<VulkanShader>();
-			s_Data->RendererDescriptorSet = pbrShader->CreateDescriptorSets(1);
+			uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+			for (int i = 0; i < framesInFlight; i++)
+				s_Data->RendererDescriptorSet[i] = pbrShader->CreateDescriptorSets(1);
 		});
 
 	}
@@ -145,19 +188,24 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
+			uint32_t bufferIndex = VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
+
+			auto& materials = mesh->GetMaterials();
+			for (auto& material : materials)
+				material.As<VulkanMaterial>()->RT_UpdateForRendering();
+
 			auto& submeshes = mesh->GetSubmeshes();
 			for (Submesh& submesh : submeshes)
 			{
 				auto material = mesh->GetMaterials()[submesh.MaterialIndex].As<VulkanMaterial>();
-				material->RT_UpdateForRendering();
 
 				VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
-				VkDescriptorSet descriptorSet = material->GetDescriptorSet();
+				VkDescriptorSet descriptorSet = material->GetDescriptorSet(bufferIndex);
 
 				// NOTE: Descriptor Set 1 is owned by the renderer
 				std::array<VkDescriptorSet, 2> descriptorSets = {
 					descriptorSet,
-					s_Data->RendererDescriptorSet.DescriptorSets[0]
+					s_Data->RendererDescriptorSet[bufferIndex].DescriptorSets[0]
 				};
 
 				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
@@ -201,7 +249,8 @@ namespace Vanta {
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 			// Bind descriptor sets describing shader binding points
-			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet();
+			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(frameIndex);
 			if (descriptorSet)
 				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
@@ -240,7 +289,8 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet();
+			uint32_t bufferIndex = VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(bufferIndex);
 			if (descriptorSet)
 				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
@@ -250,6 +300,17 @@ namespace Vanta {
 			vkCmdPushConstants(s_Data->ActiveCommandBuffer, layout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), uniformStorageBuffer.Size, uniformStorageBuffer.Data);
 			vkCmdDrawIndexed(s_Data->ActiveCommandBuffer, s_Data->QuadIndexBuffer->GetCount(), 1, 0, 0, 0);
 		});
+	}
+
+	VkDescriptorSet VulkanRenderer::RT_AllocateDescriptorSet(VkDescriptorSetAllocateInfo& allocInfo)
+	{
+		uint32_t bufferIndex = VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
+		allocInfo.descriptorPool = s_Data->DescriptorPools[bufferIndex];
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VkDescriptorSet result;
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &result));
+		s_Data->DescriptorPoolAllocationCount[bufferIndex] += allocInfo.descriptorSetCount;
+		return result;
 	}
 
 #if 0
@@ -301,7 +362,8 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet();
+			uint32_t bufferIndex = VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(bufferIndex);
 			if (descriptorSet)
 				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
@@ -327,24 +389,25 @@ namespace Vanta {
 
 			Ref<VulkanTextureCube> radianceMap = environment->RadianceMap.As<VulkanTextureCube>();
 			Ref<VulkanTextureCube> irradianceMap = environment->IrradianceMap.As<VulkanTextureCube>();
+			uint32_t bufferIndex = VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
 
 			writeDescriptors[0] = *pbrShader->GetDescriptorSet("u_EnvRadianceTex", 1);
-			writeDescriptors[0].dstSet = s_Data->RendererDescriptorSet.DescriptorSets[0];
+			writeDescriptors[0].dstSet = s_Data->RendererDescriptorSet[bufferIndex].DescriptorSets[0];
 			const auto& radianceMapImageInfo = radianceMap->GetVulkanDescriptorInfo();
 			writeDescriptors[0].pImageInfo = &radianceMapImageInfo;
 
 			writeDescriptors[1] = *pbrShader->GetDescriptorSet("u_EnvIrradianceTex", 1);
-			writeDescriptors[1].dstSet = s_Data->RendererDescriptorSet.DescriptorSets[0];
+			writeDescriptors[1].dstSet = s_Data->RendererDescriptorSet[bufferIndex].DescriptorSets[0];
 			const auto& irradianceMapImageInfo = irradianceMap->GetVulkanDescriptorInfo();
 			writeDescriptors[1].pImageInfo = &irradianceMapImageInfo;
 
 			writeDescriptors[2] = *pbrShader->GetDescriptorSet("u_BRDFLUTTexture", 1);
-			writeDescriptors[2].dstSet = s_Data->RendererDescriptorSet.DescriptorSets[0];
+			writeDescriptors[2].dstSet = s_Data->RendererDescriptorSet[bufferIndex].DescriptorSets[0];
 			const auto& brdfLutImageInfo = s_Data->BRDFLut.As<VulkanTexture2D>()->GetVulkanDescriptorInfo();
 			writeDescriptors[2].pImageInfo = &brdfLutImageInfo;
 
 			writeDescriptors[3] = *pbrShader->GetDescriptorSet("u_ShadowMapTexture", 1);
-			writeDescriptors[3].dstSet = s_Data->RendererDescriptorSet.DescriptorSets[0];
+			writeDescriptors[3].dstSet = s_Data->RendererDescriptorSet[bufferIndex].DescriptorSets[0];
 			const auto& shadowImageInfo = shadow.As<VulkanImage2D>()->GetDescriptor();
 			writeDescriptors[3].pImageInfo = &shadowImageInfo;
 
@@ -360,8 +423,15 @@ namespace Vanta {
 			Ref<VulkanContext> context = VulkanContext::Get();
 			VulkanSwapChain& swapChain = context->GetSwapChain();
 
+			// Reset descriptor pools here
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			uint32_t bufferIndex = swapChain.GetCurrentBufferIndex();
+			vkResetDescriptorPool(device, s_Data->DescriptorPools[bufferIndex], 0);
+			memset(s_Data->DescriptorPoolAllocationCount.data(), 0, s_Data->DescriptorPoolAllocationCount.size() * sizeof(uint32_t));
+
 			VkCommandBufferBeginInfo cmdBufInfo = {};
 			cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			cmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 			cmdBufInfo.pNext = nullptr;
 
 			VkCommandBuffer drawCommandBuffer = swapChain.GetCurrentDrawCommandBuffer();
@@ -405,7 +475,7 @@ namespace Vanta {
 			// TODO: Does our framebuffer have a depth attachment?
 
 			const auto& clearValues = framebuffer->GetVulkanClearValues();
-			
+
 			renderPassBeginInfo.clearValueCount = clearValues.size();
 			renderPassBeginInfo.pClearValues = clearValues.data();
 			renderPassBeginInfo.framebuffer = framebuffer->GetVulkanFramebuffer();

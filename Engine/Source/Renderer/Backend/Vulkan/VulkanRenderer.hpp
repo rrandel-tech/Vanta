@@ -2,6 +2,8 @@
 
 #include "Renderer/RendererAPI.hpp"
 
+#include "vulkan/vulkan.h"
+
 namespace Vanta {
 
 	class VulkanRenderer : public RendererAPI
@@ -26,6 +28,8 @@ namespace Vanta {
 		virtual void RenderMesh(Ref<Pipeline> pipeline, Ref<Mesh> mesh, const glm::mat4& transform) override;
 		virtual void RenderMeshWithMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms = Buffer()) override;
 		virtual void RenderQuad(Ref<Pipeline> pipeline, Ref<Material> material, const glm::mat4& transform) override;
+	public:
+		static VkDescriptorSet RT_AllocateDescriptorSet(VkDescriptorSetAllocateInfo& allocInfo);
 	};
 
 }

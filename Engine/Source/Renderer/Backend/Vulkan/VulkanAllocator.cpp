@@ -3,6 +3,12 @@
 
 #include "VulkanContext.hpp"
 
+#if VA_LOG_RENDERER_ALLOCATIONS
+#define VA_ALLOCATOR_LOG(...) VA_CORE_TRACE(__VA_ARGS__)
+#else
+#define VA_ALLOCATOR_LOG(...)
+#endif
+
 namespace Vanta {
 
 	namespace Utils {
@@ -79,11 +85,11 @@ namespace Vanta {
 		// TODO: Tracking
 		VmaAllocationInfo allocInfo;
 		vmaGetAllocationInfo(s_Data->Allocator, allocation, &allocInfo);
-		VA_CORE_TRACE("VulkanAllocator ({0}): allocating buffer; size = {1}", m_Tag, Utils::BytesToString(allocInfo.size));
+		VA_ALLOCATOR_LOG("VulkanAllocator ({0}): allocating buffer; size = {1}", m_Tag, Utils::BytesToString(allocInfo.size));
 
 		{
 			s_Data->TotalAllocatedBytes += allocInfo.size;
-			VA_CORE_TRACE("VulkanAllocator ({0}): total allocated since start is {1}", m_Tag, Utils::BytesToString(s_Data->TotalAllocatedBytes));
+			VA_ALLOCATOR_LOG("VulkanAllocator ({0}): total allocated since start is {1}", m_Tag, Utils::BytesToString(s_Data->TotalAllocatedBytes));
 		}
 
 		return allocation;
@@ -100,11 +106,11 @@ namespace Vanta {
 		// TODO: Tracking
 		VmaAllocationInfo allocInfo;
 		vmaGetAllocationInfo(s_Data->Allocator, allocation, &allocInfo);
-		VA_CORE_TRACE("VulkanAllocator ({0}): allocating image; size = {1}", m_Tag, Utils::BytesToString(allocInfo.size));
+		VA_ALLOCATOR_LOG("VulkanAllocator ({0}): allocating image; size = {1}", m_Tag, Utils::BytesToString(allocInfo.size));
 
 		{
 			s_Data->TotalAllocatedBytes += allocInfo.size;
-			VA_CORE_TRACE("VulkanAllocator ({0}): total allocated since start is {1}", m_Tag, Utils::BytesToString(s_Data->TotalAllocatedBytes));
+			VA_ALLOCATOR_LOG("VulkanAllocator ({0}): total allocated since start is {1}", m_Tag, Utils::BytesToString(s_Data->TotalAllocatedBytes));
 		}
 		return allocation;
 	}

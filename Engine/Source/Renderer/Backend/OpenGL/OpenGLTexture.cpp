@@ -170,7 +170,7 @@ namespace Vanta {
 
 		uint32_t faceWidth = m_Width / 4;
 		uint32_t faceHeight = m_Height / 3;
-		HZ_CORE_ASSERT(faceWidth == faceHeight, "Non-square faces!");
+		VA_CORE_ASSERT(faceWidth == faceHeight, "Non-square faces!");
 
 		std::array<uint8_t*, 6> faces;
 		for (size_t i = 0; i < faces.size(); i++)

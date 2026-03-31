@@ -273,6 +273,7 @@ namespace Vanta {
 					{
 						m_Textures[i] = texture;
 						mi->Set("u_AlbedoTexture", texture);
+						mi->Set("u_MaterialUniforms.AlbedoColor", glm::vec3(1.0f));
 					}
 					else
 					{
@@ -288,7 +289,6 @@ namespace Vanta {
 				}
 
 				// Normal maps
-				mi->Set("u_MaterialUniforms.UseNormalMap", (uint32_t)false);
 				bool hasNormalMap = aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
 				fallback = !hasNormalMap;
 				if (hasNormalMap)
@@ -317,6 +317,7 @@ namespace Vanta {
 				{
 					VA_MESH_LOG("    No normal map");
 					mi->Set("u_NormalTexture", whiteTexture);
+					mi->Set("u_MaterialUniforms.UseNormalMap", false);
 				}
 
 				// Roughness map
@@ -335,6 +336,7 @@ namespace Vanta {
 					{
 						m_Textures.push_back(texture);
 						mi->Set("u_RoughnessTexture", texture);
+						mi->Set("u_MaterialUniforms.Roughness", 1.0f);
 					}
 					else
 					{
@@ -456,6 +458,7 @@ namespace Vanta {
 								metalnessTextureFound = true;
 								m_Textures.push_back(texture);
 								mi->Set("u_MetalnessTexture", texture);
+								mi->Set("u_MaterialUniforms.Metalness", 1.0f);
 							}
 							else
 							{

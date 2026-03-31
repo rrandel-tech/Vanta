@@ -39,8 +39,13 @@ namespace Vanta {
         Ref<OpenGLUniformBuffer> instance = this;
         Renderer::Submit([instance, size, offset]() mutable
         {
-            glNamedBufferSubData(instance->m_RendererID, offset, size, instance->m_LocalStorage);
+            instance->RT_SetData(instance->m_LocalStorage, size, offset);
         });
+    }
+
+    void OpenGLUniformBuffer::RT_SetData(const void* data, uint32_t size, uint32_t offset)
+    {
+        glNamedBufferSubData(m_RendererID, offset, size, m_LocalStorage);
     }
 
 }
