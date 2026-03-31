@@ -134,8 +134,8 @@ namespace Vanta {
 		for (auto [stage, data] : shaderData)
 		{
 			VA_CORE_ASSERT(data.size());
-			// Create a new shader module that will be used for pipeline creation
 			VkShaderModuleCreateInfo moduleCreateInfo{};
+
 			moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 			moduleCreateInfo.codeSize = data.size() * sizeof(uint32_t);
 			moduleCreateInfo.pCode = data.data();
@@ -183,8 +183,10 @@ namespace Vanta {
 			uint32_t descriptorSet = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			uint32_t size = compiler.get_declared_struct_size(bufferType);
 
+			if (descriptorSet >= m_ShaderDescriptorSets.size())
+				m_ShaderDescriptorSets.resize(descriptorSet + 1);
+
 			ShaderDescriptorSet& shaderDescriptorSet = m_ShaderDescriptorSets[descriptorSet];
-			//VA_CORE_ASSERT(shaderDescriptorSet.UniformBuffers.find(binding) == shaderDescriptorSet.UniformBuffers.end());
 			if (s_UniformBuffers[descriptorSet].find(binding) == s_UniformBuffers[descriptorSet].end())
 			{
 				UniformBuffer* uniformBuffer = new UniformBuffer();
@@ -193,18 +195,12 @@ namespace Vanta {
 				uniformBuffer->Name = name;
 				uniformBuffer->ShaderStage = shaderStage;
 				s_UniformBuffers.at(descriptorSet)[binding] = uniformBuffer;
-
-				AllocateUniformBuffer(*uniformBuffer);
 			}
 			else
 			{
 				UniformBuffer* uniformBuffer = s_UniformBuffers.at(descriptorSet).at(binding);
 				if (size > uniformBuffer->Size)
-				{
-					VA_CORE_TRACE("Resizing uniform buffer (binding = {0}, set = {1}) to {2} bytes", binding, descriptorSet, size);
 					uniformBuffer->Size = size;
-					AllocateUniformBuffer(*uniformBuffer);
-				}
 				
 			}
 
@@ -265,6 +261,9 @@ namespace Vanta {
 			uint32_t descriptorSet = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			uint32_t dimension = type.image.dim;
 
+			if (descriptorSet >= m_ShaderDescriptorSets.size())
+				m_ShaderDescriptorSets.resize(descriptorSet + 1);
+
 			ShaderDescriptorSet& shaderDescriptorSet = m_ShaderDescriptorSets[descriptorSet];
 			auto& imageSampler = shaderDescriptorSet.ImageSamplers[binding];
 			imageSampler.BindingPoint = binding;
@@ -285,6 +284,9 @@ namespace Vanta {
 			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			uint32_t descriptorSet = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			uint32_t dimension = type.image.dim;
+
+			if (descriptorSet >= m_ShaderDescriptorSets.size())
+				m_ShaderDescriptorSets.resize(descriptorSet + 1);
 
 			ShaderDescriptorSet& shaderDescriptorSet = m_ShaderDescriptorSets[descriptorSet];
 			auto& imageSampler = shaderDescriptorSet.StorageImages[binding];
@@ -312,8 +314,10 @@ namespace Vanta {
 		//////////////////////////////////////////////////////////////////////
 
 		m_TypeCounts.clear();
-		for (auto&& [set, shaderDescriptorSet] : m_ShaderDescriptorSets)
+		for (uint32_t set = 0; set < m_ShaderDescriptorSets.size(); set++)
 		{
+			auto& shaderDescriptorSet = m_ShaderDescriptorSets[set];
+
 			if (shaderDescriptorSet.UniformBuffers.size())
 			{
 				VkDescriptorPoolSize& typeCount = m_TypeCounts[set].emplace_back();
@@ -366,9 +370,6 @@ namespace Vanta {
 				set.descriptorType = layoutBinding.descriptorType;
 				set.descriptorCount = 1;
 				set.dstBinding = layoutBinding.binding;
-
-				//if (!uniformBuffer->Memory)
-				//	AllocateUniformBuffer(*uniformBuffer);
 			}
 
 			for (auto& [binding, imageSampler] : shaderDescriptorSet.ImageSamplers)
@@ -423,6 +424,8 @@ namespace Vanta {
 			shaderDescriptorSet.UniformBuffers.size(),
 			shaderDescriptorSet.ImageSamplers.size(),
 			shaderDescriptorSet.StorageImages.size());
+			if (set >= m_DescriptorSetLayouts.size())
+				m_DescriptorSetLayouts.resize(set + 1);
 			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &m_DescriptorSetLayouts[set]));
 		}
 	}
@@ -445,7 +448,6 @@ namespace Vanta {
 
 		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &result.Pool));
 
-		// Allocate a new descriptor set from the global descriptor pool
 		VkDescriptorSetAllocateInfo allocInfo = {};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = result.Pool;
@@ -464,8 +466,12 @@ namespace Vanta {
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 		std::unordered_map<uint32_t, std::vector<VkDescriptorPoolSize>> poolSizes;
-		for (auto&& [set, shaderDescriptorSet] : m_ShaderDescriptorSets)
+		for (uint32_t set = 0; set < m_ShaderDescriptorSets.size(); set++)
 		{
+			auto& shaderDescriptorSet = m_ShaderDescriptorSets[set];
+			if (!shaderDescriptorSet) // Empty descriptor set
+				continue;
+
 			if (shaderDescriptorSet.UniformBuffers.size())
 			{
 				VkDescriptorPoolSize& typeCount = poolSizes[set].emplace_back();
@@ -514,9 +520,71 @@ namespace Vanta {
 		return result;
 	}
 
+	VulkanShader::ShaderMaterialDescriptorSet VulkanShader::AllocateDescriptorSets()
+	{
+		ShaderMaterialDescriptorSet result;
+
+		if (m_ShaderDescriptorSets.empty())
+			return result;
+
+		std::vector<VkDescriptorPoolSize> poolSizes;
+		for (uint32_t set = 0; set < m_ShaderDescriptorSets.size(); set++)
+		{
+			auto& shaderDescriptorSet = m_ShaderDescriptorSets[set];
+			if (!shaderDescriptorSet) // Empty descriptor set
+				continue;
+
+			if (shaderDescriptorSet.UniformBuffers.size())
+			{
+				VkDescriptorPoolSize& typeCount = poolSizes.emplace_back();
+				typeCount.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				typeCount.descriptorCount = shaderDescriptorSet.UniformBuffers.size();
+			}
+			if (shaderDescriptorSet.ImageSamplers.size())
+			{
+				VkDescriptorPoolSize& typeCount = poolSizes.emplace_back();
+				typeCount.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				typeCount.descriptorCount = shaderDescriptorSet.ImageSamplers.size();
+			}
+			if (shaderDescriptorSet.StorageImages.size())
+			{
+				VkDescriptorPoolSize& typeCount = poolSizes.emplace_back();
+				typeCount.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				typeCount.descriptorCount = shaderDescriptorSet.StorageImages.size();
+			}
+		}
+
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+		VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
+		descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		descriptorPoolInfo.pNext = nullptr;
+		descriptorPoolInfo.poolSizeCount = poolSizes.size();
+		descriptorPoolInfo.pPoolSizes = poolSizes.data();
+		descriptorPoolInfo.maxSets = m_ShaderDescriptorSets.size();
+
+		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &result.Pool));
+
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+		descriptorSetLayouts.reserve(m_DescriptorSetLayouts.size());
+		for (auto& shaderDescriptorSet : m_DescriptorSetLayouts)
+			descriptorSetLayouts.emplace_back(shaderDescriptorSet);
+
+		VkDescriptorSetAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = result.Pool;
+		allocInfo.descriptorSetCount = descriptorSetLayouts.size();
+		allocInfo.pSetLayouts = descriptorSetLayouts.data();
+
+		result.DescriptorSets.resize(m_ShaderDescriptorSets.size());
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, result.DescriptorSets.data()));
+		return result;
+	}
+
 	const VkWriteDescriptorSet* VulkanShader::GetDescriptorSet(const std::string& name, uint32_t set) const
 	{
-		VA_CORE_ASSERT(m_ShaderDescriptorSets.find(set) != m_ShaderDescriptorSets.end());
+		VA_CORE_ASSERT(set < m_ShaderDescriptorSets.size());
+		VA_CORE_ASSERT(m_ShaderDescriptorSets[set]);
 		if (m_ShaderDescriptorSets.at(set).WriteDescriptorSets.find(name) == m_ShaderDescriptorSets.at(set).WriteDescriptorSets.end())
 		{
 			VA_CORE_WARN("Shader {0} does not contain requested descriptor set {1}", m_Name, name);
@@ -529,39 +597,10 @@ namespace Vanta {
 	{
 		std::vector<VkDescriptorSetLayout> result;
 		result.reserve(m_DescriptorSetLayouts.size());
-		for (auto [set, layout] : m_DescriptorSetLayouts)
+		for (auto& layout : m_DescriptorSetLayouts)
 			result.emplace_back(layout);
 
 		return result;
-	}
-
-	void VulkanShader::AllocateUniformBuffer(UniformBuffer& dst)
-	{
-		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-		UniformBuffer& uniformBuffer = dst;
-
-		// Vertex shader uniform buffer block
-		VkBufferCreateInfo bufferInfo = {};
-		VkMemoryAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.pNext = nullptr;
-		allocInfo.allocationSize = 0;
-		allocInfo.memoryTypeIndex = 0;
-
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = uniformBuffer.Size;
-		// This buffer will be used as a uniform buffer
-		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-
-		// Create a new buffer
-		VulkanAllocator allocator("UniformBuffer");
-		uniformBuffer.MemoryAlloc = allocator.AllocateBuffer(bufferInfo, VMA_MEMORY_USAGE_CPU_ONLY, uniformBuffer.Buffer);
-
-		// Store information in the uniform's descriptor that is used by the descriptor set
-		uniformBuffer.Descriptor.buffer = uniformBuffer.Buffer;
-		uniformBuffer.Descriptor.offset = 0;
-		uniformBuffer.Descriptor.range = uniformBuffer.Size;
 	}
 
 	static const char* VkShaderStageCachedFileExtension(VkShaderStageFlagBits stage)
@@ -690,85 +729,6 @@ namespace Vanta {
 		return shaderSources;
 	}
 
-	void VulkanShader::Bind()
-	{
-	}
-
-	RendererID VulkanShader::GetRendererID() const
-	{
-		return 0;
-	}
-
-	void VulkanShader::SetUniformBuffer(const std::string& name, const void* data, uint32_t size)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, float value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, int value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, const glm::vec2& value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, const glm::vec3& value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, const glm::vec4& value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, const glm::mat3& value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, const glm::mat4& value)
-	{
-	}
-
-	void VulkanShader::SetUniform(const std::string& fullname, uint32_t value)
-	{
-
-	}
-
-	void VulkanShader::SetUInt(const std::string& name, uint32_t value)
-	{
-
-	}
-
-	void VulkanShader::SetFloat(const std::string& name, float value)
-	{
-	}
-
-	void VulkanShader::SetInt(const std::string& name, int value)
-	{
-	}
-
-	void VulkanShader::SetFloat2(const std::string& name, const glm::vec2& value)
-	{
-	}
-
-	void VulkanShader::SetFloat3(const std::string& name, const glm::vec3& value)
-	{
-	}
-
-	void VulkanShader::SetMat4(const std::string& name, const glm::mat4& value)
-	{
-	}
-
-	void VulkanShader::SetMat4FromRenderThread(const std::string& name, const glm::mat4& value, bool bind /*= true*/)
-	{
-	}
-
-	void VulkanShader::SetIntArray(const std::string& name, int* values, uint32_t size)
-	{
-	}
-
 	const std::unordered_map<std::string, ShaderResourceDeclaration>& VulkanShader::GetResources() const
 	{
 		return m_Resources;
@@ -776,27 +736,6 @@ namespace Vanta {
 
 	void VulkanShader::AddShaderReloadedCallback(const ShaderReloadedCallback& callback)
 	{
-	}
-
-	void* VulkanShader::MapUniformBuffer(uint32_t bindingPoint, uint32_t set)
-	{
-		VA_CORE_ASSERT(s_UniformBuffers.find(set) != s_UniformBuffers.end());
-		VA_CORE_ASSERT(s_UniformBuffers.at(set).find(bindingPoint) != s_UniformBuffers.at(set).end());
-		VA_CORE_ASSERT(s_UniformBuffers.at(set).at(bindingPoint));
-
-		VulkanAllocator allocator("VulkanShader");
-		uint8_t* pData = allocator.MapMemory<uint8_t>(s_UniformBuffers.at(set).at(bindingPoint)->MemoryAlloc);
-		return pData;
-	}
-
-	void VulkanShader::UnmapUniformBuffer(uint32_t bindingPoint, uint32_t set)
-	{
-		VA_CORE_ASSERT(s_UniformBuffers.find(set) != s_UniformBuffers.end());
-		VA_CORE_ASSERT(s_UniformBuffers.at(set).find(bindingPoint) != s_UniformBuffers.at(set).end());
-		VA_CORE_ASSERT(s_UniformBuffers.at(set).at(bindingPoint));
-		
-		VulkanAllocator allocator("VulkanShader");
-		allocator.UnmapMemory(s_UniformBuffers.at(set).at(bindingPoint)->MemoryAlloc);
 	}
 
 }

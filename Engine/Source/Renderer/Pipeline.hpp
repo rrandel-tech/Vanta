@@ -5,6 +5,7 @@
 #include "Renderer/VertexBuffer.hpp"
 #include "Renderer/Shader.hpp"
 #include "Renderer/RenderPass.hpp"
+#include "Renderer/UniformBuffer.hpp"
 
 namespace Vanta {
 
@@ -26,6 +27,7 @@ namespace Vanta {
 		virtual const PipelineSpecification& GetSpecification() const = 0;
 
 		virtual void Invalidate() = 0;
+		virtual void SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t binding, uint32_t set = 0) = 0;
 
 		// TEMP: remove this when render command buffers are a thing
 		virtual void Bind() = 0;

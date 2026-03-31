@@ -8,20 +8,22 @@
 
 #include "Renderer/Renderer.hpp"
 
-#include "Renderer/Backend/Vulkan/VulkanPipeline.hpp"
-#include "Renderer/Backend/Vulkan/VulkanVertexBuffer.hpp"
-#include "Renderer/Backend/Vulkan/VulkanIndexBuffer.hpp"
-#include "Renderer/Backend/Vulkan/VulkanFramebuffer.hpp"
-#include "Renderer/Backend/Vulkan/VulkanMaterial.hpp"
+#include "VulkanPipeline.hpp"
+#include "VulkanVertexBuffer.hpp"
+#include "VulkanIndexBuffer.hpp"
+#include "VulkanFramebuffer.hpp"
+#include "VulkanMaterial.hpp"
+#include "VulkanUniformBuffer.hpp"
 
-#include "Renderer/Backend/Vulkan/VulkanShader.hpp"
-#include "Renderer/Backend/Vulkan/VulkanTexture.hpp"
+#include "VulkanShader.hpp"
+#include "VulkanTexture.hpp"
 
 #define IMGUI_IMPL_API
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_vulkan.h"
 
 #include "VulkanComputePipeline.hpp"
+#include "Core/Timer.hpp"
 
 #include <glm/glm.hpp>
 
@@ -69,7 +71,7 @@ namespace Vanta {
 		caps.Version = std::to_string(properties.driverVersion);
 
 		Utils::DumpGPUInfo();
-		
+
 		// Create fullscreen quad
 		float x = -1;
 		float y = -1;
@@ -128,7 +130,9 @@ namespace Vanta {
 	{
 		Renderer::Submit([pipeline, mesh, transform]() mutable
 		{
-			auto vulkanMeshVB = mesh->GetVertexBuffer().As<VulkanVertexBuffer>();
+			VA_SCOPE_PERF("VulkanRenderer::RenderMesh");
+
+			Ref<VulkanVertexBuffer> vulkanMeshVB = mesh->GetVertexBuffer().As<VulkanVertexBuffer>();
 			VkBuffer vbMeshBuffer = vulkanMeshVB->GetVulkanBuffer();
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(s_Data->ActiveCommandBuffer, 0, 1, &vbMeshBuffer, offsets);
@@ -140,24 +144,22 @@ namespace Vanta {
 			Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		});
 
-		auto& submeshes = mesh->GetSubmeshes();
-		for (Submesh& submesh : submeshes)
-		{
-			auto material = mesh->GetMaterials()[submesh.MaterialIndex].As<VulkanMaterial>();
-			material->UpdateForRendering();
-
-			Renderer::Submit([pipeline, submesh, material, transform]() mutable
+			auto& submeshes = mesh->GetSubmeshes();
+			for (Submesh& submesh : submeshes)
 			{
-				Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
-				VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
+				auto material = mesh->GetMaterials()[submesh.MaterialIndex].As<VulkanMaterial>();
+				material->RT_UpdateForRendering();
 
-				// Bind descriptor sets describing shader binding points
+				VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
+				VkDescriptorSet descriptorSet = material->GetDescriptorSet();
+
+				// NOTE: Descriptor Set 1 is owned by the renderer
 				std::array<VkDescriptorSet, 2> descriptorSets = {
-					material->GetDescriptorSet().DescriptorSets[0],
+					descriptorSet,
 					s_Data->RendererDescriptorSet.DescriptorSets[0]
 				};
+
 				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
 				glm::mat4 worldTransform = transform * submesh.Transform;
@@ -166,14 +168,22 @@ namespace Vanta {
 				vkCmdPushConstants(s_Data->ActiveCommandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &worldTransform);
 				vkCmdPushConstants(s_Data->ActiveCommandBuffer, layout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), uniformStorageBuffer.Size, uniformStorageBuffer.Data);
 				vkCmdDrawIndexed(s_Data->ActiveCommandBuffer, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
-			});
-		}
+			}
+		});
 	}
 
-	void VulkanRenderer::RenderMeshWithoutMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, const glm::mat4& transform)
+	void VulkanRenderer::RenderMeshWithMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
 	{
-		Renderer::Submit([pipeline, mesh, transform]() mutable
+		Buffer pushConstantBuffer;
+		pushConstantBuffer.Allocate(sizeof(glm::mat4) + additionalUniforms.Size);
+		if (additionalUniforms.Size)
+			pushConstantBuffer.Write(additionalUniforms.Data, additionalUniforms.Size, sizeof(glm::mat4));
+
+		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
+		Renderer::Submit([pipeline, mesh, vulkanMaterial, transform, pushConstantBuffer]() mutable
 		{
+			VA_SCOPE_PERF("VulkanRenderer::RenderMeshWithMaterial");
+
 			auto vulkanMeshVB = mesh->GetVertexBuffer().As<VulkanVertexBuffer>();
 			VkBuffer vbMeshBuffer = vulkanMeshVB->GetVulkanBuffer();
 			VkDeviceSize offsets[1] = { 0 };
@@ -182,29 +192,29 @@ namespace Vanta {
 			auto vulkanMeshIB = Ref<VulkanIndexBuffer>(mesh->GetIndexBuffer());
 			VkBuffer ibBuffer = vulkanMeshIB->GetVulkanBuffer();
 			vkCmdBindIndexBuffer(s_Data->ActiveCommandBuffer, ibBuffer, 0, VK_INDEX_TYPE_UINT32);
-		});
-		
-		auto& submeshes = mesh->GetSubmeshes();
-		for (Submesh& submesh : submeshes)
-		{
-			Renderer::Submit([pipeline, submesh, transform]() mutable
-			{
-				Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
-				VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
-				VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
-				vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-				// Bind descriptor sets describing shader binding points
-				VkDescriptorSet descriptorSet = {
-					vulkanPipeline->GetDescriptorSet()
-				};
+			vulkanMaterial->RT_UpdateForRendering();
+
+			Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
+			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
+			VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
+			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+			// Bind descriptor sets describing shader binding points
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet();
+			if (descriptorSet)
 				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
+			auto& submeshes = mesh->GetSubmeshes();
+			for (Submesh& submesh : submeshes)
+			{
 				glm::mat4 worldTransform = transform * submesh.Transform;
-				vkCmdPushConstants(s_Data->ActiveCommandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &worldTransform);
+				pushConstantBuffer.Write(&worldTransform, sizeof(glm::mat4));
+				vkCmdPushConstants(s_Data->ActiveCommandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, pushConstantBuffer.Size, pushConstantBuffer.Data);
 				vkCmdDrawIndexed(s_Data->ActiveCommandBuffer, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
-			});
-		}
+			}
+			pushConstantBuffer.Release();
+		});
 	}
 
 	void VulkanRenderer::RenderQuad(Ref<Pipeline> pipeline, Ref<Material> material, const glm::mat4& transform)
@@ -230,8 +240,9 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-			// Bind descriptor sets describing shader binding points
-			vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &vulkanMaterial->GetDescriptorSet().DescriptorSets[0], 0, nullptr);
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet();
+			if (descriptorSet)
+				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
 			Buffer uniformStorageBuffer = vulkanMaterial->GetUniformStorageBuffer();
 
@@ -240,6 +251,32 @@ namespace Vanta {
 			vkCmdDrawIndexed(s_Data->ActiveCommandBuffer, s_Data->QuadIndexBuffer->GetCount(), 1, 0, 0, 0);
 		});
 	}
+
+#if 0
+	void VulkanRenderer::SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t set)
+	{
+		Renderer::Submit([uniformBuffer, set]()
+		{
+
+
+			VA_CORE_ASSERT(set == 1); // Currently we only bind to Renderer-maintaned UBs, which are in descriptor set 1
+
+			Ref<VulkanUniformBuffer> vulkanUniformBuffer = uniformBuffer.As<VulkanUniformBuffer>();
+
+			VkWriteDescriptorSet writeDescriptorSet = {};
+			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptorSet.descriptorCount = 1;
+			writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writeDescriptorSet.pBufferInfo = &vulkanUniformBuffer->GetDescriptorBufferInfo();
+			writeDescriptorSet.dstBinding = uniformBuffer->GetBinding();
+			writeDescriptorSet.dstSet = s_Data->RendererDescriptorSet.DescriptorSets[0];
+
+			VA_CORE_WARN("VulkanRenderer - Updating descriptor set (VulkanRenderer::SetUniformBuffer)");
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+		});
+	}
+#endif
 
 	void VulkanRenderer::SubmitFullscreenQuad(Ref<Pipeline> pipeline, Ref<Material> material)
 	{
@@ -264,10 +301,9 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-			// Bind descriptor sets describing shader binding points
-			const auto& descriptorSets = vulkanMaterial->GetDescriptorSet().DescriptorSets;
-			if (!descriptorSets.empty())
-				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSets[0], 0, nullptr);
+			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet();
+			if (descriptorSet)
+				vkCmdBindDescriptorSets(s_Data->ActiveCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &descriptorSet, 0, nullptr);
 
 			Buffer uniformStorageBuffer = vulkanMaterial->GetUniformStorageBuffer();
 			if (uniformStorageBuffer.Size)
@@ -419,7 +455,7 @@ namespace Vanta {
 
 		Ref<TextureCube> envUnfiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
 		Ref<TextureCube> envFiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
-
+		
 		// Convert equirectangular to cubemap
 		Ref<Shader> equirectangularConversionShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
 		Ref<VulkanComputePipeline> equirectangularConversionPipeline = Ref<VulkanComputePipeline>::Create(equirectangularConversionShader);

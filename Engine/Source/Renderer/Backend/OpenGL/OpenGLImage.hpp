@@ -10,19 +10,23 @@ namespace Vanta {
 	class OpenGLImage2D : public Image2D
 	{
 	public:
-		OpenGLImage2D(ImageFormat format, uint32_t width, uint32_t height, Buffer buffer);
-		OpenGLImage2D(ImageFormat format, uint32_t width, uint32_t height, const void* data = nullptr);
+		OpenGLImage2D(ImageSpecification specification, Buffer buffer);
+		OpenGLImage2D(ImageSpecification specification, const void* data = nullptr);
 		virtual ~OpenGLImage2D();
 
 		virtual void Invalidate() override;
 		virtual void Release() override;
 
-		virtual ImageFormat GetFormat() const override { return m_Format; }
 		virtual uint32_t GetWidth() const override { return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
 
+		virtual ImageSpecification& GetSpecification() override { return m_Specification; }
+		virtual const ImageSpecification& GetSpecification() const override { return m_Specification; }
+
 		virtual Buffer GetBuffer() const override { return m_ImageData; }
 		virtual Buffer& GetBuffer() override { return m_ImageData; }
+
+		virtual void CreatePerLayerImageViews() override {}
 
 		RendererID& GetRendererID() { return m_RendererID; }
 		RendererID GetRendererID() const { return m_RendererID; }
@@ -34,10 +38,10 @@ namespace Vanta {
 
 		virtual uint64_t GetHash() const override { return (uint64_t)m_RendererID; }
 	private:
+		ImageSpecification m_Specification;
+		uint32_t m_Width, m_Height;
 		RendererID m_RendererID = 0;
 		RendererID m_SamplerRendererID = 0;
-		uint32_t m_Width, m_Height;
-		ImageFormat m_Format;
 
 		Buffer m_ImageData;
 	};

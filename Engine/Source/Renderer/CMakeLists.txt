@@ -15,6 +15,7 @@ set(RENDERER_SOURCES
 		Texture.cpp
 		VertexBuffer.cpp
 		Image.cpp
+		UniformBuffer.cpp
 		RendererContext.cpp
 )
 
@@ -39,6 +40,7 @@ set(RENDERER_HEADERS
 		Image.hpp
 		RendererCapabilities.hpp
 		RendererContext.hpp
+		UniformBuffer.hpp
 		RendererTypes.hpp
 )
 

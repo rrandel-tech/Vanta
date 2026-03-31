@@ -47,6 +47,25 @@ namespace Vanta::UI {
         }
     }
 
+    void Image(const Ref<Image2D>& image, uint32_t imageLayer, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& tint_col, const ImVec4& border_col)
+    {
+        if (RendererAPI::Current() == RendererAPIType::OpenGL)
+        {
+            Ref<OpenGLImage2D> glImage = image.As<OpenGLImage2D>();
+            ImGui::Image((ImTextureID)glImage->GetRendererID(), size, uv0, uv1, tint_col, border_col);
+        }
+        else
+        {
+            Ref<VulkanImage2D> vulkanImage = image.As<VulkanImage2D>();
+            auto imageInfo = vulkanImage->GetImageInfo();
+            imageInfo.ImageView = vulkanImage->GetLayerImageView(imageLayer);
+            if (!imageInfo.ImageView)
+                return;
+            auto textureID = ImGui_ImplVulkan_AddTexture(imageInfo.Sampler, imageInfo.ImageView, vulkanImage->GetDescriptor().imageLayout);
+            ImGui::Image((ImTextureID)textureID, size, uv0, uv1, tint_col, border_col);
+        }
+    }
+
     void Image(const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& tint_col, const ImVec4& border_col)
     {
         if (RendererAPI::Current() == RendererAPIType::OpenGL)

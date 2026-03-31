@@ -16,7 +16,7 @@ namespace Vanta {
 
 		virtual Ref<Image2D> GetImage() const override { return m_Image; }
 
-		virtual ImageFormat GetFormat() const override { return m_Image->GetFormat(); }
+		virtual ImageFormat GetFormat() const override { return m_Image->GetSpecification().Format; }
 		virtual uint32_t GetWidth() const override { return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
 		// This function currently returns the expected number of mips based on image size,

@@ -9,13 +9,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Renderer2D.hpp"
+#include "UniformBuffer.hpp"
 
-#include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
-#include "Renderer/Backend/Vulkan/VulkanFramebuffer.hpp"
-#include "Renderer/Backend/Vulkan/VulkanShader.hpp"
-
-#include "Renderer/Backend/OpenGL/OpenGLFramebuffer.hpp"
-#include "Renderer/Backend/OpenGL/OpenGLShader.hpp"
 #include "ImGui/ImGui.hpp"
 
 namespace Vanta {
@@ -45,21 +40,57 @@ namespace Vanta {
 		Ref<RenderPass> BloomBlurPass[2];
 		Ref<RenderPass> BloomBlendPass;
 
+		struct UBCamera
+		{
+			glm::mat4 ViewProjection;
+			glm::mat4 InverseViewProjection;
+			glm::mat4 View;
+		} CameraData;
+		Ref<UniformBuffer> CameraUniformBuffer;
+
+		struct UBShadow
+		{
+			glm::mat4 ViewProjection[4];
+		} ShadowData;
+		Ref<UniformBuffer> ShadowUniformBuffer;
+
+		struct Light
+		{
+			glm::vec3 Direction;
+			float Padding = 0.0f;
+			glm::vec3 Radiance;
+			float Multiplier;
+		};
+
+		struct UBScene
+		{
+			Light lights;
+			glm::vec3 u_CameraPosition;
+		} SceneDataUB;
+		Ref<UniformBuffer> SceneUniformBuffer;
+
+		struct UBRendererData
+		{
+			glm::vec4 u_CascadeSplits;
+			bool ShowCascades = false;
+			char Padding0[3]; // Bools are 4-bytes in GLSL
+			bool SoftShadows = true;
+			char Padding1[3];
+			float LightSize = 0.5f;
+			float MaxShadowDistance = 200.0f;
+			float ShadowFade;
+			bool CascadeFading = true;
+			char Padding2[3];
+			float CascadeTransitionFade = 1.0f;
+		} RendererDataUB;
+		Ref<UniformBuffer> RendererDataUniformBuffer;
+
 		Ref<Shader> ShadowMapShader, ShadowMapAnimShader;
 		Ref<RenderPass> ShadowMapRenderPass[4];
-		float ShadowMapSize = 20.0f;
 		float LightDistance = 0.1f;
-		glm::mat4 LightViewMatrix;
 		float CascadeSplitLambda = 0.91f;
 		glm::vec4 CascadeSplits;
 		float CascadeFarPlaneOffset = 15.0f, CascadeNearPlaneOffset = -15.0f;
-		bool ShowCascades = false;
-		bool SoftShadows = true;
-		float LightSize = 0.25f;
-		float MaxShadowDistance = 200.0f;
-		float ShadowFade = 25.0f;
-		float CascadeTransitionFade = 1.0f;
-		bool CascadeFading = true;
 
 		bool EnableBloom = false;
 		float BloomThreshold = 1.5f;
@@ -72,6 +103,7 @@ namespace Vanta {
 		Ref<Pipeline> GeometryPipeline;
 		Ref<Pipeline> CompositePipeline;
 		Ref<Pipeline> ShadowPassPipeline;
+		Ref<Material> ShadowPassMaterial;
 		Ref<Pipeline> SkyboxPipeline;
 		Ref<Material> SkyboxMaterial;
 
@@ -95,8 +127,6 @@ namespace Vanta {
 
 		uint32_t ViewportWidth = 0, ViewportHeight = 0;
 		bool NeedsResize = false;
-
-		VkDescriptorImageInfo ColorBufferInfo;
 	};
 
 	static SceneRendererData* s_Data = nullptr;
@@ -104,68 +134,48 @@ namespace Vanta {
 	void SceneRenderer::Init()
 	{
 		s_Data = new SceneRendererData();
-		
-#if 0
-		FramebufferSpecification geoFramebufferSpec;
-		//geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::RGBA32F, ImageFormat::Depth };
-		geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::Depth };
-		geoFramebufferSpec.Samples = 1;
-		geoFramebufferSpec.ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
 
-		RenderPassSpecification geoRenderPassSpec;
-		geoRenderPassSpec.TargetFramebuffer = Framebuffer::Create(geoFramebufferSpec);
-		s_Data->GeoPass = RenderPass::Create(geoRenderPassSpec);
+		s_Data->BRDFLUT = Texture2D::Create("assets/textures/BRDF_LUT.tga");
 
-		FramebufferSpecification compFramebufferSpec;
-		compFramebufferSpec.Attachments = { ImageFormat::RGBA };
-		compFramebufferSpec.ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
+		// Create uniform buffers
+		s_Data->CameraUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::UBCamera), 0);
+		s_Data->ShadowUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::UBShadow), 1);
+		s_Data->SceneUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::UBScene), 2);
+		s_Data->RendererDataUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::UBRendererData), 3);
 
-		RenderPassSpecification compRenderPassSpec;
-		compRenderPassSpec.TargetFramebuffer = Framebuffer::Create(compFramebufferSpec);
-		s_Data->CompositePass = RenderPass::Create(compRenderPassSpec);
-
-		FramebufferSpecification bloomBlurFramebufferSpec;
-		bloomBlurFramebufferSpec.Attachments = { ImageFormat::RGBA32F };
-		bloomBlurFramebufferSpec.ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
-
-		RenderPassSpecification bloomBlurRenderPassSpec;
-		bloomBlurRenderPassSpec.TargetFramebuffer = Framebuffer::Create(bloomBlurFramebufferSpec);
-		s_Data->BloomBlurPass[0] = RenderPass::Create(bloomBlurRenderPassSpec);
-		bloomBlurRenderPassSpec.TargetFramebuffer = Framebuffer::Create(bloomBlurFramebufferSpec);
-		s_Data->BloomBlurPass[1] = RenderPass::Create(bloomBlurRenderPassSpec);
-
-		FramebufferSpecification bloomBlendFramebufferSpec;
-		bloomBlendFramebufferSpec.Attachments = { ImageFormat::RGBA };
-		bloomBlendFramebufferSpec.ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
-
-		RenderPassSpecification bloomBlendRenderPassSpec;
-		bloomBlendRenderPassSpec.TargetFramebuffer = Framebuffer::Create(bloomBlendFramebufferSpec);
-		s_Data->BloomBlendPass = RenderPass::Create(bloomBlendRenderPassSpec);
-#endif
-
-
-#if 0
-		s_Data->CompositeShader = Shader::Create("assets/shaders/SceneComposite.glsl");
-		s_Data->BloomBlurShader = Shader::Create("assets/shaders/BloomBlur.glsl");
-		s_Data->BloomBlendShader = Shader::Create("assets/shaders/BloomBlend.glsl");
-#endif
+		Renderer::SetUniformBuffer(s_Data->CameraUniformBuffer, 0);
+		Renderer::SetUniformBuffer(s_Data->ShadowUniformBuffer, 0);
+		Renderer::SetUniformBuffer(s_Data->SceneUniformBuffer, 0);
+		Renderer::SetUniformBuffer(s_Data->RendererDataUniformBuffer, 0);
 
 		s_Data->CompositeShader = Renderer::GetShaderLibrary()->Get("SceneComposite");
 		s_Data->CompositeMaterial = Material::Create(s_Data->CompositeShader);
-		s_Data->BRDFLUT = Texture2D::Create("assets/textures/BRDF_LUT.tga");
 
 		// Shadow pass
 		{
+			ImageSpecification spec;
+			spec.Format = ImageFormat::DEPTH32F;
+			spec.Usage = ImageUsage::Attachment;
+			spec.Width = 4096;
+			spec.Height = 4096;
+			spec.Layers = 4; // 4 cascades
+			Ref<Image2D> cascadedDepthImage = Image2D::Create(spec);
+			cascadedDepthImage->Invalidate();
+			cascadedDepthImage->CreatePerLayerImageViews();
+
 			FramebufferSpecification shadowMapFramebufferSpec;
 			shadowMapFramebufferSpec.Width = 4096;
 			shadowMapFramebufferSpec.Height = 4096;
 			shadowMapFramebufferSpec.Attachments = { ImageFormat::DEPTH32F };
 			shadowMapFramebufferSpec.ClearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 			shadowMapFramebufferSpec.NoResize = true;
+			shadowMapFramebufferSpec.ExistingImage = cascadedDepthImage;
 
 			// 4 cascades
 			for (int i = 0; i < 4; i++)
 			{
+				shadowMapFramebufferSpec.ExistingImageLayer = i;
+
 				RenderPassSpecification shadowMapRenderPassSpec;
 				shadowMapRenderPassSpec.TargetFramebuffer = Framebuffer::Create(shadowMapFramebufferSpec);
 				shadowMapRenderPassSpec.DebugName = "ShadowMap";
@@ -186,6 +196,7 @@ namespace Vanta {
 			};
 			pipelineSpec.RenderPass = s_Data->ShadowMapRenderPass[0];
 			s_Data->ShadowPassPipeline = Pipeline::Create(pipelineSpec);
+			s_Data->ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
 		}
 		
 		// Geometry
@@ -484,126 +495,42 @@ namespace Vanta {
 
 		Renderer::SetSceneEnvironment(s_Data->SceneData.SceneEnvironment, s_Data->ShadowPassPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage());
 
+		// Update uniform buffers
+		SceneRendererData::UBCamera& cameraData = s_Data->CameraData;
+		SceneRendererData::UBScene& sceneData = s_Data->SceneDataUB;
+		SceneRendererData::UBShadow& shadowData = s_Data->ShadowData;
+		SceneRendererData::UBRendererData& rendererData = s_Data->RendererDataUB;
+
 		auto& sceneCamera = s_Data->SceneData.SceneCamera;
-		auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * s_Data->SceneData.SceneCamera.ViewMatrix;
+		auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * sceneCamera.ViewMatrix;
 		glm::vec3 cameraPosition = glm::inverse(sceneCamera.ViewMatrix)[3];
 
-		// TODO: handle uniform buffers better
-		const DirectionalLight& directionalLight = s_Data->SceneData.SceneLightEnvironment.DirectionalLights[0];
-		Renderer::Submit([viewProjection, sceneCamera, cameraPosition, directionalLight]()
+		auto inverseVP = glm::inverse(viewProjection);
+		cameraData.ViewProjection = viewProjection;
+		cameraData.InverseViewProjection = inverseVP;
+		cameraData.View = sceneCamera.ViewMatrix;
+		s_Data->CameraUniformBuffer->SetData(&cameraData, sizeof(cameraData));
+
+		const auto& directionalLight = s_Data->SceneData.SceneLightEnvironment.DirectionalLights[0];
+		sceneData.lights.Direction = directionalLight.Direction;
+		sceneData.lights.Radiance = directionalLight.Radiance;
+		sceneData.lights.Multiplier = directionalLight.Multiplier;
+		sceneData.u_CameraPosition = cameraPosition;
+		s_Data->SceneUniformBuffer->SetData(&sceneData, sizeof(sceneData));
+		
+		CascadeData cascades[4];
+		CalculateCascades(cascades, sceneCamera, directionalLight.Direction);
+
+		// TODO: four cascades for now
+		for (int i = 0; i < 4; i++)
 		{
-			{
-				auto inverseVP = glm::inverse(viewProjection);
-				struct ViewProj
-				{
-					glm::mat4 ViewProjection;
-					glm::mat4 InverseViewProjection;
-				};
-				ViewProj viewProj;
-				viewProj.ViewProjection = viewProjection;
-				viewProj.InverseViewProjection = inverseVP;
-				//viewProj.LightMatrixCascade = s_Data->LightMatrices[0];
+			s_Data->CascadeSplits[i] = cascades[i].SplitDepth;
+			shadowData.ViewProjection[i] = cascades[i].ViewProj;
+		}
+		s_Data->ShadowUniformBuffer->SetData(&shadowData, sizeof(shadowData));
 
-				struct Light
-				{
-					glm::vec3 Direction;
-					float Padding = 0.0f;
-					glm::vec3 Radiance;
-					float Multiplier;
-				};
-
-				struct SceneData
-				{
-					Light lights;
-					glm::vec3 u_CameraPosition;
-				};
-
-
-				SceneData ub;
-				ub.lights.Direction = directionalLight.Direction;
-				ub.lights.Radiance = directionalLight.Radiance;
-				ub.lights.Multiplier = directionalLight.Multiplier;
-
-				ub.u_CameraPosition = cameraPosition;
-
-				if (RendererAPI::Current() == RendererAPIType::Vulkan)
-				{
-					void* ubPtr = VulkanShader::MapUniformBuffer(0);
-					memcpy(ubPtr, &viewProj, sizeof(ViewProj));
-					VulkanShader::UnmapUniformBuffer(0);
-
-					ubPtr = VulkanShader::MapUniformBuffer(2);
-					memcpy(ubPtr, &ub, sizeof(SceneData));
-					VulkanShader::UnmapUniformBuffer(2);
-				}
-				else
-				{
-					auto shader = s_Data->GridMaterial->GetShader().As<OpenGLShader>();
-					shader->SetUniformBuffer("Camera", &viewProj, sizeof(ViewProj));
-					shader->SetUniformBuffer("SceneData", &ub, sizeof(SceneData));
-				}
-			}
-
-			{
-				CascadeData cascades[4];
-				CalculateCascades(cascades, sceneCamera, directionalLight.Direction);
-				s_Data->LightViewMatrix = cascades[0].View;
-
-				// TODO: change to four cascades (or set number)
-				for (int i = 0; i < 1; i++)
-				{
-					s_Data->CascadeSplits[i] = cascades[i].SplitDepth;
-				}
-
-				struct ShadowData
-				{
-					glm::mat4 ViewProjection;
-				};
-				ShadowData shadowData;
-				shadowData.ViewProjection = cascades[0].ViewProj;
-
-				if (RendererAPI::Current() == RendererAPIType::Vulkan)
-				{
-					void* ubPtr = VulkanShader::MapUniformBuffer(1);
-					memcpy(ubPtr, &shadowData, sizeof(ShadowData));
-					VulkanShader::UnmapUniformBuffer(1);
-				}
-				else
-				{
-					auto shadowPassShader = s_Data->ShadowPassPipeline->GetSpecification().Shader;
-					auto shader = shadowPassShader.As<OpenGLShader>();
-					shader->SetUniformBuffer("ShadowData", &shadowData, sizeof(ShadowData));
-				}
-			}
-
-			{
-#if 0
-				SceneData ub;
-				ub.lights.Direction = directionalLight.Direction;
-				ub.lights.Radiance = directionalLight.Radiance;
-				ub.lights.Multiplier = directionalLight.Multiplier;
-
-				ub.u_CameraPosition = cameraPosition;
-
-				if (RendererAPI::Current() == RendererAPIType::Vulkan)
-				{
-					void* ubPtr = VulkanShader::MapUniformBuffer(0);
-					memcpy(ubPtr, &viewProj, sizeof(ViewProj));
-					VulkanShader::UnmapUniformBuffer(0);
-
-					ubPtr = VulkanShader::MapUniformBuffer(2);
-					memcpy(ubPtr, &ub, sizeof(SceneData));
-					VulkanShader::UnmapUniformBuffer(2);
-				}
-				else
-				{
-					auto shader = s_Data->GridMaterial->GetShader().As<OpenGLShader>();
-					shader->SetUniformBuffer("Camera", &viewProj, sizeof(ViewProj));
-					shader->SetUniformBuffer("SceneData", &ub, sizeof(SceneData));
-				}
-#endif
-			}
-		});
+		rendererData.u_CascadeSplits = s_Data->CascadeSplits;
+		s_Data->RendererDataUniformBuffer->SetData(&rendererData, sizeof(rendererData));
 	}
 
 	void SceneRenderer::EndScene()
@@ -648,16 +575,17 @@ namespace Vanta {
 		}
 
 		// TODO: change to four cascades (or set number)
-		for (int i = 0; i < 1; i++)
+		for (int i = 0; i < 4; i++)
 		{
 			Renderer::BeginRenderPass(s_Data->ShadowMapRenderPass[i]);
 
 			// static glm::mat4 scaleBiasMatrix = glm::scale(glm::mat4(1.0f), { 0.5f, 0.5f, 0.5f }) * glm::translate(glm::mat4(1.0f), { 1, 1, 1 });
 			
 			// Render entities
+			Buffer cascade(&i, sizeof(uint32_t));
 			for (auto& dc : s_Data->ShadowPassDrawList)
 			{
-				Renderer::RenderMeshWithoutMaterial(s_Data->ShadowPassPipeline, dc.Mesh, dc.Transform);
+				Renderer::RenderMeshWithMaterial(s_Data->ShadowPassPipeline, dc.Mesh, s_Data->ShadowPassMaterial, dc.Transform, cascade);
 			}
 
 			Renderer::EndRenderPass();
@@ -823,17 +751,17 @@ namespace Vanta {
 		if (UI::BeginTreeNode("Shadows"))
 		{
 			UI::BeginPropertyGrid();
-			UI::Property("Soft Shadows", s_Data->SoftShadows);
-			UI::Property("Light Size", s_Data->LightSize, 0.01f);
-			UI::Property("Max Shadow Distance", s_Data->MaxShadowDistance, 1.0f);
-			UI::Property("Shadow Fade", s_Data->ShadowFade, 5.0f);
+			UI::Property("Soft Shadows", s_Data->RendererDataUB.SoftShadows);
+			UI::Property("Light Size", s_Data->RendererDataUB.LightSize, 0.01f);
+			UI::Property("Max Shadow Distance", s_Data->RendererDataUB.MaxShadowDistance, 1.0f);
+			UI::Property("Shadow Fade", s_Data->RendererDataUB.ShadowFade, 5.0f);
 			UI::EndPropertyGrid();
 			if (UI::BeginTreeNode("Cascade Settings"))
 			{
 				UI::BeginPropertyGrid();
-				UI::Property("Show Cascades", s_Data->ShowCascades);
-				UI::Property("Cascade Fading", s_Data->CascadeFading);
-				UI::Property("Cascade Transition Fade", s_Data->CascadeTransitionFade, 0.05f, 0.0f, FLT_MAX);
+				UI::Property("Show Cascades", s_Data->RendererDataUB.ShowCascades);
+				UI::Property("Cascade Fading", s_Data->RendererDataUB.CascadeFading);
+				UI::Property("Cascade Transition Fade", s_Data->RendererDataUB.CascadeTransitionFade, 0.05f, 0.0f, FLT_MAX);
 				UI::Property("Cascade Split", s_Data->CascadeSplitLambda, 0.01f);
 				UI::Property("CascadeNearPlaneOffset", s_Data->CascadeNearPlaneOffset, 0.1f, -FLT_MAX, 0.0f);
 				UI::Property("CascadeFarPlaneOffset", s_Data->CascadeFarPlaneOffset, 0.1f, 0.0f, FLT_MAX);
@@ -850,7 +778,7 @@ namespace Vanta {
 				UI::BeginPropertyGrid();
 				UI::PropertySlider("Cascade Index", cascadeIndex, 0, 3);
 				UI::EndPropertyGrid();
-				UI::Image(image, { size, size }, { 0, 1 }, { 1, 0 });
+				UI::Image(image, (uint32_t)cascadeIndex, { size, size }, { 0, 1 }, { 1, 0 });
 				UI::EndTreeNode();
 			}
 

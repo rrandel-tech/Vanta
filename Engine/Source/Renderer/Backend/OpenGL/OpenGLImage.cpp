@@ -5,16 +5,16 @@
 
 namespace Vanta {
 
-	OpenGLImage2D::OpenGLImage2D(ImageFormat format, uint32_t width, uint32_t height, const void* data)
-		: m_Width(width), m_Height(height), m_Format(format)
+	OpenGLImage2D::OpenGLImage2D(ImageSpecification specification, const void* data)
+		: m_Specification(specification), m_Width(specification.Width), m_Height(specification.Height)
 	{
 		// TODO: Local storage should be optional
 		if (data)
-			m_ImageData = Buffer::Copy(data, Utils::GetImageMemorySize(format, width, height));
+			m_ImageData = Buffer::Copy(data, Utils::GetImageMemorySize(specification.Format, specification.Width, specification.Height));
 	}
 
-	OpenGLImage2D::OpenGLImage2D(ImageFormat format, uint32_t width, uint32_t height, Buffer buffer)
-		: m_Width(width), m_Height(height), m_Format(format), m_ImageData(buffer)
+	OpenGLImage2D::OpenGLImage2D(ImageSpecification specification, Buffer buffer)
+		: m_Specification(specification), m_Width(specification.Width), m_Height(specification.Height), m_ImageData(buffer)
 	{
 	}
 
@@ -39,13 +39,13 @@ namespace Vanta {
 
 		glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
 
-		GLenum internalFormat = Utils::OpenGLImageInternalFormat(m_Format);
+		GLenum internalFormat = Utils::OpenGLImageInternalFormat(m_Specification.Format);
 		uint32_t mipCount = Utils::CalculateMipCount(m_Width, m_Height);
 		glTextureStorage2D(m_RendererID, mipCount, internalFormat, m_Width, m_Height);
 		if (m_ImageData)
 		{
-			GLenum format = Utils::OpenGLImageFormat(m_Format);
-			GLenum dataType = Utils::OpenGLFormatDataType(m_Format);
+			GLenum format = Utils::OpenGLImageFormat(m_Specification.Format);
+			GLenum dataType = Utils::OpenGLFormatDataType(m_Specification.Format);
 			glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, format, dataType, m_ImageData.Data);
 			glGenerateTextureMipmap(m_RendererID); // TODO: optional
 		}

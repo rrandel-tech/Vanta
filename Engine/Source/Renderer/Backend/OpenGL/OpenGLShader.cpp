@@ -717,62 +717,6 @@ namespace Vanta {
 		});
 	}
 
-	void OpenGLShader::SetUInt(const std::string& name, uint32_t value)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformUInt(name, value);
-		});
-	}
-
-	void OpenGLShader::SetFloat(const std::string& name, float value)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformFloat(name, value);
-		});
-	}
-
-	void OpenGLShader::SetInt(const std::string& name, int value)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformInt(name, value);
-		});
-	}
-
-	void OpenGLShader::SetFloat2(const std::string& name, const glm::vec2& value)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformFloat2(name, value);
-		});
-	}
-
-	void OpenGLShader::SetFloat3(const std::string& name, const glm::vec3& value)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformFloat3(name, value);
-		});
-	}
-
-	void OpenGLShader::SetMat4(const std::string& name, const glm::mat4& value)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformMat4(name, value);
-		});
-	}
-
-	void OpenGLShader::SetMat4FromRenderThread(const std::string& name, const glm::mat4& value, bool bind)
-	{
-		if (bind)
-		{
-			UploadUniformMat4(name, value);
-		}
-		else
-		{
-			int location = glGetUniformLocation(m_RendererID, name.c_str());
-			if (location != -1)
-				UploadUniformMat4(location, value);
-		}
-	}
-
 	void OpenGLShader::SetIntArray(const std::string& name, int* values, uint32_t size)
 	{
 		Renderer::Submit([=]() {

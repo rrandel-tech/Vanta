@@ -199,7 +199,7 @@ namespace Vanta {
 			}
 		}
 
-		swapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+		swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
 		// Determine the number of images
 		uint32_t desiredNumberOfSwapchainImages = surfCaps.minImageCount + 1;
@@ -528,16 +528,22 @@ namespace Vanta {
 
 	void VulkanSwapChain::BeginFrame()
 	{
+		VA_SCOPE_PERF("VulkanSwapChain::BeginFrame");
+
 		VK_CHECK_RESULT(vkWaitForFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex], VK_TRUE, UINT64_MAX));
-		VK_CHECK_RESULT(AcquireNextImage(m_Semaphores.PresentComplete, &m_CurrentBufferIndex));
+		uint32_t imageIndex;
+		VK_CHECK_RESULT(AcquireNextImage(m_Semaphores.PresentComplete, &imageIndex));
+		//VK_CHECK_RESULT(vkWaitForFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex], VK_TRUE, UINT64_MAX));
+		//VK_CHECK_RESULT(vkResetCommandPool(m_Device->GetVulkanDevice(), m_CommandPool, 0));
+
+		VA_CORE_WARN("Staring frame {0} (image {1})", m_CurrentBufferIndex, imageIndex);
 	}
 
 	void VulkanSwapChain::Present()
 	{
-		const uint64_t DEFAULT_FENCE_TIMEOUT = 100000000000;
+		VA_SCOPE_PERF("VulkanSwapChain::Present");
 
-		// Use a fence to wait until the command buffer has finished execution before using it again
-		VK_CHECK_RESULT(vkResetFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex]));
+		const uint64_t DEFAULT_FENCE_TIMEOUT = 100000000000;
 
 		// Pipeline stage at which the queue submission will wait (via pWaitSemaphores)
 		VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -553,12 +559,17 @@ namespace Vanta {
 		submitInfo.commandBufferCount = 1;
 
 		// Submit to the graphics queue passing a wait fence
+		VK_CHECK_RESULT(vkResetFences(m_Device->GetVulkanDevice(), 1, &m_WaitFences[m_CurrentBufferIndex]));
 		VK_CHECK_RESULT(vkQueueSubmit(m_Device->GetQueue(), 1, &submitInfo, m_WaitFences[m_CurrentBufferIndex]));
 
 		// Present the current buffer to the swap chain
 		// Pass the semaphore signaled by the command buffer submission from the submit info as the wait semaphore for swap chain presentation
 		// This ensures that the image is not presented to the windowing system until all commands have been submitted
-		VkResult result = QueuePresent(m_Device->GetQueue(), m_CurrentBufferIndex, m_Semaphores.RenderComplete);
+		VkResult result;
+		{
+			VA_SCOPE_PERF("VulkanSwapChain::Present - QueuePresent");
+			result = QueuePresent(m_Device->GetQueue(), m_CurrentBufferIndex, m_Semaphores.RenderComplete);
+		}
 
 		if (result != VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
 		{
@@ -580,6 +591,16 @@ namespace Vanta {
 
 		// TODO: Do we need this anywhere?
 		//vkResetCommandPool(m_Device->GetVulkanDevice(), m_CommandPool, 0);
+
+		m_CurrentBufferIndex = (m_CurrentBufferIndex + 1) % 3;
+
+		// Resource release queue
+		uint32_t index = m_CurrentBufferIndex;
+		Renderer::Submit([index]()
+		{
+			auto& queue = Renderer::GetRenderResourceReleaseQueue(index);
+			queue.Execute();
+		});
 	}
 
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore presentCompleteSemaphore, uint32_t* imageIndex)

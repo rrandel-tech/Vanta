@@ -9,8 +9,12 @@
 #include "SceneRenderer.hpp"
 #include "Renderer2D.hpp"
 
+#include "Core/Timer.hpp"
+
 #include "Renderer/Backend/OpenGL/OpenGLRenderer.hpp"
 #include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
+
+#include "Renderer/Backend/Vulkan/VulkanContext.hpp"
 
 namespace Vanta {
 
@@ -52,6 +56,11 @@ namespace Vanta {
 		}
 	}
 
+	uint32_t Renderer::GetCurrentImageIndex()
+	{
+		return VulkanContext::Get()->GetSwapChain().GetCurrentBufferIndex();
+	}
+
 	void RendererAPI::SetAPI(RendererAPIType api)
 	{	
 		// TODO: make sure this is called at a valid time
@@ -67,10 +76,12 @@ namespace Vanta {
 		Ref<Texture2D> WhiteTexture;
 		Ref<TextureCube> BlackCubeTexture;
 		Ref<Environment> EmptyEnvironment;
+		std::map<uint32_t, std::map<uint32_t, Ref<UniformBuffer>>> UniformBuffers;
 	};
 
 	static RendererData* s_Data = nullptr;
 	static RenderCommandQueue* s_CommandQueue = nullptr;
+	static RenderCommandQueue s_ResourceFreeQueue[3];
 
 	static RendererAPI* InitRendererAPI()
 	{
@@ -99,7 +110,7 @@ namespace Vanta {
 
 		Renderer::GetShaderLibrary()->Load("assets/shaders/Grid.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/SceneComposite.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl");
+		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl", true);
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Anim.glsl");
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/Outline.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/Skybox.glsl");
@@ -142,6 +153,7 @@ namespace Vanta {
 
 	void Renderer::WaitAndRender()
 	{
+		VA_SCOPE_PERF("Renderer::WaitAndRender");
 		s_CommandQueue->Execute();
 	}
 
@@ -187,9 +199,9 @@ namespace Vanta {
 		s_RendererAPI->RenderMesh(pipeline, mesh, transform);
 	}
 
-	void Renderer::RenderMeshWithoutMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, const glm::mat4& transform)
+	void Renderer::RenderMeshWithMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
 	{
-		s_RendererAPI->RenderMeshWithoutMaterial(pipeline, mesh, transform);
+		s_RendererAPI->RenderMeshWithMaterial(pipeline, mesh, material, transform, additionalUniforms);
 	}
 
 	void Renderer::RenderQuad(Ref<Pipeline> pipeline, Ref<Material> material, const glm::mat4& transform)
@@ -308,9 +320,27 @@ namespace Vanta {
 		return s_Data->EmptyEnvironment;
 	}
 
+	void Renderer::SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t set)
+	{
+		s_Data->UniformBuffers[set][uniformBuffer->GetBinding()] = uniformBuffer;
+	}
+
+	Ref<UniformBuffer> Renderer::GetUniformBuffer(uint32_t binding, uint32_t set)
+	{
+		VA_CORE_ASSERT(s_Data->UniformBuffers.find(set) != s_Data->UniformBuffers.end());
+		VA_CORE_ASSERT(s_Data->UniformBuffers.at(set).find(binding) != s_Data->UniformBuffers.at(set).end());
+
+		return s_Data->UniformBuffers.at(set).at(binding);
+	}
+
 	RenderCommandQueue& Renderer::GetRenderCommandQueue()
 	{
 		return *s_CommandQueue;
+	}
+
+	RenderCommandQueue& Renderer::GetRenderResourceReleaseQueue(uint32_t index)
+	{
+		return s_ResourceFreeQueue[index];
 	}
 
 	RendererConfig& Renderer::GetConfig()

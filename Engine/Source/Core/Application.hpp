@@ -2,6 +2,7 @@
 
 #include "Base.hpp"
 #include "TimeStep.hpp"
+#include "Core/Timer.hpp"
 #include "Window.hpp"
 #include "LayerStack.hpp"
 
@@ -57,6 +58,8 @@ namespace Vanta {
         static const char* GetConfigurationName();
         static const char* GetPlatformName();
 
+        PerformanceProfiler* GetPerformanceProfiler() { return m_Profiler; }
+
         [[nodiscard]] const ApplicationSpecification& GetSpecification() const { return m_Specification; }
 
         std::string OpenFile(const char* filter = "All\0*.*\0") const;
@@ -74,6 +77,7 @@ namespace Vanta {
         LayerStack m_LayerStack;
         ImGuiLayer* m_ImGuiLayer;
         Timestep m_TimeStep;
+        PerformanceProfiler* m_Profiler = nullptr; // TODO: Should be null in Dist
 
         float m_LastFrameTime = 0.0f;
 

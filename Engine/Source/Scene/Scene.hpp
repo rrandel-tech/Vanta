@@ -8,7 +8,6 @@
 #include "Renderer/Material.hpp"
 #include "Renderer/SceneEnvironment.hpp"
 
-
 #include "entt/entt.hpp"
 
 #include "SceneCamera.hpp"

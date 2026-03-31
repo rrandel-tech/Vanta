@@ -19,7 +19,11 @@ namespace Vanta {
 	OpenGLTexture2D::OpenGLTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties)
 		: m_Width(width), m_Height(height), m_Properties(properties)
 	{
-		m_Image = Image2D::Create(format, width, height, data);
+		ImageSpecification spec;
+		spec.Format = format;
+		spec.Width = width;
+		spec.Height = height;
+		m_Image = Image2D::Create(spec);
 		Renderer::Submit([=]()
 		{
 			m_Image->Invalidate();
@@ -37,7 +41,11 @@ namespace Vanta {
 			float* imageData = stbi_loadf(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			VA_CORE_ASSERT(imageData);
 			Buffer buffer(imageData, Utils::GetImageMemorySize(ImageFormat::RGBA32F, width, height));
-			m_Image = Image2D::Create(ImageFormat::RGBA32F, width, height, buffer);
+			ImageSpecification spec;
+			spec.Format = ImageFormat::RGBA32F;
+			spec.Width = width;
+			spec.Height = height;
+			m_Image = Image2D::Create(spec, buffer);
 		}
 		else
 		{
@@ -48,7 +56,11 @@ namespace Vanta {
 			//ImageFormat format = channels == 4 ? ImageFormat::RGBA : ImageFormat::RGB;
 			ImageFormat format = properties.SRGB ? ImageFormat::RGB : ImageFormat::RGBA;
 			Buffer buffer(imageData, Utils::GetImageMemorySize(format, width, height));
-			m_Image = Image2D::Create(format, width, height, buffer);
+			ImageSpecification spec;
+			spec.Format = format;
+			spec.Width = width;
+			spec.Height = height;
+			m_Image = Image2D::Create(spec, buffer);
 		}
 
 		m_Image.As<OpenGLImage2D>()->CreateSampler(m_Properties);
@@ -96,7 +108,7 @@ namespace Vanta {
 		Ref<OpenGLTexture2D> instance = this;
 		Ref<OpenGLImage2D> image = m_Image.As<OpenGLImage2D>();
 		Renderer::Submit([instance, image]() mutable {
-			glTextureSubImage2D(image->GetRendererID(), 0, 0, 0, instance->m_Width, instance->m_Height, Utils::OpenGLImageFormat(image->GetFormat()), GL_UNSIGNED_BYTE, instance->m_Image->GetBuffer().Data);
+			glTextureSubImage2D(image->GetRendererID(), 0, 0, 0, instance->m_Width, instance->m_Height, Utils::OpenGLImageFormat(image->GetSpecification().Format), GL_UNSIGNED_BYTE, instance->m_Image->GetBuffer().Data);
 		});
 	}
 
@@ -158,7 +170,7 @@ namespace Vanta {
 
 		uint32_t faceWidth = m_Width / 4;
 		uint32_t faceHeight = m_Height / 3;
-		VA_CORE_ASSERT(faceWidth == faceHeight, "Non-square faces!");
+		HZ_CORE_ASSERT(faceWidth == faceHeight, "Non-square faces!");
 
 		std::array<uint8_t*, 6> faces;
 		for (size_t i = 0; i < faces.size(); i++)

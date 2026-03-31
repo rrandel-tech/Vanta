@@ -11,6 +11,7 @@ set(OPENGL_SOURCES
 		OpenGLImGuiLayer.cpp
 		OpenGLMaterial.cpp
 		OpenGLRenderer.cpp
+		OpenGLUniformBuffer.cpp
 )
 
 set(OPENGL_HEADERS
@@ -26,6 +27,7 @@ set(OPENGL_HEADERS
 		OpenGLImGuiLayer.hpp
 		OpenGLMaterial.hpp
 		OpenGLRenderer.hpp
+		OpenGLUniformBuffer.hpp
 )
 
 target_sources(Vanta

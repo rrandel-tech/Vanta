@@ -6,6 +6,10 @@
 #include "Renderer/Backend/Vulkan/VulkanContext.hpp"
 #include "Renderer/Backend/Vulkan/VulkanTexture.hpp"
 #include "Renderer/Backend/Vulkan/VulkanImage.hpp"
+#include "Renderer/Backend/Vulkan/VulkanPipeline.hpp"
+#include "Renderer/Backend/Vulkan/VulkanUniformBuffer.hpp"
+
+#include "Core/Timer.hpp"
 
 namespace Vanta {
 
@@ -27,53 +31,44 @@ namespace Vanta {
 		m_MaterialFlags |= (uint32_t)MaterialFlag::DepthTest;
 		m_MaterialFlags |= (uint32_t)MaterialFlag::Blend;
 
-		// TODO: Maybe get the descriptor set from the pipeline
-		Ref<VulkanShader> vulkanShader = m_Shader.As<VulkanShader>();
-		for (uint32_t i = 0; i < vulkanShader->GetUniformBufferCount(); i++)
-		{
-			auto& uniformBuffer = vulkanShader->GetUniformBuffer(i);
-			VkWriteDescriptorSet writeDescriptorSet = {};
-			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writeDescriptorSet.descriptorCount = 1;
-			writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			writeDescriptorSet.pBufferInfo = &uniformBuffer.Descriptor;
-			writeDescriptorSet.dstBinding = uniformBuffer.BindingPoint;
-			m_WriteDescriptors.push_back(writeDescriptorSet);
-		}
+		Invalidate();
 
+#if INVALIDATE_ON_RT
 		Ref<VulkanMaterial> instance = this;
 		Renderer::Submit([instance]() mutable
 		{
-			auto shader = instance->GetShader().As<VulkanShader>();
-			const auto& shaderDescriptorSets = shader->GetShaderDescriptorSets();
-			if (!shaderDescriptorSets.empty())
-				instance->m_DescriptorSet = shader->CreateDescriptorSets();
+			instance->Invalidate();
 		});
+#endif
 	}
 
 	void VulkanMaterial::Invalidate()
 	{
 		auto shader = m_Shader.As<VulkanShader>();
-		const auto& shaderDescriptorSets = shader->GetShaderDescriptorSets();
-		if (!shaderDescriptorSets.empty())
+		if (shader->HasDescriptorSet(0))
 		{
-			m_DescriptorSet = shader->CreateDescriptorSets();
-
-			Ref<VulkanShader> vulkanShader = m_Shader.As<VulkanShader>();
-			for (uint32_t i = 0; i < vulkanShader->GetUniformBufferCount(); i++)
+			const auto& shaderDescriptorSets = shader->GetShaderDescriptorSets();
+			if (!shaderDescriptorSets.empty())
 			{
-				auto& uniformBuffer = vulkanShader->GetUniformBuffer(i);
-				VkWriteDescriptorSet writeDescriptorSet = {};
-				writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescriptorSet.descriptorCount = 1;
-				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				writeDescriptorSet.pBufferInfo = &uniformBuffer.Descriptor;
-				writeDescriptorSet.dstBinding = uniformBuffer.BindingPoint;
-				m_WriteDescriptors.push_back(writeDescriptorSet);
-			}
+				m_DescriptorSet = shader->CreateDescriptorSets();
 
-			for (auto&& [binding, descriptor] : m_ResidentDescriptors)
-				m_PendingDescriptors.push_back(descriptor);
+				Ref<VulkanShader> vulkanShader = m_Shader.As<VulkanShader>();
+				for (auto&& [binding, shaderUB] : shaderDescriptorSets[0].UniformBuffers)
+				{
+					Ref<VulkanUniformBuffer> uniformBuffer = Renderer::GetUniformBuffer(binding, 0).As<VulkanUniformBuffer>(); // set = 0 for now
+
+					VkWriteDescriptorSet writeDescriptorSet = {};
+					writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					writeDescriptorSet.descriptorCount = 1;
+					writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+					writeDescriptorSet.pBufferInfo = &uniformBuffer->GetDescriptorBufferInfo();
+					writeDescriptorSet.dstBinding = uniformBuffer->GetBinding();
+					m_WriteDescriptors.push_back(writeDescriptorSet);
+				}
+
+				for (auto&& [binding, descriptor] : m_ResidentDescriptors)
+					m_PendingDescriptors.push_back(descriptor);
+			}
 		}
 	}
 
@@ -186,6 +181,8 @@ namespace Vanta {
 
 	void VulkanMaterial::SetVulkanDescriptor(const std::string& name, const Ref<Image2D>& image)
 	{
+		VA_CORE_ASSERT(image.As<VulkanImage2D>()->GetImageInfo().ImageView, "ImageView is null");
+
 		const ShaderResourceDeclaration* resource = FindResourceDeclaration(name);
 		VA_CORE_ASSERT(resource);
 
@@ -334,118 +331,65 @@ namespace Vanta {
 	void VulkanMaterial::UpdateForRendering()
 	{
 		Ref<VulkanMaterial> instance = this;
-		std::vector<VkWriteDescriptorSet>& writeDescriptors = m_WriteDescriptors;
-		auto& pendingDescriptors = m_PendingDescriptors;
-		auto& residentDescriptors = m_ResidentDescriptors;
-
-#if COPY
-		Renderer::Submit([instance, writeDescriptors, residentDescriptors, pendingDescriptors]() mutable
-		{
-			auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-			for (auto& descriptor : residentDescriptors)
-			{
-				if (descriptor->Type == PendingDescriptorType::Image2D)
-				{
-					Ref<VulkanImage2D> image = descriptor->Image.As<VulkanImage2D>();
-					if (descriptor->WDS.pImageInfo && image->GetImageInfo().ImageView != descriptor->WDS.pImageInfo->imageView)
-					{
-						VA_CORE_WARN("Found out of date Image2D descriptor ({0} vs. {1})", (void*)image->GetImageInfo().ImageView, (void*)descriptor->WDS.pImageInfo->imageView);
-						pendingDescriptors.emplace_back(descriptor);
-					}
-				}
-			}
-			
-			for (auto& pd : pendingDescriptors)
-			{
-				if (pd->Type == PendingDescriptorType::Texture2D)
-				{
-					Ref<VulkanTexture2D> texture = pd->Texture.As<VulkanTexture2D>();
-					pd->ImageInfo = texture->GetVulkanDescriptorInfo();
-					pd->WDS.pImageInfo = &pd->ImageInfo;
-				}
-				else if (pd->Type == PendingDescriptorType::TextureCube)
-				{
-					Ref<VulkanTextureCube> texture = pd->Texture.As<VulkanTextureCube>();
-					pd->ImageInfo = texture->GetVulkanDescriptorInfo();
-					pd->WDS.pImageInfo = &pd->ImageInfo;
-				}
-				else if (pd->Type == PendingDescriptorType::Image2D)
-				{
-					Ref<VulkanImage2D> image = pd->Image.As<VulkanImage2D>();
-					pd->ImageInfo = image->GetDescriptor();
-					pd->WDS.pImageInfo = &pd->ImageInfo;
-				}
-
-				writeDescriptors.push_back(pd->WDS);
-			}
-
-			if (writeDescriptors.size())
-			{
-				for (auto& writeDescriptor : writeDescriptors)
-					writeDescriptor.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
-
-				VA_CORE_WARN("Updating {0} descriptor sets", writeDescriptors.size());
-				vkUpdateDescriptorSets(vulkanDevice, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
-			}
-		});
-		pendingDescriptors.clear();
-		writeDescriptors.clear();
-#else
 		Renderer::Submit([instance]() mutable
 		{
-			auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-
-			for (auto&& [binding, descriptor] : instance->m_ResidentDescriptors)
-			{
-				if (descriptor->Type == PendingDescriptorType::Image2D)
-				{
-					Ref<VulkanImage2D> image = descriptor->Image.As<VulkanImage2D>();
-					if (descriptor->WDS.pImageInfo && image->GetImageInfo().ImageView != descriptor->WDS.pImageInfo->imageView)
-					{
-						VA_CORE_WARN("Found out of date Image2D descriptor ({0} vs. {1})", (void*)image->GetImageInfo().ImageView, (void*)descriptor->WDS.pImageInfo->imageView);
-						instance->m_PendingDescriptors.emplace_back(descriptor);
-					}
-				}
-			}
-
-			for (auto& pd : instance->m_PendingDescriptors)
-			{
-				if (pd->Type == PendingDescriptorType::Texture2D)
-				{
-					Ref<VulkanTexture2D> texture = pd->Texture.As<VulkanTexture2D>();
-					pd->ImageInfo = texture->GetVulkanDescriptorInfo();
-					pd->WDS.pImageInfo = &pd->ImageInfo;
-				}
-				else if (pd->Type == PendingDescriptorType::TextureCube)
-				{
-					Ref<VulkanTextureCube> texture = pd->Texture.As<VulkanTextureCube>();
-					pd->ImageInfo = texture->GetVulkanDescriptorInfo();
-					pd->WDS.pImageInfo = &pd->ImageInfo;
-				}
-				else if (pd->Type == PendingDescriptorType::Image2D)
-				{
-					Ref<VulkanImage2D> image = pd->Image.As<VulkanImage2D>();
-					pd->ImageInfo = image->GetDescriptor();
-					pd->WDS.pImageInfo = &pd->ImageInfo;
-				}
-
-				instance->m_WriteDescriptors.push_back(pd->WDS);
-			}
-
-			if (instance->m_WriteDescriptors.size())
-			{
-				for (auto& writeDescriptor : instance->m_WriteDescriptors)
-					writeDescriptor.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
-
-				VA_CORE_WARN("VulkanMaterial - Updating {0} descriptor sets", instance->m_WriteDescriptors.size());
-				vkUpdateDescriptorSets(vulkanDevice, instance->m_WriteDescriptors.size(), instance->m_WriteDescriptors.data(), 0, nullptr);
-			}
-
-			instance->m_PendingDescriptors.clear();
-			instance->m_WriteDescriptors.clear();
+			instance->RT_UpdateForRendering();
 		});
-#endif
+	}
+
+	void VulkanMaterial::RT_UpdateForRendering()
+	{
+		VA_SCOPE_PERF("VulkanMaterial::RT_UpdateForRendering");
+		auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		for (auto&& [binding, descriptor] : m_ResidentDescriptors)
+		{
+			if (descriptor->Type == PendingDescriptorType::Image2D)
+			{
+				Ref<VulkanImage2D> image = descriptor->Image.As<VulkanImage2D>();
+				VA_CORE_ASSERT(image->GetImageInfo().ImageView, "ImageView is null");
+				if (descriptor->WDS.pImageInfo && image->GetImageInfo().ImageView != descriptor->WDS.pImageInfo->imageView)
+				{
+					VA_CORE_WARN("Found out of date Image2D descriptor ({0} vs. {1})", (void*)image->GetImageInfo().ImageView, (void*)descriptor->WDS.pImageInfo->imageView);
+					m_PendingDescriptors.emplace_back(descriptor);
+				}
+			}
+		}
+
+		for (auto& pd : m_PendingDescriptors)
+		{
+			if (pd->Type == PendingDescriptorType::Texture2D)
+			{
+				Ref<VulkanTexture2D> texture = pd->Texture.As<VulkanTexture2D>();
+				pd->ImageInfo = texture->GetVulkanDescriptorInfo();
+				pd->WDS.pImageInfo = &pd->ImageInfo;
+			}
+			else if (pd->Type == PendingDescriptorType::TextureCube)
+			{
+				Ref<VulkanTextureCube> texture = pd->Texture.As<VulkanTextureCube>();
+				pd->ImageInfo = texture->GetVulkanDescriptorInfo();
+				pd->WDS.pImageInfo = &pd->ImageInfo;
+			}
+			else if (pd->Type == PendingDescriptorType::Image2D)
+			{
+				Ref<VulkanImage2D> image = pd->Image.As<VulkanImage2D>();
+				pd->ImageInfo = image->GetDescriptor();
+				pd->WDS.pImageInfo = &pd->ImageInfo;
+			}
+
+			m_WriteDescriptors.push_back(pd->WDS);
+		}
+
+		if (m_WriteDescriptors.size())
+		{
+			for (auto& writeDescriptor : m_WriteDescriptors)
+				writeDescriptor.dstSet = m_DescriptorSet.DescriptorSets[0];
+
+			VA_CORE_WARN("VulkanMaterial - Updating {0} descriptor sets", m_WriteDescriptors.size());
+			vkUpdateDescriptorSets(vulkanDevice, m_WriteDescriptors.size(), m_WriteDescriptors.data(), 0, nullptr);
+		}
+
+		m_PendingDescriptors.clear();
+		m_WriteDescriptors.clear();
 	}
 
 }

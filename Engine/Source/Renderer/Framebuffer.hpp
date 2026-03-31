@@ -39,7 +39,10 @@ namespace Vanta {
 		
 		// SwapChainTarget = screen buffer (i.e. no framebuffer)
 		bool SwapChainTarget = false;
-		
+
+		Ref<Image2D> ExistingImage;
+		uint32_t ExistingImageLayer;
+
 		std::string DebugName;
 	};
 

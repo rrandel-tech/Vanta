@@ -14,6 +14,7 @@ namespace Vanta {
 		virtual const PipelineSpecification& GetSpecification() const { return m_Specification; }
 
 		virtual void Invalidate() override;
+		virtual void SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t binding, uint32_t set = 0) override {}
 
 		virtual void Bind() override;
 	private:

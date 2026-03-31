@@ -23,6 +23,8 @@ namespace Vanta {
     {
         s_Instance = this;
 
+        m_Profiler = new PerformanceProfiler();
+
         WindowSpecification windowSpec;
         windowSpec.Title = m_Specification.Name;
         windowSpec.Width = m_Specification.WindowWidth;
@@ -62,6 +64,9 @@ namespace Vanta {
 
         Renderer::WaitAndRender();
         Renderer::Shutdown();
+
+        delete m_Profiler;
+        m_Profiler = nullptr;
     }
 
     void Application::PushLayer(Layer* layer)
@@ -109,6 +114,19 @@ namespace Vanta {
         }
 
         ImGui::End();
+
+        ImGui::Begin("Performance");
+        //VA_CORE_WARN("Spent {0}ms updating materials", g_MaterialUpdateTimer);
+        //VA_CORE_WARN("Spent {0}ms rendering meshes (CPU)", g_MeshRenderTimer);
+        ImGui::Text("Frame Time: %.2fms\n", m_TimeStep.GetMilliseconds());
+        const auto& perFrameData = m_Profiler->GetPerFrameData();
+        for (auto&& [name, time] : perFrameData)
+        {
+            ImGui::Text("%s: %.3fms\n", name, time);
+        }
+
+        ImGui::End();
+        m_Profiler->Clear();
 
         for (Layer* layer : m_LayerStack)
             layer->OnImGuiRender();
