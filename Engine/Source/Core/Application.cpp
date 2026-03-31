@@ -8,6 +8,7 @@
 
 #include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
 #include "Renderer/Backend/Vulkan/VulkanAllocator.hpp"
+#include "Renderer/Backend/Vulkan/VulkanSwapChain.hpp"
 
 #include <imgui.h>
 #include "imgui_internal.h"
@@ -155,7 +156,7 @@ namespace Vanta {
                 Renderer::EndFrame();
 
                 // On Render thread
-                m_Window->GetRenderContext()->BeginFrame();
+                m_Window->GetSwapChain().BeginFrame();
                 Renderer::WaitAndRender();
 
                 m_Window->SwapBuffers();
@@ -225,7 +226,7 @@ namespace Vanta {
         }
         m_Minimized = false;
 
-        m_Window->GetRenderContext()->OnResize(width, height);
+        m_Window->GetSwapChain().OnResize(width, height);
 
         auto& fbs = FramebufferPool::GetGlobal()->GetAll();
         for (auto& fb : fbs)

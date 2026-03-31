@@ -3,6 +3,8 @@
 #include "DefaultAssetEditors.hpp"
 #include "Asset/AssetManager.hpp"
 
+#include "MeshViewerPanel.hpp"
+
 namespace Vanta {
 
 	AssetEditor::AssetEditor(const char* title)
@@ -54,11 +56,24 @@ namespace Vanta {
 	void AssetEditorPanel::RegisterDefaultEditors()
 	{
 		RegisterEditor<TextureViewer>(AssetType::Texture);
+		RegisterEditor<MeshViewerPanel>(AssetType::Mesh);
 	}
 
 	void AssetEditorPanel::UnregisterAllEditors()
 	{
 		s_Editors.clear();
+	}
+
+	void AssetEditorPanel::OnUpdate(Timestep ts)
+	{
+		for (auto& kv : s_Editors)
+			kv.second->OnUpdate(ts);
+	}
+
+	void AssetEditorPanel::OnEvent(Event& e)
+	{
+		for (auto& kv : s_Editors)
+			kv.second->OnEvent(e);
 	}
 
 	void AssetEditorPanel::OnImGuiRender()

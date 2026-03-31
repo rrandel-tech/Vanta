@@ -16,6 +16,9 @@ namespace Vanta {
 		void OnUpdate(Timestep ts);
 		void OnEvent(Event& e);
 
+		bool IsActive() const { return m_IsActive; }
+		void SetActive(bool active) { m_IsActive = active; }
+
 		inline float GetDistance() const { return m_Distance; }
 		inline void SetDistance(float distance) { m_Distance = distance; }
 
@@ -49,6 +52,8 @@ namespace Vanta {
 	private:
 		glm::mat4 m_ViewMatrix;
 		glm::vec3 m_Position, m_Rotation, m_FocalPoint;
+
+		bool m_IsActive = true;
 
 		bool m_Panning, m_Rotating;
 		glm::vec2 m_InitialMousePosition;

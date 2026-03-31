@@ -20,21 +20,19 @@ namespace Vanta {
 		return VK_FALSE;
 	}
 
-	VulkanContext::VulkanContext(SDL_Window* windowHandle)
-		: m_WindowHandle(windowHandle)
+	VulkanContext::VulkanContext()
 	{
 	}
 
 	VulkanContext::~VulkanContext()
 	{
-		m_SwapChain.Cleanup();
 		m_Device->Destroy();
-		
+
 		vkDestroyInstance(s_VulkanInstance, nullptr);
 		s_VulkanInstance = nullptr;
 	}
 
-	void VulkanContext::Create()
+	void VulkanContext::Init()
 	{
 		VA_CORE_INFO("VulkanContext::Create");
 
@@ -67,19 +65,20 @@ namespace Vanta {
 
 		VkInstanceCreateInfo instanceCreateInfo = {};
 		instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		instanceCreateInfo.pNext = nullptr;
+		instanceCreateInfo.pNext = NULL;
 		instanceCreateInfo.pApplicationInfo = &appInfo;
 		instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.size();
 		instanceCreateInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
+		// TODO: Extract all validation into separate class
 		if (s_Validation)
 		{
 			const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
-			uint32_t instanceLayerCount = 0;
+			// Check if this layer is available at instance level
+			uint32_t instanceLayerCount;
 			vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr);
 			std::vector<VkLayerProperties> instanceLayerProperties(instanceLayerCount);
 			vkEnumerateInstanceLayerProperties(&instanceLayerCount, instanceLayerProperties.data());
-
 			bool validationLayerPresent = false;
 			VA_CORE_TRACE("Vulkan Instance Layers:");
 			for (const VkLayerProperties& layer : instanceLayerProperties)
@@ -91,7 +90,6 @@ namespace Vanta {
 					break;
 				}
 			}
-
 			if (validationLayerPresent)
 			{
 				instanceCreateInfo.ppEnabledLayerNames = &validationLayerName;
@@ -99,7 +97,7 @@ namespace Vanta {
 			}
 			else
 			{
-				VA_CORE_ERROR("Validation layer VK_LAYER_KHRONOS_validation not present, validation is disabled");
+				VA_CORE_ERROR("Validation layer VK_LAYER_LUNARG_standard_validation not present, validation is disabled");
 			}
 		}
 
@@ -129,31 +127,10 @@ namespace Vanta {
 
 		VulkanAllocator::Init(m_Device);
 
-		m_SwapChain.Init(s_VulkanInstance, m_Device);
-		m_SwapChain.InitSurface(m_WindowHandle);
-
-		uint32_t width = 1280, height = 720;
-		m_SwapChain.Create(&width, &height, true);
-
 		// Pipeline Cache
 		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
 		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 		VK_CHECK_RESULT(vkCreatePipelineCache(m_Device->GetVulkanDevice(), &pipelineCacheCreateInfo, nullptr, &m_PipelineCache));
-	}
-
-	void VulkanContext::OnResize(uint32_t width, uint32_t height)
-	{
-		m_SwapChain.OnResize(width, height);
-	}
-
-	void VulkanContext::BeginFrame()
-	{
-		m_SwapChain.BeginFrame();
-	}
-
-	void VulkanContext::SwapBuffers()
-	{
-		m_SwapChain.Present();
 	}
 
 }

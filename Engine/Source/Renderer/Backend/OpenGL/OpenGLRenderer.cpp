@@ -2,6 +2,7 @@
 #include "OpenGLRenderer.hpp"
 
 #include "Renderer/Renderer.hpp"
+#include "Renderer/SceneRenderer.hpp"
 
 #include <glad/glad.h>
 
@@ -188,7 +189,7 @@ namespace Vanta {
 	{
 	}
 
-	void OpenGLRenderer::BeginRenderPass(const Ref<RenderPass>& renderPass)
+	void OpenGLRenderer::BeginRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer, const Ref<RenderPass>& renderPass)
 	{
 		s_Data->ActiveRenderPass = renderPass;
 
@@ -203,14 +204,14 @@ namespace Vanta {
 		}
 	}
 
-	void OpenGLRenderer::EndRenderPass()
+	void OpenGLRenderer::EndRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer)
 	{
 		s_Data->ActiveRenderPass = nullptr;
 	}
 
-	void OpenGLRenderer::SubmitFullscreenQuad(Ref<Pipeline> pipeline, Ref<Material> material)
+	void OpenGLRenderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
 	{
-		 const auto& shader = material->GetShader();
+		const auto& shader = material->GetShader();
 
 		bool depthTest = true;
 		Ref<OpenGLMaterial> glMaterial = material.As<OpenGLMaterial>();
@@ -230,7 +231,7 @@ namespace Vanta {
 
 	}
 
-	void OpenGLRenderer::SetSceneEnvironment(Ref<Environment> environment, Ref<Image2D> shadow)
+	void OpenGLRenderer::SetSceneEnvironment(Ref<SceneRenderer> sceneRenderer, Ref<Environment> environment, Ref<Image2D> shadow)
 	{
 		if (!environment)
 			environment = Renderer::GetEmptyEnvironment();
@@ -343,7 +344,7 @@ namespace Vanta {
 		return { envFiltered, irradianceMap };
 	}
 
-	void OpenGLRenderer::RenderMesh(Ref<Pipeline> pipeline, Ref<Mesh> mesh, const glm::mat4& transform)
+	void OpenGLRenderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
 	{
 		mesh->m_VertexBuffer->Bind();
 		pipeline->Bind();
@@ -383,7 +384,7 @@ namespace Vanta {
 		}
 	}
 
-	void OpenGLRenderer::RenderMeshWithMaterial(Ref<Pipeline> pipeline, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
+	void OpenGLRenderer::RenderMeshWithMaterial(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
 	{
 		mesh->m_VertexBuffer->Bind();
 		pipeline->Bind();
@@ -415,7 +416,7 @@ namespace Vanta {
 		}
 	}
 
-	void OpenGLRenderer::RenderQuad(Ref<Pipeline> pipeline, Ref<Material> material, const glm::mat4& transform)
+	void OpenGLRenderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, const glm::mat4& transform)
 	{
 		s_Data->m_FullscreenQuadVertexBuffer->Bind();
 		pipeline->Bind();

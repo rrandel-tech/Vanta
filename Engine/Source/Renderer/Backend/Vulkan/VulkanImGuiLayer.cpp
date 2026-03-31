@@ -99,14 +99,15 @@ namespace Vanta {
     	    init_info.PhysicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetVulkanPhysicalDevice();
     	    init_info.Device = device;
     	    init_info.QueueFamily = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetQueueFamilyIndices().Graphics;
-    	    init_info.Queue = VulkanContext::GetCurrentDevice()->GetQueue();
+    		init_info.Queue = VulkanContext::GetCurrentDevice()->GetGraphicsQueue();
     	    init_info.DescriptorPool = descriptorPool;
     	    init_info.MinImageCount = 2;
-    	    init_info.ImageCount = vulkanContext->GetSwapChain().GetImageCount();
+    		VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
+    		init_info.ImageCount = swapChain.GetImageCount();
     		init_info.CheckVkResultFn = Utils::VulkanCheckResult;
 
     	    init_info.PipelineInfoMain = {};
-    	    init_info.PipelineInfoMain.RenderPass = vulkanContext->GetSwapChain().GetRenderPass();
+    	    init_info.PipelineInfoMain.RenderPass = swapChain.GetRenderPass();
     	    init_info.PipelineInfoMain.Subpass = 0;
 
     	    init_info.UseDynamicRendering = false;
@@ -145,9 +146,7 @@ namespace Vanta {
 	{
 		ImGui::Render();
 
-		Ref<VulkanContext> context = VulkanContext::Get();
-		VulkanSwapChain& swapChain = context->GetSwapChain();
-		VkCommandBuffer drawCommandBuffer = swapChain.GetCurrentDrawCommandBuffer();
+		VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
 
 		VkClearValue clearValues[2];
 		clearValues[0].color = { {0.1f, 0.1f,0.1f, 1.0f} };
@@ -157,6 +156,14 @@ namespace Vanta {
 		uint32_t height = swapChain.GetHeight();
 
 		uint32_t commandBufferIndex = swapChain.GetCurrentBufferIndex();
+
+		VkCommandBufferBeginInfo drawCmdBufInfo = {};
+		drawCmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		drawCmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		drawCmdBufInfo.pNext = nullptr;
+
+		VkCommandBuffer drawCommandBuffer = swapChain.GetCurrentDrawCommandBuffer();
+		VK_CHECK_RESULT(vkBeginCommandBuffer(drawCommandBuffer, &drawCmdBufInfo));
 
 		VkRenderPassBeginInfo renderPassBeginInfo = {};
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -211,6 +218,8 @@ namespace Vanta {
 		vkCmdExecuteCommands(drawCommandBuffer, commandBuffers.size(), commandBuffers.data());
 
 		vkCmdEndRenderPass(drawCommandBuffer);
+
+		VK_CHECK_RESULT(vkEndCommandBuffer(drawCommandBuffer));
 
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		// Update and Render additional Platform Windows

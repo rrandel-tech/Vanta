@@ -7,6 +7,7 @@
 
 #include "Renderer/Renderer.hpp"
 #include "Renderer/SceneRenderer.hpp"
+#include "Renderer/SceneRenderer.hpp"
 
 #include "Renderer/Renderer2D.hpp"
 
@@ -44,8 +45,6 @@ namespace Vanta {
 
 	Scene::~Scene()
 	{
-		m_Registry.on_destroy<ScriptComponent>().disconnect();
-
 		m_Registry.clear();
 		s_ActiveScenes.erase(m_SceneID);
 	}
@@ -54,7 +53,7 @@ namespace Vanta {
 	{
 		auto skyboxShader = Renderer::GetShaderLibrary()->Get("Skybox");
 		m_SkyboxMaterial = Material::Create(skyboxShader);
-		m_SkyboxMaterial->SetFlag(MaterialFlag::DepthTest);
+		m_SkyboxMaterial->SetFlag(MaterialFlag::DepthTest, false);
 	}
 
 	// Merge OnUpdate/Render into one function?
@@ -79,7 +78,7 @@ namespace Vanta {
 		}
 	}
 
-	void Scene::OnRenderRuntime(Timestep ts)
+	void Scene::OnRenderRuntime(Ref<SceneRenderer> renderer, Timestep ts)
 	{
 		/////////////////////////////////////////////////////////////////////
 		// RENDER 3D SCENE
@@ -114,7 +113,7 @@ namespace Vanta {
 
 		// TODO: only one sky light at the moment!
 		{
-			// m_Environment = Ref<Environment>::Create();
+			//m_Environment = Ref<Environment>::Create();
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			for (auto entity : lights)
 			{
@@ -129,7 +128,8 @@ namespace Vanta {
 		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SkyboxLod);
 
 		auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
-		SceneRenderer::BeginScene(this, { camera, cameraViewMatrix });
+		renderer->SetScene(this);
+		renderer->BeginScene({ camera, cameraViewMatrix });
 		for (auto entity : group)
 		{
 			auto [transformComponent, meshComponent] = group.get<TransformComponent, MeshComponent>(entity);
@@ -139,10 +139,10 @@ namespace Vanta {
 				glm::mat4 transform = GetTransformRelativeToParent(Entity(entity, this));
 
 				// TODO: Should we render (logically)
-				SceneRenderer::SubmitMesh(meshComponent, transform);
+				renderer->SubmitMesh(meshComponent, transform);
 			}
 		}
-		SceneRenderer::EndScene();
+		renderer->EndScene();
 		/////////////////////////////////////////////////////////////////////
 
 #if 0
@@ -164,7 +164,7 @@ namespace Vanta {
 #endif
 	}
 
-	void Scene::OnRenderEditor(Timestep ts, const EditorCamera& editorCamera)
+	void Scene::OnRenderEditor(Ref<SceneRenderer> renderer, Timestep ts, const EditorCamera& editorCamera)
 	{
 		/////////////////////////////////////////////////////////////////////
 		// RENDER 3D SCENE
@@ -192,6 +192,7 @@ namespace Vanta {
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			if (lights.empty())
 				m_Environment = Ref<Environment>::Create(Renderer::GetBlackCubeTexture(), Renderer::GetBlackCubeTexture());
+
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);
@@ -210,7 +211,8 @@ namespace Vanta {
 		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SkyboxLod);
 
 		auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
-		SceneRenderer::BeginScene(this, { editorCamera, editorCamera.GetViewMatrix(), 0.1f, 1000.0f, 45.0f }); // TODO: real values
+		renderer->SetScene(this);
+		renderer->BeginScene({ editorCamera, editorCamera.GetViewMatrix(), 0.1f, 1000.0f, 45.0f }); // TODO: real values
 		for (auto entity : group)
 		{
 			auto [meshComponent, transformComponent] = group.get<MeshComponent, TransformComponent>(entity);
@@ -223,13 +225,13 @@ namespace Vanta {
 
 				// TODO: Should we render (logically)
 				if (m_SelectedEntity == entity)
-					SceneRenderer::SubmitSelectedMesh(meshComponent, transform);
+					renderer->SubmitSelectedMesh(meshComponent, transform);
 				else
-					SceneRenderer::SubmitMesh(meshComponent, transform);
+					renderer->SubmitMesh(meshComponent, transform);
 			}
 		}
 
-		SceneRenderer::EndScene();
+		renderer->EndScene();
 		/////////////////////////////////////////////////////////////////////
 
 #if 0
@@ -262,7 +264,7 @@ namespace Vanta {
 
 	void Scene::OnRuntimeStop()
 	{
-		// Input::SetCursorMode(CursorMode::Normal);
+		Input::SetCursorMode(CursorMode::Normal);
 
 		m_IsPlaying = false;
 	}
@@ -275,8 +277,8 @@ namespace Vanta {
 
 	void Scene::SetSkybox(const Ref<TextureCube>& skybox)
 	{
-		// m_SkyboxTexture = skybox;
-		// m_SkyboxMaterial->Set("u_Texture", skybox);
+		//m_SkyboxTexture = skybox;
+		//m_SkyboxMaterial->Set("u_Texture", skybox);
 	}
 
 	Entity Scene::GetMainCameraEntity()
@@ -365,7 +367,9 @@ namespace Vanta {
 		CopyComponentIfExists<MeshComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<DirectionalLightComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<SkyLightComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
+		CopyComponentIfExists<ScriptComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 		CopyComponentIfExists<CameraComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
+		CopyComponentIfExists<SpriteRendererComponent>(newEntity.m_EntityHandle, entity.m_EntityHandle, m_Registry);
 	}
 
 	Entity Scene::FindEntityByTag(const std::string& tag)
@@ -406,6 +410,20 @@ namespace Vanta {
 		return transform * entity.Transform().GetTransform();
 	}
 
+glm::mat4 Scene::GetWorldSpaceTransform(Entity entity)
+{
+	glm::mat4 transform = entity.Transform().GetTransform();
+
+	while (Entity parent = FindEntityByUUID(entity.GetParentUUID()))
+	{
+		transform = parent.Transform().GetTransform() * transform;
+		entity = parent;
+	}
+
+	return transform;
+}
+
+
 	// Copy to runtime
 	void Scene::CopyTo(Ref<Scene>& target)
 	{
@@ -433,6 +451,7 @@ namespace Vanta {
 		CopyComponent<MeshComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<DirectionalLightComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<SkyLightComponent>(target->m_Registry, m_Registry, enttMap);
+		CopyComponent<ScriptComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<CameraComponent>(target->m_Registry, m_Registry, enttMap);
 		CopyComponent<SpriteRendererComponent>(target->m_Registry, m_Registry, enttMap);
 	}

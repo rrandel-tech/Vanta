@@ -8,13 +8,13 @@
 
 namespace Vanta {
 
-	Ref<RendererContext> RendererContext::Create(SDL_Window* windowHandle)
+	Ref<RendererContext> RendererContext::Create()
 	{
 		switch (RendererAPI::Current())
 		{
 			case RendererAPIType::None:    return nullptr;
-			case RendererAPIType::OpenGL:  return Ref<OpenGLContext>::Create(windowHandle);
-			case RendererAPIType::Vulkan:  return Ref<VulkanContext>::Create(windowHandle);
+			case RendererAPIType::OpenGL:  return Ref<OpenGLContext>::Create();
+			case RendererAPIType::Vulkan:  return Ref<VulkanContext>::Create();
 		}
 		VA_CORE_ASSERT(false, "Unknown RendererAPI");
 		return nullptr;

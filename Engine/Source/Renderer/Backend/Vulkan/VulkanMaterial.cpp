@@ -16,7 +16,6 @@ namespace Vanta {
 	VulkanMaterial::VulkanMaterial(const Ref<Shader>& shader, const std::string& name)
 		: m_Shader(shader), m_Name(name),
 		m_WriteDescriptors(Renderer::GetConfig().FramesInFlight),
-		m_UBWriteDescriptors(Renderer::GetConfig().FramesInFlight),
 		m_DirtyDescriptorSets(Renderer::GetConfig().FramesInFlight, true)
 	{
 		Init();
@@ -55,23 +54,6 @@ namespace Vanta {
 			const auto& shaderDescriptorSets = shader->GetShaderDescriptorSets();
 			if (!shaderDescriptorSets.empty())
 			{
-				Ref<VulkanShader> vulkanShader = m_Shader.As<VulkanShader>();
-				for (auto&& [binding, shaderUB] : shaderDescriptorSets[0].UniformBuffers)
-				{
-					for (int frame = 0; frame < framesInFlight; frame++)
-					{
-						Ref<VulkanUniformBuffer> uniformBuffer = Renderer::GetUniformBuffer(frame, binding, 0).As<VulkanUniformBuffer>(); // set = 0 for now
-
-						VkWriteDescriptorSet writeDescriptorSet = {};
-						writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-						writeDescriptorSet.pBufferInfo = &uniformBuffer->GetDescriptorBufferInfo();
-						writeDescriptorSet.dstBinding = uniformBuffer->GetBinding();
-						m_UBWriteDescriptors[frame].push_back(writeDescriptorSet);
-					}
-				}
-
 				for (auto&& [binding, descriptor] : m_ResidentDescriptors)
 					m_PendingDescriptors.push_back(descriptor);
 			}
@@ -322,16 +304,7 @@ namespace Vanta {
 		return GetResource<TextureCube>(name);
 	}
 
-	void VulkanMaterial::UpdateForRendering()
-	{
-		Ref<VulkanMaterial> instance = this;
-		Renderer::Submit([instance]() mutable
-		{
-			instance->RT_UpdateForRendering();
-		});
-	}
-
-	void VulkanMaterial::RT_UpdateForRendering()
+	void VulkanMaterial::RT_UpdateForRendering(const std::vector<std::vector<VkWriteDescriptorSet>>& uniformBufferWriteDescriptors)
 	{
 		VA_SCOPE_PERF("VulkanMaterial::RT_UpdateForRendering");
 		auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -351,13 +324,18 @@ namespace Vanta {
 		}
 
 		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
-		if (m_DirtyDescriptorSets[frameIndex])
+		// NOTE(Yan): we can't cache the results atm because we might render the same material in different viewports,
+		//            and so we can't bind to the same uniform buffers
+		if (m_DirtyDescriptorSets[frameIndex] || true) 
 		{
 			m_DirtyDescriptorSets[frameIndex] = false;
 			m_WriteDescriptors[frameIndex].clear();
 
-			for (auto& wd : m_UBWriteDescriptors[frameIndex])
-				m_WriteDescriptors[frameIndex].push_back(wd);
+			if (!uniformBufferWriteDescriptors.empty())
+			{
+				for (auto& wd : uniformBufferWriteDescriptors[frameIndex])
+					m_WriteDescriptors[frameIndex].push_back(wd);
+			}
 
 			for (auto&& [binding, pd] : m_ResidentDescriptors)
 			{
@@ -392,7 +370,6 @@ namespace Vanta {
 			writeDescriptor.dstSet = descriptorSet.DescriptorSets[0];
 
 		vkUpdateDescriptorSets(vulkanDevice, m_WriteDescriptors[frameIndex].size(), m_WriteDescriptors[frameIndex].data(), 0, nullptr);
-
 		m_PendingDescriptors.clear();
 	}
 

@@ -211,5 +211,6 @@ namespace Vanta {
 		friend class VulkanRenderer;
 		friend class OpenGLRenderer;
 		friend class SceneHierarchyPanel;
+		friend class MeshViewerPanel;
 	};
 }

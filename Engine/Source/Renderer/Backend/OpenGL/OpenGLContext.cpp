@@ -7,18 +7,15 @@
 
 namespace Vanta {
 
-	OpenGLContext::OpenGLContext(SDL_Window* windowHandle)
-		: m_WindowHandle(windowHandle), m_GLContext(nullptr)
+	OpenGLContext::OpenGLContext()
 	{
 	}
 
 	OpenGLContext::~OpenGLContext()
 	{
-		if (m_GLContext)
-			SDL_GL_DestroyContext(m_GLContext);
 	}
 
-	void OpenGLContext::Create()
+	void OpenGLContext::Init()
 	{
 		VA_CORE_INFO("OpenGLContext::Create");
 
@@ -43,11 +40,6 @@ namespace Vanta {
 
 		VA_CORE_ASSERT(versionMajor > 4 || (versionMajor == 4 && versionMinor >= 5), "Vanta requires at least OpenGL version 4.5!");
 #endif
-	}
-
-	void OpenGLContext::SwapBuffers()
-	{
-		SDL_GL_SwapWindow(m_WindowHandle);
 	}
 
 }

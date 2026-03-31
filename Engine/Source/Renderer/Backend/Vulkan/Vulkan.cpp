@@ -30,7 +30,7 @@ namespace Vanta::Utils {
 				data[i].sType = VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV;
 
 			uint32_t retrievedCount = checkpointCount;
-			vkGetQueueCheckpointDataNV(::Vanta::VulkanContext::GetCurrentDevice()->GetQueue(), &retrievedCount, data);
+			vkGetQueueCheckpointDataNV(::Vanta::VulkanContext::GetCurrentDevice()->GetGraphicsQueue(), &retrievedCount, data);
 			VA_CORE_ERROR("RetrieveDiagnosticCheckpoints (Graphics Queue):");
 			for (uint32_t i = 0; i < retrievedCount; i++)
 			{

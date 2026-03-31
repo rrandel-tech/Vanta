@@ -3,7 +3,7 @@
 #include "Utilities/StringUtils.hpp"
 #include "Utilities/FileSystem.hpp"
 #include "Renderer/Mesh.hpp"
-#include "Renderer/SceneRenderer.hpp"
+#include "Renderer/Renderer.hpp"
 
 #include "yaml-cpp/yaml.h"
 
@@ -38,7 +38,7 @@ namespace Vanta {
 
 	bool EnvironmentSerializer::TryLoadData(Ref<Asset>& asset) const
 	{
-		auto [radiance, irradiance] = SceneRenderer::CreateEnvironmentMap(asset->FilePath);
+		auto [radiance, irradiance] = Renderer::CreateEnvironmentMap(asset->FilePath);
 
 		if (!radiance || !irradiance)
 			return false;

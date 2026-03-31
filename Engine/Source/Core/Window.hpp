@@ -26,6 +26,8 @@ namespace Vanta {
         bool VSync = true;
     };
 
+    class VulkanSwapChain;
+
     class Window
     {
     public:
@@ -38,14 +40,14 @@ namespace Vanta {
         void ProcessEvents();
         void SwapBuffers();
 
-        uint32_t GetWidth() const { return m_data.width; }
-        uint32_t GetHeight() const { return m_data.height; }
+        uint32_t GetWidth() const { return m_Data.Width; }
+        uint32_t GetHeight() const { return m_Data.Height; }
 
-        virtual std::pair<uint32_t, uint32_t> GetSize() const { return { m_data.width, m_data.height }; }
+        virtual std::pair<uint32_t, uint32_t> GetSize() const { return { m_Data.Width, m_Data.Height }; }
         virtual std::pair<float, float> GetWindowPos() const;
 
         // Window attributes
-        void SetEventCallback(const EventCallbackFn& callback) { m_data.eventCallback = callback; }
+        void SetEventCallback(const EventCallbackFn& callback) { m_Data.EventCallback = callback; }
 
         void SetVSync(bool enabled);
         bool IsVSync() const;
@@ -54,12 +56,13 @@ namespace Vanta {
         void Maximize();
         void CenterWindow();
 
-        const std::string& GetTitle() const { return m_data.title; }
+        const std::string& GetTitle() const { return m_Data.Title; }
         void SetTitle(const std::string& title);
 
         SDL_Window* GetNativeWindow() const { return m_Window; }
 
         Ref<RendererContext> GetRenderContext() { return m_RendererContext; }
+        VulkanSwapChain& GetSwapChain();
 
         static Window* Create(const WindowSpecification& specification = WindowSpecification());
     private:
@@ -69,16 +72,17 @@ namespace Vanta {
         SDL_Window* m_Window = nullptr;
         SDL_Event m_Event {};
 
-        WindowSpecification m_specification;
+        WindowSpecification m_Specification;
         struct WindowData
         {
-            std::string title;
-            uint32_t width, height;
+            std::string Title;
+            uint32_t Width, Height;
 
-            EventCallbackFn eventCallback;
-        }; WindowData m_data;
+            EventCallbackFn EventCallback;
+        }; WindowData m_Data;
 
         Ref<RendererContext> m_RendererContext;
+        VulkanSwapChain* m_SwapChain;
     };
 
 }

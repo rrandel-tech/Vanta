@@ -108,8 +108,7 @@ namespace Vanta {
 
 		Buffer GetUniformStorageBuffer() { return m_UniformStorageBuffer; }
 
-		void UpdateForRendering();
-		void RT_UpdateForRendering();
+		void RT_UpdateForRendering(const std::vector<std::vector<VkWriteDescriptorSet>>& uniformBufferWriteDescriptors = std::vector<std::vector<VkWriteDescriptorSet>>());
 		void InvalidateDescriptorSets();
 
 		VkDescriptorSet GetDescriptorSet(uint32_t index) const { return !m_DescriptorSets[index].DescriptorSets.empty() ? m_DescriptorSets[index].DescriptorSets[0] : nullptr; }
@@ -155,7 +154,6 @@ namespace Vanta {
 		std::unordered_map<uint32_t, uint64_t> m_ImageHashes;
 
 		std::vector<std::vector<VkWriteDescriptorSet>> m_WriteDescriptors;
-		std::vector<std::vector<VkWriteDescriptorSet>> m_UBWriteDescriptors;
 		std::vector<bool> m_DirtyDescriptorSets;
 
 		std::unordered_map<std::string, VkDescriptorImageInfo> m_ImageInfos;

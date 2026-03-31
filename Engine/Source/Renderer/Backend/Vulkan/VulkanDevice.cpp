@@ -291,7 +291,7 @@ namespace Vanta {
 		VK_CHECK_RESULT(vkCreateCommandPool(m_LogicalDevice, &cmdPoolInfo, nullptr, &m_ComputeCommandPool));
 
 		// Get a graphics queue from the device
-		vkGetDeviceQueue(m_LogicalDevice, m_PhysicalDevice->m_QueueFamilyIndices.Graphics, 0, &m_Queue);
+		vkGetDeviceQueue(m_LogicalDevice, m_PhysicalDevice->m_QueueFamilyIndices.Graphics, 0, &m_GraphicsQueue);
 		vkGetDeviceQueue(m_LogicalDevice, m_PhysicalDevice->m_QueueFamilyIndices.Compute, 0, &m_ComputeQueue);
 	}
 
@@ -333,7 +333,7 @@ namespace Vanta {
 
 	void VulkanDevice::FlushCommandBuffer(VkCommandBuffer commandBuffer)
 	{
-		FlushCommandBuffer(commandBuffer, m_Queue);
+		FlushCommandBuffer(commandBuffer, m_GraphicsQueue);
 	}
 
 	void VulkanDevice::FlushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue)

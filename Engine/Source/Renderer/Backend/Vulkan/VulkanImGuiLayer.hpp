@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ImGui/ImGuiLayer.hpp"
+#include "Renderer/RenderCommandBuffer.hpp"
 
 namespace Vanta {
 
@@ -18,6 +19,7 @@ namespace Vanta {
 		virtual void OnDetach() override;
 		virtual void OnImGuiRender() override;
 	private:
+		Ref<RenderCommandBuffer> m_RenderCommandBuffer;
 		float m_Time = 0.0f;
 	};
 

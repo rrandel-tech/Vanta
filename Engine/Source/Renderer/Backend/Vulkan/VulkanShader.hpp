@@ -60,7 +60,7 @@ namespace Vanta {
 			if (m_ShaderDescriptorSets.size() < set)
 				return 0;
 
-			return m_ShaderDescriptorSets[set].UniformBuffers.size();
+			return (uint32_t)m_ShaderDescriptorSets[set].UniformBuffers.size();
 		}
 
 		struct ShaderDescriptorSet

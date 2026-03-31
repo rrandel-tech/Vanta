@@ -15,6 +15,8 @@
 
 namespace Vanta {
 
+	class SceneRenderer;
+
 	struct Light
 	{
 		glm::vec3 Direction = { 0.0f, 0.0f, 0.0f };
@@ -50,8 +52,8 @@ namespace Vanta {
 		void Init();
 
 		void OnUpdate(Timestep ts);
-		void OnRenderRuntime(Timestep ts);
-		void OnRenderEditor(Timestep ts, const EditorCamera& editorCamera);
+		void OnRenderRuntime(Ref<SceneRenderer> renderer, Timestep ts);
+		void OnRenderEditor(Ref<SceneRenderer> renderer, Timestep ts, const EditorCamera& editorCamera);
 		void OnEvent(Event& e);
 
 		// Runtime
@@ -87,6 +89,7 @@ namespace Vanta {
 		Entity FindEntityByUUID(UUID id);
 
 		glm::mat4 GetTransformRelativeToParent(Entity entity);
+		glm::mat4 GetWorldSpaceTransform(Entity entity);
 
 		const EntityMap& GetEntityMap() const { return m_EntityIDMap; }
 		void CopyTo(Ref<Scene>& target);

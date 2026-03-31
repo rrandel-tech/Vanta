@@ -17,6 +17,8 @@ set(RENDERER_SOURCES
 		Image.cpp
 		UniformBuffer.cpp
 		RendererContext.cpp
+		RenderCommandBuffer.cpp
+		UniformBufferSet.cpp
 )
 
 set(RENDERER_HEADERS
@@ -42,6 +44,8 @@ set(RENDERER_HEADERS
 		RendererContext.hpp
 		UniformBuffer.hpp
 		RendererTypes.hpp
+		RenderCommandBuffer.hpp
+		UniformBufferSet.hpp
 )
 
 target_sources(Vanta

@@ -8,6 +8,9 @@
 
 #include "Renderer/RendererAPI.hpp"
 
+#include "Renderer/Backend/Vulkan/VulkanContext.hpp"
+#include "Renderer/Backend/Vulkan/VulkanSwapChain.hpp"
+
 #include <glad/glad.h>
 
 #include <imgui_impl_sdl3.h>
@@ -25,7 +28,7 @@ namespace Vanta {
     }
 
     Window::Window(const WindowSpecification& props)
-        : m_specification(props), m_data()
+        : m_Specification(props), m_Data()
     {
     }
 
@@ -36,11 +39,11 @@ namespace Vanta {
 
     void Window::Init()
     {
-        m_data.title = m_specification.Title;
-        m_data.width = m_specification.Width;
-        m_data.height = m_specification.Height;
+        m_Data.Title = m_Specification.Title;
+        m_Data.Width = m_Specification.Width;
+        m_Data.Height = m_Specification.Height;
 
-        VA_CORE_INFO("Creating window {0} ({1}, {2})", m_specification.Title, m_specification.Width, m_specification.Height);
+        VA_CORE_INFO("Creating window {0} ({1}, {2})", m_Specification.Title, m_Specification.Width, m_Specification.Height);
 
         SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
@@ -69,14 +72,14 @@ namespace Vanta {
     			break;
     	}
 
-		switch (m_specification.Mode)
+		switch (m_Specification.Mode)
 		{
 			case WindowMode::Windowed:
-				m_Window = SDL_CreateWindow(m_data.title.c_str(), m_data.width, m_data.height, windowFlags);
+				m_Window = SDL_CreateWindow(m_Data.Title.c_str(), m_Data.Width, m_Data.Height, windowFlags);
 				break;
 			case WindowMode::BorderlessFullscreen:
 				windowFlags |= SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN;
-				m_Window = SDL_CreateWindow(m_data.title.c_str(), 0, 0, windowFlags);
+				m_Window = SDL_CreateWindow(m_Data.Title.c_str(), 0, 0, windowFlags);
 				break;
 			case WindowMode::ExclusiveFullscreen:
 			{
@@ -94,7 +97,7 @@ namespace Vanta {
 					VA_CORE_ASSERT(false, "Could not get display mode!");
 				}
 
-				m_Window = SDL_CreateWindow(m_data.title.c_str(), mode->w, mode->h, windowFlags | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MOUSE_GRABBED);
+				m_Window = SDL_CreateWindow(m_Data.Title.c_str(), mode->w, mode->h, windowFlags | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MOUSE_GRABBED);
 				break;
 			}
 		}
@@ -106,14 +109,23 @@ namespace Vanta {
 		}
 
     	// Create Renderer Context
-    	m_RendererContext = RendererContext::Create(m_Window);
-    	m_RendererContext->Create();
+    	m_RendererContext = RendererContext::Create();
+    	m_RendererContext->Init();
+
+    	Ref<VulkanContext> context = m_RendererContext.As<VulkanContext>();
+
+    	m_SwapChain = new VulkanSwapChain();
+    	m_SwapChain->Init(VulkanContext::GetInstance(), context->GetDevice());
+    	m_SwapChain->InitSurface(m_Window);
+
+    	uint32_t width = m_Data.Width, height = m_Data.Height;
+    	m_SwapChain->Create(&width, &height, true);
 
 		// Update window size to actual size
 		int w, h;
 		SDL_GetWindowSize(m_Window, &w, &h);
-		m_data.width = w;
-		m_data.height = h;
+		m_Data.Width = w;
+		m_Data.Height = h;
 	}
 
 	void Window::PollEvents()
@@ -137,7 +149,7 @@ namespace Vanta {
 				case SDL_EVENT_QUIT:
 				{
 					WindowCloseEvent event;
-					m_data.eventCallback(event);
+					m_Data.EventCallback(event);
 					break;
 				}
 				case SDL_EVENT_WINDOW_RESIZED:
@@ -148,9 +160,9 @@ namespace Vanta {
 						SDL_GetWindowSize(m_Window, &width, &height);
 
 						WindowResizeEvent event(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-						m_data.eventCallback(event);
-						m_data.width = width;
-						m_data.height = height;
+						m_Data.EventCallback(event);
+						m_Data.Width = width;
+						m_Data.Height = height;
 					}
 					break;
 				}
@@ -161,7 +173,7 @@ namespace Vanta {
 						KeyCode key = static_cast<KeyCode>(m_Event.key.scancode);
 						int repeatCount = m_Event.key.repeat ? 1 : 0;
 						KeyPressedEvent event(key, repeatCount);
-						m_data.eventCallback(event);
+						m_Data.EventCallback(event);
 					}
 					break;
 				}
@@ -171,7 +183,7 @@ namespace Vanta {
 					{
 						KeyCode key = static_cast<KeyCode>(m_Event.key.scancode);
 						KeyReleasedEvent event(key);
-						m_data.eventCallback(event);
+						m_Data.EventCallback(event);
 					}
 					break;
 				}
@@ -180,7 +192,7 @@ namespace Vanta {
 					if (m_Event.button.windowID == windowID)
 					{
 						MouseButtonPressedEvent event(static_cast<MouseButton>(m_Event.button.button));
-						m_data.eventCallback(event);
+						m_Data.EventCallback(event);
 					}
 					break;
 				}
@@ -189,7 +201,7 @@ namespace Vanta {
 					if (m_Event.button.windowID == windowID)
 					{
 						MouseButtonReleasedEvent event(static_cast<MouseButton>(m_Event.button.button));
-						m_data.eventCallback(event);
+						m_Data.EventCallback(event);
 					}
 					break;
 				}
@@ -198,7 +210,7 @@ namespace Vanta {
 					if (m_Event.wheel.windowID == windowID)
 					{
 						MouseScrolledEvent event(m_Event.wheel.x, m_Event.wheel.y);
-						m_data.eventCallback(event);
+						m_Data.EventCallback(event);
 					}
 					break;
 				}
@@ -207,7 +219,7 @@ namespace Vanta {
 					if (m_Event.motion.windowID == windowID)
 					{
 						MouseMovedEvent event(m_Event.motion.x, m_Event.motion.y);
-						m_data.eventCallback(event);
+						m_Data.EventCallback(event);
 					}
 					break;
 				}
@@ -243,12 +255,12 @@ namespace Vanta {
 
     void Window::SwapBuffers()
     {
-    	m_RendererContext->SwapBuffers();
+    	m_SwapChain->Present();
     }
 
 	void Window::SetVSync(bool enabled)
     {
-    	m_specification.VSync = enabled;
+    	m_Specification.VSync = enabled;
     	if (RendererAPI::Current() == RendererAPIType::OpenGL) {
     		if (SDL_GL_SetSwapInterval(enabled ? 1 : 0) != 0)
     		{
@@ -261,7 +273,7 @@ namespace Vanta {
 
 	bool Window::IsVSync() const
     {
-    	return m_specification.VSync;
+    	return m_Specification.VSync;
     }
 
 	void Window::SetResizable(bool resizable) const
@@ -274,7 +286,7 @@ namespace Vanta {
 
 	void Window::Maximize()
     {
-    	if (m_specification.Mode == WindowMode::Windowed)
+    	if (m_Specification.Mode == WindowMode::Windowed)
     	{
     		if (SDL_MaximizeWindow(m_Window) == false)
     		{
@@ -299,8 +311,8 @@ namespace Vanta {
     		return;
     	}
 
-    	int x = (videomode->w / 2) - (m_data.width / 2);
-    	int y = (videomode->h / 2) - (m_data.height / 2);
+    	int x = (videomode->w / 2) - (m_Data.Width / 2);
+    	int y = (videomode->h / 2) - (m_Data.Height / 2);
 
     	if (SDL_SetWindowPosition(m_Window, x, y) == false)
     	{
@@ -310,11 +322,16 @@ namespace Vanta {
 
     void Window::SetTitle(const std::string& title)
     {
-        m_data.title = title;
+        m_Data.Title = title;
     	if (SDL_SetWindowTitle(m_Window, title.c_str()) == false)
     	{
     		SDLErrorCallback("SDL_SetWindowTitle");
     	}
+    }
+
+	VulkanSwapChain& Window::GetSwapChain()
+	{
+    	return *m_SwapChain;
     }
 
 }

@@ -28,6 +28,7 @@ set(OPENGL_HEADERS
 		OpenGLMaterial.hpp
 		OpenGLRenderer.hpp
 		OpenGLUniformBuffer.hpp
+		OpenGLUniformBufferSet.hpp
 )
 
 target_sources(Vanta

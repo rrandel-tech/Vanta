@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ImGui/ImGui.hpp"
+#include "Core/TimeStep.hpp"
+#include "Events/Event.hpp"
 
 namespace Vanta {
 
@@ -12,7 +14,9 @@ namespace Vanta {
 	public:
 		virtual ~AssetEditor(){}
 
-		void OnImGuiRender();
+		virtual void OnUpdate(Timestep ts) {}
+		virtual void OnEvent(Event& e) {}
+		virtual void OnImGuiRender();
 		void SetOpen(bool isOpen);
 		virtual void SetAsset(const Ref<Asset>& asset) = 0;
 
@@ -23,7 +27,6 @@ namespace Vanta {
 	private:
 		virtual void OnClose() = 0;
 		virtual void Render() = 0;
-
 	private:
 		const char* m_Title;
 		bool m_IsOpen = false;
@@ -37,6 +40,8 @@ namespace Vanta {
 	public:
 		static void RegisterDefaultEditors();
 		static void UnregisterAllEditors();
+		static void OnUpdate(Timestep ts);
+		static void OnEvent(Event& e);
 		static void OnImGuiRender();
 		static void OpenEditor(const Ref<Asset>& asset);
 
