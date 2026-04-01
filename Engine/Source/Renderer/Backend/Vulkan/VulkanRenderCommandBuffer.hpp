@@ -9,7 +9,7 @@ namespace Vanta {
     class VulkanRenderCommandBuffer : public RenderCommandBuffer
     {
     public:
-        VulkanRenderCommandBuffer(uint32_t count = 0);
+        VulkanRenderCommandBuffer(uint32_t count = 0, const std::string& debugName = "");
         ~VulkanRenderCommandBuffer();
 
         virtual void Begin() override;
@@ -27,6 +27,8 @@ namespace Vanta {
         std::vector<VkFence> m_WaitFences;
 
         int m_ActiveBufferIndex = -1;
+
+        std::string m_DebugName;
     };
 
 }

@@ -5,7 +5,8 @@
 
 namespace Vanta {
 
-	VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count)
+	VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count, const std::string& debugName)
+		: m_DebugName(debugName)
 	{
 		auto device = VulkanContext::GetCurrentDevice();
 

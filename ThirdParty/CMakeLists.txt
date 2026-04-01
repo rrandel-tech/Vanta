@@ -241,3 +241,36 @@ target_include_directories(VulkanMemoryAllocator INTERFACE
 )
 
 add_library(VulkanMemoryAllocator::VulkanMemoryAllocator ALIAS VulkanMemoryAllocator)
+
+# ==== Tracy Profiler ====
+option(TRACY_ON_DEMAND "Enable Tracy on-demand profiling" OFF)
+option(TRACY_NO_EXIT "Disable Tracy exit handling" OFF)
+option(TRACY_CALLSTACK "Enable Tracy callstack sampling" OFF)
+
+set(TRACY_DIR ${CMAKE_CURRENT_LIST_DIR}/tracy)
+
+add_library(tracy STATIC
+        ${TRACY_DIR}/public/TracyClient.cpp
+)
+
+target_include_directories(tracy PUBLIC
+        ${TRACY_DIR}/public/tracy
+)
+
+target_compile_definitions(tracy PUBLIC
+        TRACY_ENABLE
+        $<$<BOOL:${TRACY_ON_DEMAND}>:TRACY_ON_DEMAND>
+        $<$<BOOL:${TRACY_NO_EXIT}>:TRACY_NO_EXIT>
+        $<$<BOOL:${TRACY_CALLSTACK}>:TRACY_CALLSTACK=10>
+)
+
+if(WIN32)
+    target_link_libraries(tracy PUBLIC ws2_32 dbghelp)
+elseif(UNIX AND NOT APPLE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(tracy PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+elseif(APPLE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(tracy PUBLIC Threads::Threads)
+endif()
+add_library(tracy::tracy ALIAS tracy)

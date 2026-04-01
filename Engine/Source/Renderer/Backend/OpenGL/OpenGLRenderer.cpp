@@ -189,13 +189,12 @@ namespace Vanta {
 	{
 	}
 
-	void OpenGLRenderer::BeginRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer, const Ref<RenderPass>& renderPass)
+	void OpenGLRenderer::BeginRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer, const Ref<RenderPass>& renderPass, bool explicitClear)
 	{
 		s_Data->ActiveRenderPass = renderPass;
 
 		renderPass->GetSpecification().TargetFramebuffer->Bind();
-		bool clear = true;
-		if (clear)
+		if (explicitClear)
 		{
 			const glm::vec4& clearColor = renderPass->GetSpecification().TargetFramebuffer->GetSpecification().ClearColor;
 			Renderer::Submit([=]() {

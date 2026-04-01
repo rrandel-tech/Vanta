@@ -521,7 +521,17 @@ namespace Vanta {
 		DrawComponent<MeshComponent>("Mesh", entity, [&](MeshComponent& mc)
 		{
 			UI::BeginPropertyGrid();
-			UI::PropertyAssetReference("Mesh", mc.Mesh);
+
+			Ref<MeshAsset> meshAsset;
+
+			if (mc.Mesh && mc.Mesh->IsValid())
+				meshAsset = mc.Mesh->GetMeshAsset();
+
+			if (UI::PropertyAssetReference("Mesh", meshAsset))
+			{
+				mc.Mesh = meshAsset ? Ref<Mesh>::Create(meshAsset) : nullptr;
+			}
+
 			UI::EndPropertyGrid();
 		});
 

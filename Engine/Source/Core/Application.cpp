@@ -6,6 +6,8 @@
 
 #include "Asset/AssetManager.hpp"
 
+#include "Debug/Profiler.hpp"
+
 #include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
 #include "Renderer/Backend/Vulkan/VulkanAllocator.hpp"
 #include "Renderer/Backend/Vulkan/VulkanSwapChain.hpp"
@@ -108,6 +110,8 @@ namespace Vanta {
 
     void Application::RenderImGui()
     {
+        VA_PROFILE_FUNC();
+
         m_ImGuiLayer->Begin();
         ImGui::Begin("Renderer");
         auto& caps = Renderer::GetCapabilities();

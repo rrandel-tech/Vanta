@@ -92,7 +92,7 @@ namespace Vanta {
 		VA_CORE_ASSERT(false, "Unknown RendererAPI");
 		return nullptr;
 	}
-	
+
 	void Renderer::Init()
 	{
 		s_Data = new RendererData();
@@ -115,25 +115,34 @@ namespace Vanta {
 		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl");
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Anim.glsl");
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/Outline.glsl");
+		Renderer::GetShaderLibrary()->Load("assets/shaders/Wireframe.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/Skybox.glsl");
 		Renderer::GetShaderLibrary()->Load("assets/shaders/ShadowMap.glsl");
+
+		// Renderer2D Shaders
+		Renderer::GetShaderLibrary()->Load("assets/shaders/Renderer2D.glsl");
+		Renderer::GetShaderLibrary()->Load("assets/shaders/Renderer2D_Line.glsl");
+		Renderer::GetShaderLibrary()->Load("assets/shaders/Renderer2D_Circle.glsl");
 
 		// Compile shaders
 		Renderer::WaitAndRender();
 
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data->WhiteTexture = Texture2D::Create(ImageFormat::RGBA, 1, 1, &whiteTextureData);
-		
+
 		uint32_t blackTextureData[6] = { 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000 };
 		s_Data->BlackCubeTexture = TextureCube::Create(ImageFormat::RGBA, 1, 1, &blackTextureData);
 
 		s_Data->EmptyEnvironment = Ref<Environment>::Create(s_Data->BlackCubeTexture, s_Data->BlackCubeTexture);
 
 		s_RendererAPI->Init();
+		Renderer2D::Init();
 	}
 
 	void Renderer::Shutdown()
 	{
+		Renderer2D::Shutdown();
+
 		s_ShaderDependencies.clear();
 		s_RendererAPI->Shutdown();
 
@@ -157,11 +166,11 @@ namespace Vanta {
 		s_CommandQueue->Execute();
 	}
 
-	void Renderer::BeginRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<RenderPass> renderPass, bool clear)
+	void Renderer::BeginRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<RenderPass> renderPass, bool explicitClear)
 	{
 		VA_CORE_ASSERT(renderPass, "Render pass cannot be null!");
 
-		s_RendererAPI->BeginRenderPass(renderCommandBuffer, renderPass);
+		s_RendererAPI->BeginRenderPass(renderCommandBuffer, renderPass, explicitClear);
 	}
 
 	void Renderer::EndRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer)
@@ -207,6 +216,11 @@ namespace Vanta {
 	void Renderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, const glm::mat4& transform)
 	{
 		s_RendererAPI->RenderQuad(renderCommandBuffer, pipeline, uniformBufferSet, material, transform);
+	}
+
+	void Renderer::RenderGeometry(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer, const glm::mat4& transform, uint32_t indexCount /*= 0*/)
+	{
+		s_RendererAPI->RenderGeometry(renderCommandBuffer, pipeline, uniformBufferSet, material, vertexBuffer, indexBuffer, transform, indexCount);
 	}
 
 	void Renderer::SubmitQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Material> material, const glm::mat4& transform)
@@ -265,47 +279,6 @@ namespace Vanta {
 		Renderer::DrawIndexed(6, PrimitiveType::Triangles, depthTest);
 	}
 #endif
-
-	void Renderer::DrawAABB(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color)
-	{
-		const auto& meshAssetSubmeshes = mesh->GetMeshAsset()->GetSubmeshes();
-		auto& submeshes = mesh->GetSubmeshes();
-		for (uint32_t submeshIndex : submeshes)
-		{
-			const Submesh& submesh = meshAssetSubmeshes[submeshIndex];
-			auto& aabb = submesh.BoundingBox;
-			auto aabbTransform = transform * submesh.Transform;
-			DrawAABB(aabb, aabbTransform);
-		}
-	}
-
-	void Renderer::DrawAABB(const AABB& aabb, const glm::mat4& transform, const glm::vec4& color /*= glm::vec4(1.0f)*/)
-	{
-		glm::vec4 min = { aabb.Min.x, aabb.Min.y, aabb.Min.z, 1.0f };
-		glm::vec4 max = { aabb.Max.x, aabb.Max.y, aabb.Max.z, 1.0f };
-
-		glm::vec4 corners[8] =
-		{
-			transform * glm::vec4 { aabb.Min.x, aabb.Min.y, aabb.Max.z, 1.0f },
-			transform * glm::vec4 { aabb.Min.x, aabb.Max.y, aabb.Max.z, 1.0f },
-			transform * glm::vec4 { aabb.Max.x, aabb.Max.y, aabb.Max.z, 1.0f },
-			transform * glm::vec4 { aabb.Max.x, aabb.Min.y, aabb.Max.z, 1.0f },
-
-			transform * glm::vec4 { aabb.Min.x, aabb.Min.y, aabb.Min.z, 1.0f },
-			transform * glm::vec4 { aabb.Min.x, aabb.Max.y, aabb.Min.z, 1.0f },
-			transform * glm::vec4 { aabb.Max.x, aabb.Max.y, aabb.Min.z, 1.0f },
-			transform * glm::vec4 { aabb.Max.x, aabb.Min.y, aabb.Min.z, 1.0f }
-		};
-
-		for (uint32_t i = 0; i < 4; i++)
-			Renderer2D::DrawLine(corners[i], corners[(i + 1) % 4], color);
-
-		for (uint32_t i = 0; i < 4; i++)
-			Renderer2D::DrawLine(corners[i + 4], corners[((i + 1) % 4) + 4], color);
-
-		for (uint32_t i = 0; i < 4; i++)
-			Renderer2D::DrawLine(corners[i], corners[i + 4], color);
-	}
 
 	Ref<Texture2D> Renderer::GetWhiteTexture()
 	{

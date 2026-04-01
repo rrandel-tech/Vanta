@@ -22,6 +22,7 @@ target_sources(Vanta PRIVATE ${VANTA_ROOT_SOURCES} ${VANTA_ROOT_HEADERS} ${VANTA
 
 add_subdirectory(${VANTA_SRC_DIR}/Asset)
 add_subdirectory(${VANTA_SRC_DIR}/Core)
+add_subdirectory(${VANTA_SRC_DIR}/Debug)
 add_subdirectory(${VANTA_SRC_DIR}/Editor)
 add_subdirectory(${VANTA_SRC_DIR}/Events)
 add_subdirectory(${VANTA_SRC_DIR}/ImGui)
@@ -55,6 +56,7 @@ target_link_libraries(Vanta
         entt::entt
         fastnoise::fastnoise
         yaml-cpp::yaml-cpp
+        tracy::tracy
 
         lua
         sol2::sol2

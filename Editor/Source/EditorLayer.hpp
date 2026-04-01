@@ -48,6 +48,9 @@ namespace Vanta {
 		void OpenScene(const std::string& filepath);
 		void SaveScene();
 		void SaveSceneAs();
+
+		void UI_WelcomePopup();
+		void UI_AboutPopup();
 	private:
 		std::pair<float, float> GetMouseViewportSpace(bool primaryViewport);
 		std::pair<glm::vec3, glm::vec3> CastRay(const EditorCamera& camera, float mx, float my);
@@ -71,6 +74,8 @@ namespace Vanta {
 		float GetSnapValue();
 
 		void DeleteEntity(Entity entity);
+
+		void UpdateSceneRendererSettings();
 	private:
 		Scope<SceneHierarchyPanel> m_SceneHierarchyPanel;
 		Scope<ContentBrowserPanel> m_ContentBrowserPanel;
@@ -87,6 +92,8 @@ namespace Vanta {
 
 		Ref<Shader> m_BrushShader;
 		Ref<Material> m_SphereBaseMaterial;
+
+		float m_LineWidth = 2.0f;
 
 		struct AlbedoInput
 		{
@@ -139,8 +146,10 @@ namespace Vanta {
 		float m_RotationSnapValue = 45.0f;
 		bool m_DrawOnTopBoundingBoxes = false;
 
-		bool m_UIShowBoundingBoxes = false;
-		bool m_UIShowBoundingBoxesOnTop = false;
+		bool m_ShowBoundingBoxes = false;
+		bool m_ShowBoundingBoxSelectedMeshOnly = true;
+		bool m_ShowBoundingBoxSubmeshes = false;
+		bool m_ShowSelectedWireframe = true;
 
 		bool m_ViewportPanelMouseOver = false;
 		bool m_ViewportPanelFocused = false;

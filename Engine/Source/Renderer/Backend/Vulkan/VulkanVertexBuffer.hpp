@@ -16,7 +16,8 @@ namespace Vanta {
 
 		virtual ~VulkanVertexBuffer();
 
-		virtual void SetData(void* buffer, uint32_t size, uint32_t offset = 0) override {}
+		virtual void SetData(void* buffer, uint32_t size, uint32_t offset = 0) override;
+		virtual void RT_SetData(void* buffer, uint32_t size, uint32_t offset = 0) override;
 		virtual void Bind() const override {}
 
 		virtual const VertexBufferLayout& GetLayout() const override { return {}; }

@@ -101,7 +101,7 @@ namespace Vanta {
 					return;
 				}
 			}
-			
+
 			// should never get here - more bones than we have space for
 			VA_CORE_ASSERT(false, "Too many bones!");
 		}
@@ -163,6 +163,8 @@ namespace Vanta {
 
 		static AssetType GetStaticType() { return AssetType::MeshAsset; }
 		virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
+		const AABB& GetBoundingBox() const { return m_BoundingBox; }
 	private:
 		void BoneTransform(float time);
 		void ReadNodeHierarchy(float AnimationTime, const aiNode* pNode, const glm::mat4& ParentTransform);
@@ -203,6 +205,8 @@ namespace Vanta {
 		std::vector<Ref<Material>> m_Materials;
 
 		std::unordered_map<uint32_t, std::vector<Triangle>> m_TriangleCache;
+
+		AABB m_BoundingBox;
 
 		// Animation
 		bool m_IsAnimated = false;

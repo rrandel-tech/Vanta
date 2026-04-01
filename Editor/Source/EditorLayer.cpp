@@ -61,6 +61,8 @@ namespace Vanta {
 		m_ContentBrowserPanel = CreateScope<ContentBrowserPanel>();
 		m_ObjectsPanel = CreateScope<ObjectsPanel>();
 
+		Renderer2D::SetLineWidth(m_LineWidth);
+
 		NewScene();
 		m_ViewportRenderer = Ref<SceneRenderer>::Create(m_CurrentScene);
 		m_SecondViewportRenderer = Ref<SceneRenderer>::Create(m_CurrentScene);
@@ -68,6 +70,8 @@ namespace Vanta {
 
 		AssetEditorPanel::RegisterDefaultEditors();
 		FileSystem::StartWatching();
+
+		UpdateSceneRendererSettings();
 	}
 
 	void EditorLayer::OnDetach()
@@ -130,6 +134,19 @@ namespace Vanta {
 		m_EditorScene->DestroyEntity(entity);
 	}
 
+	void EditorLayer::UpdateSceneRendererSettings()
+	{
+		std::array<Ref<SceneRenderer>, 2> renderers = { m_ViewportRenderer, m_SecondViewportRenderer };
+
+		for (Ref<SceneRenderer> renderer : renderers)
+		{
+			SceneRendererOptions& options = renderer->GetOptions();
+			options.ShowSelectedInWireframe = m_ShowSelectedWireframe;
+		}
+
+		//m_SecondViewportRenderer
+	}
+
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
 		//SceneRenderer::SetFocusPoint({ x * 0.5f + 0.5f, y * 0.5f + 0.5f });
@@ -148,6 +165,62 @@ namespace Vanta {
 					m_SecondEditorCamera.OnUpdate(ts);
 					m_EditorScene->OnRenderEditor(m_SecondViewportRenderer, ts, m_SecondEditorCamera);
 				}
+
+				Renderer2D::SetTargetRenderPass(m_ViewportRenderer->GetExternalCompositeRenderPass());
+
+				if (m_ShowBoundingBoxes)
+				{
+					Renderer2D::BeginScene(m_EditorCamera.GetViewProjection());
+					if (m_ShowBoundingBoxSelectedMeshOnly)
+					{
+						if (m_SelectionContext.size())
+						{
+							auto& selection = m_SelectionContext[0];
+							if (selection.Entity.HasComponent<MeshComponent>())
+							{
+								if (m_ShowBoundingBoxSubmeshes)
+								{
+									auto& mesh = selection.Entity.GetComponent<MeshComponent>().Mesh;
+									if (mesh)
+									{
+										auto& submeshIndices = mesh->GetSubmeshes();
+										auto meshAsset = mesh->GetMeshAsset();
+										auto& submeshes = meshAsset->GetSubmeshes();
+										for (uint32_t submeshIndex : submeshIndices)
+										{
+											glm::mat4 transform = selection.Entity.GetComponent<TransformComponent>().GetTransform();
+											const AABB& aabb = submeshes[submeshIndex].BoundingBox;
+											Renderer2D::DrawAABB(aabb, transform * submeshes[submeshIndex].Transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+										}
+									}
+								}
+								else
+								{
+									auto& mesh = selection.Entity.GetComponent<MeshComponent>().Mesh;
+									if (mesh)
+									{
+										glm::mat4 transform = selection.Entity.GetComponent<TransformComponent>().GetTransform();
+										const AABB& aabb = mesh->GetMeshAsset()->GetBoundingBox();
+										Renderer2D::DrawAABB(aabb, transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+									}
+								}
+							}
+						}
+					}
+					else
+					{
+						auto entities = m_CurrentScene->GetAllEntitiesWith<MeshComponent>();
+						for (auto e : entities)
+						{
+							Entity entity = { e, m_CurrentScene.Raw() };
+							glm::mat4 transform = entity.GetComponent<TransformComponent>().GetTransform();
+							const AABB& aabb = entity.GetComponent<MeshComponent>().Mesh->GetMeshAsset()->GetBoundingBox();
+							Renderer2D::DrawAABB(aabb, transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+						}
+					}
+					Renderer2D::EndScene();
+				}
+
 
 #if RENDERER_2D
 				if (m_DrawOnTopBoundingBoxes)
@@ -284,7 +357,7 @@ namespace Vanta {
 	void EditorLayer::OpenScene()
 	{
 		auto& app = Application::Get();
-		std::string filepath = app.OpenFile("Hazel Scene (*.hsc)\0*.hsc\0");
+		std::string filepath = app.OpenFile("Vanta Scene (*.vscene)\0*.vscene\0");
 		if (!filepath.empty())
 			OpenScene(filepath);
 	}
@@ -332,6 +405,69 @@ namespace Vanta {
 			std::filesystem::path path = filepath;
 			UpdateWindowTitle(path.filename().string());
 			m_SceneFilePath = filepath;
+		}
+	}
+
+	void EditorLayer::UI_WelcomePopup()
+	{
+		if (m_ShowWelcomePopup)
+		{
+			ImGui::OpenPopup("Welcome");
+			m_ShowWelcomePopup = false;
+		}
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2{ 400,0 });
+		if (ImGui::BeginPopupModal("Welcome", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("Welcome to Vanta!");
+			ImGui::Separator();
+			ImGui::TextWrapped("Environment maps are currently disabled because they're a little unstable on certain GPU drivers.");
+
+			UI::BeginPropertyGrid();
+			UI::Property("Enable environment maps?", Renderer::GetConfig().ComputeEnvironmentMaps);
+			UI::EndPropertyGrid();
+
+			if (ImGui::Button("OK"))
+				ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+	}
+
+	void EditorLayer::UI_AboutPopup()
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		auto boldFont = io.Fonts->Fonts[0];
+		auto largeFont = io.Fonts->Fonts[1];
+
+		if (m_ShowAboutPopup)
+		{
+			ImGui::OpenPopup("About##AboutPopup");
+			m_ShowAboutPopup = false;
+		}
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2{ 600,0 });
+		if (ImGui::BeginPopupModal("About##AboutPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::PushFont(largeFont);
+			ImGui::Text("Vanta Engine");
+			ImGui::PopFont();
+
+			ImGui::Separator();
+			ImGui::TextWrapped("Vanta is an early-stage interactive application and rendering engine for Windows.");
+			ImGui::Separator();
+			ImGui::PushFont(boldFont);
+			ImGui::Text("Vanta Core Team");
+			ImGui::PopFont();
+			ImGui::Text("Robert Randel");
+
+			if (ImGui::Button("OK"))
+				ImGui::CloseCurrentPopup();
+
+			ImGui::EndPopup();
 		}
 	}
 
@@ -397,18 +533,25 @@ namespace Vanta {
 			UI::PropertySlider("Exposure", m_EditorCamera.GetExposure(), 0.0f, 5.0f);
 			UI::PropertySlider("Env Map Rotation", m_EnvMapRotation, -360.0f, 360.0f);
 
-			if (UI::Property("Show Bounding Boxes", m_UIShowBoundingBoxes))
-				ShowBoundingBoxes(m_UIShowBoundingBoxes, m_UIShowBoundingBoxesOnTop);
-			if (m_UIShowBoundingBoxes && UI::Property("On Top", m_UIShowBoundingBoxesOnTop))
-				ShowBoundingBoxes(m_UIShowBoundingBoxes, m_UIShowBoundingBoxesOnTop);
+			if (UI::Property("Line Width", m_LineWidth, 0.25f, 0.5f, 5.0f))
+				Renderer2D::SetLineWidth(m_LineWidth);
+
+			UI::Property("Show Bounding Boxes", m_ShowBoundingBoxes);
+			if (m_ShowBoundingBoxes)
+				UI::Property("Selected Entity", m_ShowBoundingBoxSelectedMeshOnly);
+			if (m_ShowBoundingBoxes && m_ShowBoundingBoxSelectedMeshOnly)
+				UI::Property("Submeshes", m_ShowBoundingBoxSubmeshes);
+
+			if (UI::Property("Show Selected Wireframe", m_ShowSelectedWireframe))
+				UpdateSceneRendererSettings();
+
+			UI::EndPropertyGrid();
 
 			const char* label = m_SelectionMode == SelectionMode::Entity ? "Entity" : "Mesh";
 			if (ImGui::Button(label))
 			{
 				m_SelectionMode = m_SelectionMode == SelectionMode::Entity ? SelectionMode::SubMesh : SelectionMode::Entity;
 			}
-
-			UI::EndPropertyGrid();
 
 			ImGui::Separator();
 			ImGui::PushFont(boldFont);
@@ -1105,57 +1248,8 @@ namespace Vanta {
 
 		ImGui::End();
 
-		if (m_ShowWelcomePopup)
-		{
-			ImGui::OpenPopup("Welcome");
-			m_ShowWelcomePopup = false;
-		}
-
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		ImGui::SetNextWindowSize(ImVec2{ 400,0 });
-		if (ImGui::BeginPopupModal("Welcome", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-		{
-			ImGui::Text("Welcome to Hazel!");
-			ImGui::Separator();
-			ImGui::TextWrapped("Environment maps are currently disabled because they're a little unstable on certain GPU drivers.");
-
-			UI::BeginPropertyGrid();
-			UI::Property("Enable environment maps?", Renderer::GetConfig().ComputeEnvironmentMaps);
-			UI::EndPropertyGrid();
-
-			if (ImGui::Button("OK"))
-				ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
-		}
-
-		if (m_ShowAboutPopup)
-		{
-			ImGui::OpenPopup("About##AboutPopup");
-			m_ShowAboutPopup = false;
-		}
-
-		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		ImGui::SetNextWindowSize(ImVec2{ 600,0 });
-		if (ImGui::BeginPopupModal("About##AboutPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-		{
-			ImGui::PushFont(largeFont);
-			ImGui::Text("Vanta Engine");
-			ImGui::PopFont();
-
-			ImGui::Separator();
-			ImGui::TextWrapped("Vanta is an early-stage interactive application and rendering engine for Windows.");
-			ImGui::Separator();
-			ImGui::PushFont(boldFont);
-			ImGui::Text("Vanta Core Team");
-			ImGui::PopFont();
-			ImGui::Text("Robert Randel");
-
-			if (ImGui::Button("OK"))
-				ImGui::CloseCurrentPopup();
-
-			ImGui::EndPopup();
-		}
+		UI_WelcomePopup();
+		UI_AboutPopup();
 
 		AssetEditorPanel::OnImGuiRender();
 	}
@@ -1244,8 +1338,7 @@ namespace Vanta {
 			{
 				case KeyCode::B:
 					// Toggle bounding boxes 
-					m_UIShowBoundingBoxes = !m_UIShowBoundingBoxes;
-					ShowBoundingBoxes(m_UIShowBoundingBoxes, m_UIShowBoundingBoxesOnTop);
+					m_ShowBoundingBoxes = !m_ShowBoundingBoxes;
 					break;
 				case KeyCode::D:
 					if (m_SelectionContext.size())

@@ -14,6 +14,7 @@ namespace Vanta {
 		virtual ~OpenGLVertexBuffer();
 
 		virtual void SetData(void* data, uint32_t size, uint32_t offset = 0);
+		virtual void RT_SetData(void* data, uint32_t size, uint32_t offset = 0) {}
 		virtual void Bind() const;
 
 		virtual const VertexBufferLayout& GetLayout() const override { return m_Layout; }

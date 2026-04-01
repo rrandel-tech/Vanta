@@ -31,7 +31,7 @@ namespace Vanta {
 	{
 		VA_SCOPE_TIMER("SceneRenderer::Init");
 
-		m_CommandBuffer = RenderCommandBuffer::Create();
+		m_CommandBuffer = RenderCommandBuffer::Create(0, "SceneRenderer");
 
 		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
 		m_UniformBufferSet = UniformBufferSet::Create(framesInFlight);
@@ -94,11 +94,9 @@ namespace Vanta {
 		// Geometry
 		{
 			FramebufferSpecification geoFramebufferSpec;
-			geoFramebufferSpec.Width = 1280;
-			geoFramebufferSpec.Height = 720;
 			geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::RGBA32F, ImageFormat::Depth };
 			geoFramebufferSpec.Samples = 1;
-			geoFramebufferSpec.ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
+			geoFramebufferSpec.ClearColor = { 0.1f, 0.5f, 0.1f, 1.0f };
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(geoFramebufferSpec);
 
@@ -118,14 +116,19 @@ namespace Vanta {
 			pipelineSpecification.RenderPass = RenderPass::Create(renderPassSpec);
 			pipelineSpecification.DebugName = "PBR-Static";
 			m_GeometryPipeline = Pipeline::Create(pipelineSpecification);
+
+			pipelineSpecification.Wireframe = true;
+			pipelineSpecification.DepthTest = false;
+			pipelineSpecification.LineWidth = 2.0f;
+			pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("Wireframe");
+			pipelineSpecification.DebugName = "Wireframe";
+			m_GeometryWireframePipeline = Pipeline::Create(pipelineSpecification);
 		}
 
 		// Composite
 		{
 			FramebufferSpecification compFramebufferSpec;
-			compFramebufferSpec.Width = 1280;
-			compFramebufferSpec.Height = 720;
-			compFramebufferSpec.Attachments = { ImageFormat::RGBA };
+			compFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
 			compFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(compFramebufferSpec);
@@ -142,7 +145,24 @@ namespace Vanta {
 			renderPassSpec.DebugName = "Composite";
 			pipelineSpecification.RenderPass = RenderPass::Create(renderPassSpec);
 			pipelineSpecification.DebugName = "SceneComposite";
+			pipelineSpecification.DepthWrite = false;
 			m_CompositePipeline = Pipeline::Create(pipelineSpecification);
+		}
+
+		// External compositing
+		{
+			FramebufferSpecification extCompFramebufferSpec;
+			extCompFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
+			extCompFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
+			extCompFramebufferSpec.ClearOnLoad = false;
+			extCompFramebufferSpec.ExistingFramebuffer = m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
+
+			Ref<Framebuffer> framebuffer = Framebuffer::Create(extCompFramebufferSpec);
+
+			RenderPassSpecification renderPassSpec;
+			renderPassSpec.TargetFramebuffer = framebuffer;
+			renderPassSpec.DebugName = "External-Composite";
+			m_ExternalCompositeRenderPass = RenderPass::Create(renderPassSpec);
 		}
 
 		// Grid
@@ -157,6 +177,7 @@ namespace Vanta {
 			PipelineSpecification pipelineSpec;
 			pipelineSpec.DebugName = "Grid";
 			pipelineSpec.Shader = m_GridShader;
+			pipelineSpec.BackfaceCulling = false;
 			pipelineSpec.Layout = {
 				{ ShaderDataType::Float3, "a_Position" },
 				{ ShaderDataType::Float2, "a_TexCoord" }
@@ -165,10 +186,8 @@ namespace Vanta {
 			m_GridPipeline = Pipeline::Create(pipelineSpec);
 		}
 
-		// Collider
-		//auto colliderShader = Shader::Create("assets/shaders/Collider.glsl");
-		//ColliderMaterial = Material::Create(Material::Create(colliderShader));
-		//ColliderMaterial->SetFlag(MaterialFlag::DepthTest, false);
+		m_WireframeMaterial = Material::Create(Renderer::GetShaderLibrary()->Get("Wireframe"));
+		m_WireframeMaterial->Set("u_MaterialUniforms.Color", { 1.0f, 0.5f, 0.0f, 1.0f });
 
 		// Skybox
 		{
@@ -354,6 +373,7 @@ namespace Vanta {
 		{
 			m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+			m_ExternalCompositeRenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_NeedsResize = false;
 		}
 
@@ -426,6 +446,7 @@ namespace Vanta {
 #else
 		FlushDrawList();
 #endif
+
 		m_Active = false;
 	}
 
@@ -497,7 +518,11 @@ namespace Vanta {
 			Renderer::RenderMesh(m_CommandBuffer, m_GeometryPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform);
 
 		for (auto& dc : m_SelectedMeshDrawList)
+		{
 			Renderer::RenderMesh(m_CommandBuffer, m_GeometryPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform);
+			if (m_Options.ShowSelectedInWireframe)
+				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_GeometryWireframePipeline, m_UniformBufferSet, dc.Mesh, dc.Transform, m_WireframeMaterial);
+		}
 
 		// Grid
 		if (GetOptions().ShowGrid)
@@ -521,7 +546,7 @@ namespace Vanta {
 
 	void SceneRenderer::CompositePass()
 	{
-		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass);
+		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass, true);
 
 		auto framebuffer = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
 		// float exposure = SceneData.SceneCamera.Camera.GetExposure();

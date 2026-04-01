@@ -13,6 +13,8 @@
 
 #include <unordered_map>
 
+#include "imgui_internal.h"
+
 namespace Vanta::UI {
 
     static std::unordered_map<VkImageView, ImTextureID> s_VulkanTextureCache;
@@ -83,50 +85,58 @@ namespace Vanta::UI {
     }
 
     bool ImageButton(const Ref<Image2D>& image, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& bg_col, const ImVec4& tint_col)
+	{
+		return ImageButton(nullptr, image, size, uv0, uv1, bg_col, tint_col);
+	}
+
+	bool ImageButton(const char* stringID, const Ref<Image2D>& image, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& bg_col, const ImVec4& tint_col)
     {
-        if (RendererAPI::Current() == RendererAPIType::OpenGL)
-        {
-            Ref<OpenGLImage2D> glImage = image.As<OpenGLImage2D>();
-            return ImGui::ImageButton("##imgbtn", (ImTextureID)glImage->GetRendererID(), size, uv0, uv1, bg_col, tint_col);
-        }
-        else
-        {
-            Ref<VulkanImage2D> vulkanImage = image.As<VulkanImage2D>();
-            const auto& imageInfo = vulkanImage->GetImageInfo();
+    	const char* id = stringID ? stringID : "##ImageButton";
 
-            if (!imageInfo.ImageView)
-                return false;
+    	if (RendererAPI::Current() == RendererAPIType::OpenGL)
+    	{
+    		Ref<OpenGLImage2D> glImage = image.As<OpenGLImage2D>();
 
-            ImTextureID textureID = GetVulkanTextureID(vulkanImage->GetDescriptor());
+    		return ImGui::ImageButton(id, (ImTextureRef)(uintptr_t)glImage->GetRendererID(), size, uv0, uv1, bg_col, tint_col);
+    	}
+    	else
+    	{
+    		Ref<VulkanImage2D> vulkanImage = image.As<VulkanImage2D>();
+    		const auto& imageInfo = vulkanImage->GetImageInfo();
 
-            ImGui::PushID((void*)imageInfo.ImageView);
-            bool pressed = ImGui::ImageButton("##imgbtn", textureID, size, uv0, uv1, bg_col, tint_col);
-            ImGui::PopID();
+    		if (!imageInfo.ImageView)
+    			return false;
 
-            return pressed;
-        }
+    		ImTextureID textureID = GetVulkanTextureID(vulkanImage->GetDescriptor());
+
+    		return ImGui::ImageButton(id, (ImTextureRef)textureID, size, uv0, uv1, bg_col, tint_col);
+    	}
     }
 
-    bool ImageButton(const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& bg_col, const ImVec4& tint_col)
+	bool ImageButton(const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& bg_col, const ImVec4& tint_col)
+	{
+		return ImageButton(nullptr, texture, size, uv0, uv1, bg_col, tint_col);
+	}
+
+	bool ImageButton(const char* stringID, const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& bg_col, const ImVec4& tint_col)
     {
-        if (RendererAPI::Current() == RendererAPIType::OpenGL)
-        {
-            Ref<OpenGLImage2D> image = texture->GetImage().As<OpenGLImage2D>();
-            return ImGui::ImageButton("##imgbtn", (ImTextureID)image->GetRendererID(), size, uv0, uv1, bg_col, tint_col);
-        }
-        else
-        {
-            Ref<VulkanTexture2D> vulkanTexture = texture.As<VulkanTexture2D>();
-            const VkDescriptorImageInfo& imageInfo = vulkanTexture->GetVulkanDescriptorInfo();
+    	const char* id = stringID ? stringID : "##ImageButton";
 
-            ImTextureID textureID = GetVulkanTextureID(imageInfo);
+    	if (RendererAPI::Current() == RendererAPIType::OpenGL)
+    	{
+    		Ref<OpenGLImage2D> image = texture->GetImage().As<OpenGLImage2D>();
 
-            ImGui::PushID((void*)imageInfo.imageView);
-            bool pressed = ImGui::ImageButton("##imgbtn", textureID, size, uv0, uv1, bg_col, tint_col);
-            ImGui::PopID();
+    		return ImGui::ImageButton(id, (ImTextureRef)(uintptr_t)image->GetRendererID(), size, uv0, uv1, bg_col, tint_col);
+    	}
+    	else
+    	{
+    		Ref<VulkanTexture2D> vulkanTexture = texture.As<VulkanTexture2D>();
+    		const VkDescriptorImageInfo& imageInfo = vulkanTexture->GetVulkanDescriptorInfo();
 
-            return pressed;
-        }
+    		ImTextureID textureID = GetVulkanTextureID(imageInfo);
+
+    		return ImGui::ImageButton(id, (ImTextureRef)textureID, size, uv0, uv1, bg_col, tint_col);
+    	}
     }
 
     void ClearVulkanTextureCache() { s_VulkanTextureCache.clear(); }

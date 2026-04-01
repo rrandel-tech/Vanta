@@ -7,6 +7,8 @@
 
 namespace Vanta {
 
+	class Framebuffer;
+
 	struct FramebufferTextureSpecification
 	{
 		FramebufferTextureSpecification() = default;
@@ -31,6 +33,7 @@ namespace Vanta {
 		uint32_t Width = 0;
 		uint32_t Height = 0;
 		glm::vec4 ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+		bool ClearOnLoad = true;
 		FramebufferAttachmentSpecification Attachments;
 		uint32_t Samples = 1; // multisampling
 
@@ -42,6 +45,10 @@ namespace Vanta {
 
 		Ref<Image2D> ExistingImage;
 		uint32_t ExistingImageLayer;
+
+		// At the moment this will just create a new render pass
+		// with an existing framebuffer
+		Ref<Framebuffer> ExistingFramebuffer;
 
 		std::string DebugName;
 	};

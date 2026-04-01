@@ -123,6 +123,8 @@ namespace Vanta {
 		VkPhysicalDeviceFeatures enabledFeatures;
 		memset(&enabledFeatures, 0, sizeof(VkPhysicalDeviceFeatures));
 		enabledFeatures.samplerAnisotropy = true;
+		enabledFeatures.wideLines = true;
+		enabledFeatures.fillModeNonSolid = true;
 		m_Device = Ref<VulkanDevice>::Create(m_PhysicalDevice, enabledFeatures);
 
 		VulkanAllocator::Init(m_Device);
