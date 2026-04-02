@@ -47,7 +47,6 @@ namespace Vanta {
 	{
 	}
 
-	
 	void EditorLayer::OnAttach()
 	{
 		using namespace glm;
@@ -61,6 +60,8 @@ namespace Vanta {
 		m_SceneHierarchyPanel = CreateScope<SceneHierarchyPanel>(m_EditorScene);
 		m_SceneHierarchyPanel->SetSelectionChangedCallback(std::bind(&EditorLayer::SelectEntity, this, std::placeholders::_1));
 		m_SceneHierarchyPanel->SetEntityDeletedCallback(std::bind(&EditorLayer::OnEntityDeleted, this, std::placeholders::_1));
+		m_SceneHierarchyPanel->SetMeshAssetConvertCallback(std::bind(&EditorLayer::OnCreateMeshFromMeshAsset, this, std::placeholders::_1, std::placeholders::_2));
+		m_SceneHierarchyPanel->SetInvalidMetadataCallback(std::bind(&EditorLayer::SceneHierarchyInvalidMetadataCallback, this, std::placeholders::_1, std::placeholders::_2));
 
 		Renderer2D::SetLineWidth(m_LineWidth);
 
@@ -502,9 +503,119 @@ namespace Vanta {
 
 			if (ImGui::Button("OK"))
 				ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+	}
+
+	void EditorLayer::UI_CreateNewMeshPopup()
+	{
+		if (m_ShowCreateNewMeshPopup)
+		{
+			ImGui::OpenPopup("Create New Mesh");
+			m_ShowCreateNewMeshPopup = false;
+		}
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2{ 400,0 });
+		if (ImGui::BeginPopupModal("Create New Mesh", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::TextWrapped("A Mesh asset must be created from this Mesh Source file (eg. FBX) before it can be added to your scene. More options can be accessed by double-clicking a Mesh Source file in the Content Browser panel.");
+			const std::string& meshAssetPath = Project::GetActive()->GetConfig().MeshPath;
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text("Path: %s/", meshAssetPath.c_str());
+			ImGui::SameLine();
+
+			VA_CORE_ASSERT(m_CreateNewMeshPopupData.MeshToCreate);
+
+			const AssetMetadata& assetData = AssetManager::GetMetadata(m_CreateNewMeshPopupData.MeshToCreate->Handle);
+			std::string filepath = std::format("{0}/{1}.vmesh", m_CurrentScene->GetName(), assetData.FilePath.stem().string());
+
+			if (!m_CreateNewMeshPopupData.CreateMeshFilenameBuffer[0])
+				strcpy(m_CreateNewMeshPopupData.CreateMeshFilenameBuffer.data(), filepath.c_str());
+
+			ImGui::InputText("##meshPath", m_CreateNewMeshPopupData.CreateMeshFilenameBuffer.data(), 256);
+
+			if (ImGui::Button("Create"))
+			{
+				std::string serializePath = m_CreateNewMeshPopupData.CreateMeshFilenameBuffer.data();
+				std::filesystem::path path = Project::GetActive()->GetMeshPath() / serializePath;
+				if (!FileSystem::Exists(path.parent_path()))
+					FileSystem::CreateDirectory(path.parent_path());
+
+				Ref<Mesh> mesh = AssetManager::CreateNewAsset<Mesh>(path.filename().string(), path.parent_path().string(), m_CreateNewMeshPopupData.MeshToCreate);
+
+				Entity entity = m_CreateNewMeshPopupData.TargetEntity;
+				if (entity)
+				{
+					if (!entity.HasComponent<MeshComponent>())
+						entity.AddComponent<MeshComponent>();
+
+					MeshComponent& mc = entity.GetComponent<MeshComponent>();
+					mc.Mesh = mesh;
+				}
+				else
+				{
+					const auto& meshMetadata = AssetManager::GetMetadata(mesh->Handle);
+					Entity entity = m_EditorScene->CreateEntity(meshMetadata.FilePath.stem().string());
+					entity.AddComponent<MeshComponent>(mesh);
+					SelectEntity(entity);
+				}
+
+				m_CreateNewMeshPopupData = {};
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+			{
+				m_CreateNewMeshPopupData = {};
+				ImGui::CloseCurrentPopup();
+			}
 
 			ImGui::EndPopup();
 		}
+	}
+
+	void EditorLayer::UI_InvalidAssetMetadataPopup()
+	{
+		if (m_ShowInvalidAssetMetadataPopup)
+		{
+			ImGui::OpenPopup("Invalid Asset Metadata");
+			m_ShowInvalidAssetMetadataPopup = false;
+		}
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2{ 400,0 });
+		if (ImGui::BeginPopupModal("Invalid Asset Metadata", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::TextWrapped("You tried to use an asset with invalid metadata. This most likely happened because an asset has a reference to another non-existent asset.");
+			ImGui::Separator();
+
+			auto& metadata = m_InvalidAssetMetadataPopupData.Metadata;
+			UI::BeginPropertyGrid();
+			const auto& filepath = metadata.FilePath.string();
+			UI::Property("Asset Filepath", filepath);
+			UI::Property("Asset ID", std::format("{0}", (uint64_t)metadata.Handle));
+			UI::EndPropertyGrid();
+
+			if (ImGui::Button("OK"))
+				ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+	}
+
+	void EditorLayer::OnCreateMeshFromMeshAsset(Entity entity, Ref<MeshAsset> meshAsset)
+	{
+		m_ShowCreateNewMeshPopup = true;
+		m_CreateNewMeshPopupData.MeshToCreate = meshAsset;
+		m_CreateNewMeshPopupData.TargetEntity = entity;
+	}
+
+	void EditorLayer::SceneHierarchyInvalidMetadataCallback(Entity entity, AssetHandle handle)
+	{
+		m_ShowInvalidAssetMetadataPopup = true;
+		m_InvalidAssetMetadataPopupData.Metadata = AssetManager::GetMetadata(handle);
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -782,17 +893,36 @@ namespace Vanta {
 					}
 
 					Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
-					if (asset->GetAssetType() == AssetType::MeshAsset)
+					if (asset)
 					{
-						Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
-						entity.AddComponent<MeshComponent>(Ref<Mesh>::Create(asset.As<MeshAsset>()));
-						SelectEntity(entity);
+						if (asset->GetAssetType() == AssetType::MeshAsset)
+						{
+							m_ShowCreateNewMeshPopup = true;
+							m_CreateNewMeshPopupData.MeshToCreate = asset.As<MeshAsset>();
+							m_CreateNewMeshPopupData.TargetEntity = {};
+#if 0
+							// Create new mesh
+							std::filesystem::path meshPath = assetData.FileName;
+							std::filesystem::path meshDirectory = Project::GetMeshPath();
+							std::string filename = fmt::format("{0}.hzm", meshPath.stem().string());
+							Ref<Mesh> mesh = AssetManager::CreateNewAsset<Mesh>(filename, meshDirectory.string(), asset.As<MeshAsset>());
+
+							Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
+							entity.AddComponent<MeshComponent>(mesh);
+							SelectEntity(entity);
+#endif
+						}
+						else if (asset->GetAssetType() == AssetType::Mesh)
+						{
+							Entity entity = m_EditorScene->CreateEntity(assetData.FilePath.stem().string());
+							entity.AddComponent<MeshComponent>(asset.As<Mesh>());
+							SelectEntity(entity);
+						}
 					}
-					else if (asset->GetAssetType() == AssetType::Mesh)
+					else
 					{
-						Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
-						entity.AddComponent<MeshComponent>(asset.As<Mesh>());
-						SelectEntity(entity);
+						m_ShowInvalidAssetMetadataPopup = true;
+						m_InvalidAssetMetadataPopupData.Metadata = assetData;
 					}
 				}
 			}
@@ -914,14 +1044,14 @@ namespace Vanta {
 							// We can't really support dragging and dropping scenes when we're dropping multiple assets
 							if (count == 1 && assetData.Type == AssetType::Scene)
 							{
-								OpenScene(assetData.FilePath);
+								OpenScene(assetData.FilePath.string());
 								break;
 							}
 
 							Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
 							if (asset->GetAssetType() == AssetType::Mesh)
 							{
-								Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
+								Entity entity = m_EditorScene->CreateEntity(assetData.FilePath.stem().string());
 								entity.AddComponent<MeshComponent>(asset.As<Mesh>());
 								SelectEntity(entity);
 							}
@@ -1310,8 +1440,12 @@ namespace Vanta {
 
 		UI_WelcomePopup();
 		UI_AboutPopup();
+		
+		UI_CreateNewMeshPopup();
+		UI_InvalidAssetMetadataPopup();
 
 		AssetEditorPanel::OnImGuiRender();
+		AssetManager::OnImGuiRender(m_AssetManagerPanelOpen);
 	}
 
 	void EditorLayer::OnEvent(Event& e)

@@ -64,11 +64,11 @@ namespace Vanta {
 		{
 			uint32_t entityCount = 0, meshCount = 0;
 			m_Context->m_Registry.each([&](auto entity)
-			{
-				Entity e(entity, m_Context.Raw());
-				if (e.HasComponent<IDComponent>() && e.GetParentUUID() == 0)
-					DrawEntityNode(e);
-			});
+				{
+					Entity e(entity, m_Context.Raw());
+					if (e.HasComponent<IDComponent>() && e.GetParentUUID() == 0)
+						DrawEntityNode(e);
+				});
 
 			if (ImGui::BeginDragDropTargetCustom(windowRect, ImGui::GetCurrentWindow()->ID))
 			{
@@ -160,6 +160,13 @@ namespace Vanta {
 						newEntity.GetComponent<TransformComponent>().Rotation = glm::radians(glm::vec3{ 80.0f, 10.0f, 0.0f });
 						SetSelected(newEntity);
 					}
+					if (ImGui::MenuItem("Point Light"))
+					{
+						auto newEntity = m_Context->CreateEntity("Point Light");
+						newEntity.AddComponent<PointLightComponent>();
+						newEntity.GetComponent<TransformComponent>().Translation = glm::vec3{ 0 };
+						SetSelected(newEntity);
+					}
 					if (ImGui::MenuItem("Sky Light"))
 					{
 						auto newEntity = m_Context->CreateEntity("Sky Light");
@@ -213,11 +220,11 @@ namespace Vanta {
 			flags |= ImGuiTreeNodeFlags_Leaf;
 
 		// TODO: This should probably be a function that checks that the entities components are valid
-		bool missingMesh = entity.HasComponent<MeshComponent>() && (entity.GetComponent<MeshComponent>().Mesh && entity.GetComponent<MeshComponent>().Mesh->IsFlagSet(AssetFlag::Missing));
+		const bool missingMesh = entity.HasComponent<MeshComponent>() && (entity.GetComponent<MeshComponent>().Mesh && entity.GetComponent<MeshComponent>().Mesh->IsFlagSet(AssetFlag::Missing));
 		if (missingMesh)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.4f, 0.3f, 1.0f));
 
-		bool opened = ImGui::TreeNodeEx((void*)(uint32_t)entity, flags, name);
+		const bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, name);
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectionContext = entity;
@@ -482,6 +489,14 @@ namespace Vanta {
 					ImGui::CloseCurrentPopup();
 				}
 			}
+			if (!m_SelectionContext.HasComponent<PointLightComponent>())
+			{
+				if (ImGui::Button("Point Light"))
+				{
+					m_SelectionContext.AddComponent<PointLightComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
 			if (!m_SelectionContext.HasComponent<SkyLightComponent>())
 			{
 				if (ImGui::Button("Sky Light"))
@@ -510,117 +525,139 @@ namespace Vanta {
 		}
 
 		DrawComponent<TransformComponent>("Transform", entity, [](TransformComponent& component)
-		{
-			DrawVec3Control("Translation", component.Translation);
-			glm::vec3 rotation = glm::degrees(component.Rotation);
-			DrawVec3Control("Rotation", rotation);
-			component.Rotation = glm::radians(rotation);
-			DrawVec3Control("Scale", component.Scale, 1.0f);
-		}, false);
+			{
+				DrawVec3Control("Translation", component.Translation);
+				glm::vec3 rotation = glm::degrees(component.Rotation);
+				DrawVec3Control("Rotation", rotation);
+				component.Rotation = glm::radians(rotation);
+				DrawVec3Control("Scale", component.Scale, 1.0f);
+			}, false);
 
 		DrawComponent<MeshComponent>("Mesh", entity, [&](MeshComponent& mc)
 		{
 			UI::BeginPropertyGrid();
 
-			Ref<MeshAsset> meshAsset;
-
-			if (mc.Mesh && mc.Mesh->IsValid())
-				meshAsset = mc.Mesh->GetMeshAsset();
-
-			if (UI::PropertyAssetReference("Mesh", meshAsset))
+			UI::PropertyAssetReferenceError error;
+			if (UI::PropertyAssetReferenceWithConversion<Mesh, MeshAsset>("Mesh", mc.Mesh,
+				[=](Ref<MeshAsset> meshAsset)
+				{
+					if (m_MeshAssetConvertCallback)
+						m_MeshAssetConvertCallback(entity, meshAsset);
+				}, &error))
 			{
-				mc.Mesh = meshAsset ? Ref<Mesh>::Create(meshAsset) : nullptr;
+				// Mesh updated — no collider/physics handling
+			}
+
+			if (error == UI::PropertyAssetReferenceError::InvalidMetadata)
+			{
+				if (m_InvalidMetadataCallback)
+					m_InvalidMetadataCallback(entity, UI::s_PropertyAssetReferenceAssetHandle);
 			}
 
 			UI::EndPropertyGrid();
 		});
 
 		DrawComponent<CameraComponent>("Camera", entity, [](CameraComponent& cc)
-		{
-			UI::BeginPropertyGrid();
-
-			// Projection Type
-			const char* projTypeStrings[] = { "Perspective", "Orthographic" };
-			int currentProj = (int)cc.Camera.GetProjectionType();
-			if (UI::PropertyDropdown("Projection", projTypeStrings, 2, &currentProj))
 			{
-				cc.Camera.SetProjectionType((SceneCamera::ProjectionType)currentProj);
-			}
+				UI::BeginPropertyGrid();
 
-			// Perspective parameters
-			if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Perspective)
-			{
-				float verticalFOV = cc.Camera.GetPerspectiveVerticalFOV();
-				if (UI::Property("Vertical FOV", verticalFOV))
-					cc.Camera.SetPerspectiveVerticalFOV(verticalFOV);
+				// Projection Type
+				const char* projTypeStrings[] = { "Perspective", "Orthographic" };
+				int currentProj = (int)cc.Camera.GetProjectionType();
+				if (UI::PropertyDropdown("Projection", projTypeStrings, 2, &currentProj))
+				{
+					cc.Camera.SetProjectionType((SceneCamera::ProjectionType)currentProj);
+				}
 
-				float nearClip = cc.Camera.GetPerspectiveNearClip();
-				if (UI::Property("Near Clip", nearClip))
-					cc.Camera.SetPerspectiveNearClip(nearClip);
-				ImGui::SameLine();
-				float farClip = cc.Camera.GetPerspectiveFarClip();
-				if (UI::Property("Far Clip", farClip))
-					cc.Camera.SetPerspectiveFarClip(farClip);
-			}
+				// Perspective parameters
+				if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Perspective)
+				{
+					float verticalFOV = cc.Camera.GetPerspectiveVerticalFOV();
+					if (UI::Property("Vertical FOV", verticalFOV))
+						cc.Camera.SetPerspectiveVerticalFOV(verticalFOV);
 
-			// Orthographic parameters
-			else if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Orthographic)
-			{
-				float orthoSize = cc.Camera.GetOrthographicSize();
-				if (UI::Property("Size", orthoSize))
-					cc.Camera.SetOrthographicSize(orthoSize);
+					float nearClip = cc.Camera.GetPerspectiveNearClip();
+					if (UI::Property("Near Clip", nearClip))
+						cc.Camera.SetPerspectiveNearClip(nearClip);
+					ImGui::SameLine();
+					float farClip = cc.Camera.GetPerspectiveFarClip();
+					if (UI::Property("Far Clip", farClip))
+						cc.Camera.SetPerspectiveFarClip(farClip);
+				}
 
-				float nearClip = cc.Camera.GetOrthographicNearClip();
-				if (UI::Property("Near Clip", nearClip))
-					cc.Camera.SetOrthographicNearClip(nearClip);
-				ImGui::SameLine();
-				float farClip = cc.Camera.GetOrthographicFarClip();
-				if (UI::Property("Far Clip", farClip))
-					cc.Camera.SetOrthographicFarClip(farClip);
-			}
+				// Orthographic parameters
+				else if (cc.Camera.GetProjectionType() == SceneCamera::ProjectionType::Orthographic)
+				{
+					float orthoSize = cc.Camera.GetOrthographicSize();
+					if (UI::Property("Size", orthoSize))
+						cc.Camera.SetOrthographicSize(orthoSize);
 
-			UI::EndPropertyGrid();
-		});
+					float nearClip = cc.Camera.GetOrthographicNearClip();
+					if (UI::Property("Near Clip", nearClip))
+						cc.Camera.SetOrthographicNearClip(nearClip);
+					ImGui::SameLine();
+					float farClip = cc.Camera.GetOrthographicFarClip();
+					if (UI::Property("Far Clip", farClip))
+						cc.Camera.SetOrthographicFarClip(farClip);
+				}
+
+				UI::EndPropertyGrid();
+			});
+
 
 		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [](SpriteRendererComponent& mc)
-		{
-		});
+			{
+			});
 
 		DrawComponent<DirectionalLightComponent>("Directional Light", entity, [](DirectionalLightComponent& dlc)
-		{
-			UI::BeginPropertyGrid();
-			UI::PropertyColor("Radiance", dlc.Radiance);
-			UI::Property("Intensity", dlc.Intensity);
-			UI::Property("Cast Shadows", dlc.CastShadows);
-			UI::Property("Soft Shadows", dlc.SoftShadows);
-			UI::Property("Source Size", dlc.LightSize);
-			UI::EndPropertyGrid();
-		});
+			{
+				UI::BeginPropertyGrid();
+				UI::PropertyColor("Radiance", dlc.Radiance);
+				UI::Property("Intensity", dlc.Intensity);
+				UI::Property("Cast Shadows", dlc.CastShadows);
+				UI::Property("Soft Shadows", dlc.SoftShadows);
+				UI::Property("Source Size", dlc.LightSize);
+				UI::EndPropertyGrid();
+			});
+
+		DrawComponent<PointLightComponent>("Point Light", entity, [](PointLightComponent& dlc)
+			{
+				UI::BeginPropertyGrid();
+				UI::PropertyColor("Radiance", dlc.Radiance);
+				UI::Property("Intensity", dlc.Intensity, 0.05f, 0.f, 500.f);
+				//UI::Property("Source Size", dlc.LightSize, 0.05f, 0.f, std::numeric_limits<float>::max());
+				UI::Property("Min Radius", dlc.MinRadius, 0.05f, 0.f, std::numeric_limits<float>::max());
+				UI::Property("Radius", dlc.Radius, 0.1f, 0.f, std::numeric_limits<float>::max());
+				//UI::Property("Cast Shadows", dlc.CastsShadows);
+				//UI::Property("Soft Shadows", dlc.SoftShadows);
+				UI::Property("Falloff", dlc.Falloff, 0.005f, 0.f, 1.f);
+				UI::EndPropertyGrid();
+			});
 
 		DrawComponent<SkyLightComponent>("Sky Light", entity, [](SkyLightComponent& slc)
-		{
-			UI::BeginPropertyGrid();
-			UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment);
-			UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
-			ImGui::Separator();
-			UI::Property("Dynamic Sky", slc.DynamicSky);
-			if (slc.DynamicSky)
 			{
-				bool changed = UI::Property("Turbidity", slc.TurbidityAzimuthInclination.x, 0.01f);
-				changed |= UI::Property("Azimuth", slc.TurbidityAzimuthInclination.y, 0.01f);
-				changed |= UI::Property("Inclination", slc.TurbidityAzimuthInclination.z, 0.01f);
-				if (changed)
+				UI::BeginPropertyGrid();
+				UI::PropertyAssetReference("Environment Map", slc.SceneEnvironment);
+				UI::Property("Intensity", slc.Intensity, 0.01f, 0.0f, 5.0f);
+				ImGui::Separator();
+				UI::Property("Dynamic Sky", slc.DynamicSky);
+				if (slc.DynamicSky)
 				{
-					Ref<TextureCube> preethamEnv = Renderer::CreatePreethamSky(slc.TurbidityAzimuthInclination.x, slc.TurbidityAzimuthInclination.y, slc.TurbidityAzimuthInclination.z);
-					slc.SceneEnvironment = Ref<Environment>::Create(preethamEnv, preethamEnv);
+					bool changed = UI::Property("Turbidity", slc.TurbidityAzimuthInclination.x, 0.01f);
+					changed |= UI::Property("Azimuth", slc.TurbidityAzimuthInclination.y, 0.01f);
+					changed |= UI::Property("Inclination", slc.TurbidityAzimuthInclination.z, 0.01f);
+					if (changed)
+					{
+						Ref<TextureCube> preethamEnv = Renderer::CreatePreethamSky(slc.TurbidityAzimuthInclination.x, slc.TurbidityAzimuthInclination.y, slc.TurbidityAzimuthInclination.z);
+						slc.SceneEnvironment = Ref<Environment>::Create(preethamEnv, preethamEnv);
+					}
 				}
-			}
-			UI::EndPropertyGrid();
-		});
+				UI::EndPropertyGrid();
+			});
 
 		DrawComponent<ScriptComponent>("Script", entity, [=](ScriptComponent& sc) mutable
-		{
-		});
+			{
+			});
 
 	}
 

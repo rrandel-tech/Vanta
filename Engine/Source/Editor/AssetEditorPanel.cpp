@@ -18,9 +18,9 @@ namespace Vanta {
 			return;
 
 		bool was_open = m_IsOpen;
-		// NOTE: SetNextWindowSizeConstraints requires a max constraint that's above 0. For now we're just setting it to a large value
+		// NOTE(Peter): SetNextWindowSizeConstraints requires a max constraint that's above 0. For now we're just setting it to a large value
 		ImGui::SetNextWindowSizeConstraints(m_MinSize, m_MaxSize);
-		ImGui::Begin(m_Title, &m_IsOpen, m_Flags);
+		ImGui::Begin(m_Title.c_str(), &m_IsOpen, m_Flags);
 		Render();
 		ImGui::End();
 
@@ -40,17 +40,27 @@ namespace Vanta {
 		if (width <= 0) width = 200;
 		if (height <= 0) height = 400;
 
-		m_MinSize = ImVec2(width, height);
+		m_MinSize = ImVec2(float(width), float(height));
 	}
 
 	void AssetEditor::SetMaxSize(uint32_t width, uint32_t height)
 	{
 		if (width <= 0) width = 2000;
 		if (height <= 0) height = 2000;
-		if (width <= m_MinSize.x) width = m_MinSize.x * 2;
-		if (height <= m_MinSize.y) height = m_MinSize.y * 2;
+		if (float(width) <= m_MinSize.x) width = (uint32_t)(m_MinSize.x * 2.f);
+		if (float(height) <= m_MinSize.y) height = (uint32_t)(m_MinSize.y * 2.f);
 
-		m_MaxSize = ImVec2(width, height);
+		m_MaxSize = ImVec2(float(width), float(height));
+	}
+
+	void AssetEditor::SetTitle(const std::string& newTitle)
+	{
+		m_Title = newTitle;
+	}
+
+	const std::string& AssetEditor::GetTitle() const
+	{
+		return m_Title;
 	}
 
 	void AssetEditorPanel::RegisterDefaultEditors()

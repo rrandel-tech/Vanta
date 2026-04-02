@@ -17,12 +17,13 @@ namespace Vanta {
     {
         if (s_Serializers.find(metadata.Type) == s_Serializers.end())
         {
-            VA_CORE_WARN("There's currently no importer for assets of type {0}", metadata.Extension);
+            VA_CORE_WARN("There's currently no importer for assets of type {0}", metadata.FilePath.extension().string());
             return;
         }
 
         s_Serializers[asset->GetAssetType()]->Serialize(metadata, asset);
     }
+
 
     void AssetImporter::Serialize(const Ref<Asset>& asset)
     {
@@ -34,7 +35,7 @@ namespace Vanta {
     {
         if (s_Serializers.find(metadata.Type) == s_Serializers.end())
         {
-            VA_CORE_WARN("There's currently no importer for assets of type {0}", metadata.Extension);
+            VA_CORE_WARN("There's currently no importer for assets of type {0}", metadata.FilePath.extension().string());
             return false;
         }
 

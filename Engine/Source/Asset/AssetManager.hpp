@@ -1,14 +1,17 @@
 #pragma once
 
-#include "AssetImporter.hpp"
 #include "Project/Project.hpp"
 #include "Utilities/FileSystem.hpp"
 #include "Utilities/StringUtils.hpp"
+
+#include "AssetImporter.hpp"
+#include "AssetRegistry.hpp"
 
 #include <map>
 #include <unordered_map>
 
 namespace Vanta {
+
 	// Deserialized from project file - these are just defaults
 	class AssetManagerConfig
 	{
@@ -32,48 +35,51 @@ namespace Vanta {
 		static AssetMetadata& GetMetadata(const std::string& filepath);
 
 		static std::string GetFileSystemPath(const AssetMetadata& metadata) { return (Project::GetAssetDirectory() / metadata.FilePath).string(); }
+		static std::string GetRelativePath(const std::string& filepath);
 
 		static AssetHandle GetAssetHandleFromFilePath(const std::string& filepath);
 		static bool IsAssetHandleValid(AssetHandle assetHandle) { return GetMetadata(assetHandle).IsValid(); }
 
-		static AssetType GetAssetTypeForFileType(const std::string& extension);
+		static AssetType GetAssetTypeFromExtension(const std::string& extension);
+		static AssetType GetAssetTypeFromPath(const std::filesystem::path& path);
 
 		static AssetHandle ImportAsset(const std::string& filepath);
+		static bool ReloadData(AssetHandle assetHandle);
 
 		template<typename T, typename... Args>
-		static Ref<T> CreateNewAsset(const std::string& filename, const std::string& directoryPath, Args&&... args)
+		static Ref<T> CreateNewAsset(const std::string& filename, const std::string& directory, Args&&... args)
 		{
 			static_assert(std::is_base_of<Asset, T>::value, "CreateNewAsset only works for types derived from Asset");
 
-			FileSystem::SkipNextFileSystemChange();
+			// TODO: this shouldn't be needed anymore - all paths MUST be relative to asset directory anyway
+			std::filesystem::path relativePath = std::filesystem::relative(std::filesystem::path(directory), Project::GetAssetDirectory());
+			std::string directoryPath = relativePath.string();
+			std::replace(directoryPath.begin(), directoryPath.end(), '\\', '/');
 
 			AssetMetadata metadata;
 			metadata.Handle = AssetHandle();
 			metadata.FilePath = directoryPath + "/" + filename;
-			metadata.FileName = Utils::RemoveExtension(Utils::GetFilename(metadata.FilePath));
-			metadata.Extension = Utils::GetExtension(filename);
 			metadata.IsDataLoaded = true;
 			metadata.Type = T::GetStaticType();
-			
-			if (FileSystem::Exists(metadata.FilePath))
+
+			if (FileExists(metadata))
 			{
 				bool foundAvailableFileName = false;
 				int current = 1;
 
 				while (!foundAvailableFileName)
 				{
-					std::string nextFilePath = directoryPath + "/" + metadata.FileName;
+					std::string nextFilePath = (relativePath / metadata.FilePath.stem()).string();
 					if (current < 10)
 						nextFilePath += " (0" + std::to_string(current) + ")";
 					else
 						nextFilePath += " (" + std::to_string(current) + ")";
-					nextFilePath += "." + metadata.Extension;
+					nextFilePath += metadata.FilePath.extension().string();
 
 					if (!FileSystem::Exists(nextFilePath))
 					{
 						foundAvailableFileName = true;
 						metadata.FilePath = nextFilePath;
-						metadata.FileName = Utils::RemoveExtension(Utils::GetFilename(metadata.FilePath));
 						break;
 					}
 
@@ -81,7 +87,7 @@ namespace Vanta {
 				}
 			}
 
-			s_AssetRegistry[metadata.FilePath] = metadata;
+			s_AssetRegistry[metadata.FilePath.string()] = metadata;
 
 			WriteRegistryToFile();
 
@@ -97,12 +103,14 @@ namespace Vanta {
 		static Ref<T> GetAsset(AssetHandle assetHandle)
 		{
 			auto& metadata = GetMetadata(assetHandle);
-			VA_CORE_ASSERT(metadata.IsValid());
 
 			Ref<Asset> asset = nullptr;
 			if (!metadata.IsDataLoaded)
 			{
 				metadata.IsDataLoaded = AssetImporter::TryLoadData(metadata, asset);
+				if (!metadata.IsDataLoaded)
+					return nullptr;
+
 				s_LoadedAssets[assetHandle] = asset;
 			}
 			else
@@ -116,9 +124,19 @@ namespace Vanta {
 		template<typename T>
 		static Ref<T> GetAsset(const std::string& filepath)
 		{
-			return GetAsset<T>(GetAssetHandleFromFilePath(filepath));
+			std::string fp = filepath;
+			if (fp.find(Project::GetAssetDirectory().string()) == std::string::npos)
+				fp = (Project::GetAssetDirectory() / fp).string();
+
+			return GetAsset<T>(GetAssetHandleFromFilePath(fp));
 		}
 
+		static bool FileExists(AssetMetadata& metadata)
+		{
+			return FileSystem::Exists(Project::GetActive()->GetAssetDirectory() / metadata.FilePath);
+		}
+
+		static void OnImGuiRender(bool& open);
 	private:
 		static void LoadAssetRegistry();
 		static void ProcessDirectory(const std::string& directoryPath);
@@ -132,11 +150,11 @@ namespace Vanta {
 
 	private:
 		static std::unordered_map<AssetHandle, Ref<Asset>> s_LoadedAssets;
-		static std::unordered_map<std::string, AssetMetadata> s_AssetRegistry;
 		static AssetsChangeEventFn s_AssetsChangeCallback;
-
+		inline static AssetRegistry s_AssetRegistry;
 	private:
 		friend class ContentBrowserPanel;
 		friend class ContentBrowserAsset;
 	};
+
 }

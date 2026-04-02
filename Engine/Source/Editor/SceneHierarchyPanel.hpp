@@ -15,6 +15,8 @@ namespace Vanta {
 		void SetSelected(Entity entity);
 		void SetSelectionChangedCallback(const std::function<void(Entity)>& func) { m_SelectionChangedCallback = func; }
 		void SetEntityDeletedCallback(const std::function<void(Entity)>& func) { m_EntityDeletedCallback = func; }
+		void SetMeshAssetConvertCallback(const std::function<void(Entity, Ref<MeshAsset>)>& func) { m_MeshAssetConvertCallback = func; }
+		void SetInvalidMetadataCallback(const std::function<void(Entity, AssetHandle)>& func) { m_InvalidMetadataCallback = func; }
 
 		void OnImGuiRender();
 	private:
@@ -25,6 +27,8 @@ namespace Vanta {
 		Entity m_SelectionContext;
 
 		std::function<void(Entity)> m_SelectionChangedCallback, m_EntityDeletedCallback;
+		std::function<void(Entity, Ref<MeshAsset>)> m_MeshAssetConvertCallback;
+		std::function<void(Entity, AssetHandle)> m_InvalidMetadataCallback;
 	};
 
 }

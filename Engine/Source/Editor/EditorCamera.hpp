@@ -1,10 +1,16 @@
 #pragma once
 
 #include "Renderer/Camera.hpp"
-#include "Core/Timestep.hpp"
+#include "Core/TimeStep.hpp"
+#include "Events/KeyEvent.hpp"
 #include "Events/MouseEvent.hpp"
 
 namespace Vanta {
+
+	enum class CameraMode
+	{
+		NONE, FLYCAM, ARCBALL
+	};
 
 	class EditorCamera : public Camera
 	{
@@ -30,15 +36,22 @@ namespace Vanta {
 		glm::vec3 GetUpDirection();
 		glm::vec3 GetRightDirection();
 		glm::vec3 GetForwardDirection();
+
 		const glm::vec3& GetPosition() const { return m_Position; }
 		glm::quat GetOrientation() const;
 
 		float GetPitch() const { return m_Pitch; }
 		float GetYaw() const { return m_Yaw; }
+		float& GetCameraSpeed() { return m_Speed; }
+		float GetCameraSpeed() const { return m_Speed; }
 	private:
+		void CalculateYaw(float degrees);
+		void CalculatePitch(float degrees);
 		void UpdateCameraView();
 
 		bool OnMouseScroll(MouseScrolledEvent& e);
+		bool OnKeyPressed(KeyPressedEvent& e);
+		bool OnKeyReleased(KeyReleasedEvent& e);
 
 		void MousePan(const glm::vec2& delta);
 		void MouseRotate(const glm::vec2& delta);
@@ -53,14 +66,22 @@ namespace Vanta {
 		glm::mat4 m_ViewMatrix;
 		glm::vec3 m_Position, m_Rotation, m_FocalPoint;
 
-		bool m_IsActive = true;
-
+		bool m_IsActive = false;
 		bool m_Panning, m_Rotating;
-		glm::vec2 m_InitialMousePosition;
+		glm::vec2 m_InitialMousePosition {};
 		glm::vec3 m_InitialFocalPoint, m_InitialRotation;
 
 		float m_Distance;
+		float m_Speed {0.005f};
+		float m_LastSpeed = 0.f;
+
 		float m_Pitch, m_Yaw;
+		glm::vec3 m_CameraPositionDelta;
+		glm::vec3 m_RightDirection {};
+
+		bool m_IsAllowed = false;
+
+		CameraMode m_CameraMode { CameraMode::NONE };
 
 		float m_MinFocusDistance = 100.0f;
 

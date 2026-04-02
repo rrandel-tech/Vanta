@@ -53,6 +53,12 @@ namespace Vanta {
 
 		void UI_WelcomePopup();
 		void UI_AboutPopup();
+
+		void UI_CreateNewMeshPopup();
+		void UI_InvalidAssetMetadataPopup();
+
+		void OnCreateMeshFromMeshAsset(Entity entity, Ref<MeshAsset> meshAsset);
+		void SceneHierarchyInvalidMetadataCallback(Entity entity, AssetHandle handle);
 	private:
 		std::pair<float, float> GetMouseViewportSpace(bool primaryViewport);
 		std::pair<glm::vec3, glm::vec3> CastRay(const EditorCamera& camera, float mx, float my);
@@ -151,7 +157,7 @@ namespace Vanta {
 		bool m_ShowBoundingBoxes = false;
 		bool m_ShowBoundingBoxSelectedMeshOnly = true;
 		bool m_ShowBoundingBoxSubmeshes = false;
-		bool m_ShowSelectedWireframe = true;
+		bool m_ShowSelectedWireframe = false;
 
 		bool m_ViewportPanelMouseOver = false;
 		bool m_ViewportPanelFocused = false;
@@ -164,6 +170,28 @@ namespace Vanta {
 		bool m_ShowWelcomePopup = true;
 		bool m_ShowAboutPopup = false;
 
+		bool m_ShowCreateNewMeshPopup = false;
+		struct CreateNewMeshPopupData
+		{
+			Ref<MeshAsset> MeshToCreate;
+			std::array<char, 256> CreateMeshFilenameBuffer;
+			Entity TargetEntity;
+
+			CreateNewMeshPopupData()
+			{
+				CreateMeshFilenameBuffer.fill(0);
+				MeshToCreate = nullptr;
+				TargetEntity = {};
+			}
+
+		} m_CreateNewMeshPopupData;
+
+		bool m_ShowInvalidAssetMetadataPopup = false;
+		struct InvalidAssetMetadataPopupData
+		{
+			AssetMetadata Metadata;
+		} m_InvalidAssetMetadataPopupData;
+
 		enum class SceneState
 		{
 			Edit = 0, Play = 1, Pause = 2
@@ -174,6 +202,8 @@ namespace Vanta {
 		{
 			None = 0, Entity = 1, SubMesh = 2
 		};
+
+		bool m_AssetManagerPanelOpen = false;
 
 		SelectionMode m_SelectionMode = SelectionMode::Entity;
 		std::vector<SelectedSubmesh> m_SelectionContext;

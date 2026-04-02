@@ -133,6 +133,9 @@ namespace Vanta {
             ImGui::Text("Free VRAM: %s", free.c_str());
         }
 
+        bool vsync = m_Window->IsVSync();
+        if (ImGui::Checkbox("Vsync", &vsync))
+            m_Window->SetVSync(vsync);
         ImGui::End();
 
         ImGui::Begin("Performance");

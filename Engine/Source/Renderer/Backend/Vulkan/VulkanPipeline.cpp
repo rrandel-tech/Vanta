@@ -131,16 +131,51 @@ namespace Vanta {
 			// We need one blend attachment state per color attachment (even if blending is not used)
 			size_t colorAttachmentCount = framebuffer->GetSpecification().SwapChainTarget ? 1 : framebuffer->GetColorAttachmentCount();
 			std::vector<VkPipelineColorBlendAttachmentState> blendAttachmentStates(colorAttachmentCount);
-			for (size_t i = 0; i < colorAttachmentCount; i++)
+			if (framebuffer->GetSpecification().SwapChainTarget)
 			{
-				blendAttachmentStates[i].colorWriteMask = 0xf;
-				blendAttachmentStates[i].blendEnable = VK_TRUE;
-				blendAttachmentStates[i].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-				blendAttachmentStates[i].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-				blendAttachmentStates[i].colorBlendOp = VK_BLEND_OP_ADD;
-				blendAttachmentStates[i].alphaBlendOp = VK_BLEND_OP_ADD;
-				blendAttachmentStates[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-				blendAttachmentStates[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+				blendAttachmentStates[0].colorWriteMask = 0xf;
+				blendAttachmentStates[0].blendEnable = VK_TRUE;
+				blendAttachmentStates[0].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+				blendAttachmentStates[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+				blendAttachmentStates[0].colorBlendOp = VK_BLEND_OP_ADD;
+				blendAttachmentStates[0].alphaBlendOp = VK_BLEND_OP_ADD;
+				blendAttachmentStates[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+				blendAttachmentStates[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			}
+			else
+			{
+				for (size_t i = 0; i < colorAttachmentCount; i++)
+				{
+					if (!framebuffer->GetSpecification().Blend)
+						break;
+
+					const auto& attachmentSpec = framebuffer->GetSpecification().Attachments.Attachments[i];
+					FramebufferBlendMode blendMode = framebuffer->GetSpecification().BlendMode == FramebufferBlendMode::None
+						? attachmentSpec.BlendMode
+						: framebuffer->GetSpecification().BlendMode;
+
+					blendAttachmentStates[i].colorWriteMask = 0xf;
+					blendAttachmentStates[i].blendEnable = attachmentSpec.Blend ? VK_TRUE : VK_FALSE;
+					if (blendMode == FramebufferBlendMode::SrcAlphaOneMinusSrcAlpha)
+					{
+						blendAttachmentStates[i].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+						blendAttachmentStates[i].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+					}
+					else if (blendMode == FramebufferBlendMode::OneZero)
+					{
+						blendAttachmentStates[i].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+						blendAttachmentStates[i].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+					}
+					else
+					{
+						VA_CORE_VERIFY(false);
+					}
+					blendAttachmentStates[i].colorBlendOp = VK_BLEND_OP_ADD;
+					blendAttachmentStates[i].alphaBlendOp = VK_BLEND_OP_ADD;
+					blendAttachmentStates[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+					blendAttachmentStates[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+				}
+
 			}
 			
 			VkPipelineColorBlendStateCreateInfo colorBlendState = {};

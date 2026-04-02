@@ -791,11 +791,7 @@ namespace Vanta {
 	Mesh::Mesh(Ref<MeshAsset> meshAsset)
 		: m_MeshAsset(meshAsset)
 	{
-		const auto& assetSubmeshes = m_MeshAsset->GetSubmeshes();
-		m_Submeshes.resize(assetSubmeshes.size());
-		for (size_t i = 0; i < assetSubmeshes.size(); i++)
-			m_Submeshes[i] = i;
-
+		SetSubmeshes({});
 		// TODO: we should actually copy materials in most cases
 		for (const auto& material : meshAsset->GetMaterials())
 			m_Materials.push_back(material);
@@ -803,16 +799,19 @@ namespace Vanta {
 	}
 
 	Mesh::Mesh(Ref<MeshAsset> meshAsset, const std::vector<uint32_t>& submeshes)
-		: m_MeshAsset(meshAsset), m_Submeshes(submeshes)
+		: m_MeshAsset(meshAsset)
 	{
+		SetSubmeshes(submeshes);
+
 		// TODO: we should actually copy materials in most cases
 		for (const auto& material : meshAsset->GetMaterials())
 			m_Materials.push_back(material);
 	}
 
 	Mesh::Mesh(const Ref<Mesh>& other)
-		: m_MeshAsset(other->m_MeshAsset), m_Submeshes(other->m_Submeshes), m_Materials(other->m_Materials)
+		: m_MeshAsset(other->m_MeshAsset), m_Materials(other->m_Materials)
 	{
+		SetSubmeshes(other->m_Submeshes);
 	}
 
 	Mesh::~Mesh()
@@ -837,6 +836,21 @@ namespace Vanta {
 			BoneTransform(m_AnimationTime);
 		}
 #endif
+	}
+
+	void Mesh::SetSubmeshes(const std::vector<uint32_t>& submeshes)
+	{
+		if (!submeshes.empty())
+		{
+			m_Submeshes = submeshes;
+		}
+		else
+		{
+			const auto& submeshes = m_MeshAsset->GetSubmeshes();
+			m_Submeshes.resize(submeshes.size());
+			for (uint32_t i = 0; i < submeshes.size(); i++)
+				m_Submeshes[i] = i;
+		}
 	}
 
 }

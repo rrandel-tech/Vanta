@@ -59,6 +59,12 @@ namespace Vanta {
 			return std::filesystem::path(s_ActiveProject->GetConfig().ProjectDirectory) / s_ActiveProject->GetConfig().AssetRegistryPath;
 		}
 
+		static std::filesystem::path GetMeshPath()
+		{
+			VA_CORE_ASSERT(s_ActiveProject);
+			return std::filesystem::path(s_ActiveProject->GetConfig().ProjectDirectory) / s_ActiveProject->GetConfig().MeshPath;
+		}
+
 		static std::filesystem::path GetCacheDirectory()
 		{
 			VA_CORE_ASSERT(s_ActiveProject);

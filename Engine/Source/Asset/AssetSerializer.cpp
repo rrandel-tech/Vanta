@@ -1,11 +1,12 @@
 #include "vapch.hpp"
 #include "AssetSerializer.hpp"
-
-#include "AssetManager.hpp"
 #include "Utilities/StringUtils.hpp"
 #include "Utilities/FileSystem.hpp"
+#include "AssetManager.hpp"
+
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Renderer.hpp"
+
 
 #include "yaml-cpp/yaml.h"
 
@@ -13,7 +14,7 @@ namespace Vanta {
 
 	bool TextureSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset) const
 	{
-		asset = Texture2D::Create(metadata.FilePath);
+		asset = Texture2D::Create(AssetManager::GetFileSystemPath(metadata));
 		asset->Handle = metadata.Handle;
 
 		bool result = asset.As<Texture2D>()->Loaded();

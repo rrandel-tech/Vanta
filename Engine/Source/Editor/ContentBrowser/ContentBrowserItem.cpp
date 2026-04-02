@@ -49,6 +49,7 @@ namespace Vanta {
 			if (!selectionStack.IsSelected(m_ID))
 				result.Set(ContentBrowserAction::ClearSelections, true);
 
+
 			auto& currentItems = ContentBrowserPanel::Get().GetCurrentItems();
 
 			if (selectionStack.SelectionCount() > 0)
@@ -160,11 +161,21 @@ namespace Vanta {
 
 	void ContentBrowserItem::OnContextMenuOpen(CBItemActionResult& actionResult)
 	{
+		if (ImGui::MenuItem("Reload"))
+			actionResult.Set(ContentBrowserAction::Reload, true);
+
 		if (ImGui::MenuItem("Rename"))
 			StartRenaming();
 
 		if (ImGui::MenuItem("Delete"))
 			actionResult.Set(ContentBrowserAction::OpenDeleteDialogue, true);
+
+		ImGui::Separator();
+
+		if (ImGui::MenuItem("Show In Explorer"))
+			actionResult.Set(ContentBrowserAction::ShowInExplorer, true);
+		if (ImGui::MenuItem("Open Externally"))
+			actionResult.Set(ContentBrowserAction::OpenExternal, true);
 
 		RenderCustomContextItems();
 	}
@@ -192,22 +203,19 @@ namespace Vanta {
 
 	void ContentBrowserDirectory::OnRenamed(const std::string& newName, bool fromCallback)
 	{
-		std::filesystem::path path = m_DirectoryInfo->FilePath;
-		std::string newFilePath = path.parent_path().string() + "/" + newName;
-
 		if (!fromCallback)
 		{
-			if (FileSystem::Exists(newFilePath))
+			if (FileSystem::Exists((m_DirectoryInfo->FilePath / newName).string()))
 			{
 				VA_CORE_ERROR("A directory with that name already exists!");
 				return;
 			}
 
-			FileSystem::Rename(m_DirectoryInfo->FilePath, newName);
+			FileSystem::Rename(m_DirectoryInfo->FilePath.string(), newName);
 		}
 
 		m_DirectoryInfo->Name = newName;
-		UpdateDirectoryPath(m_DirectoryInfo, path.parent_path().string());
+		UpdateDirectoryPath(m_DirectoryInfo, m_DirectoryInfo->FilePath.parent_path().string());
 	}
 
 	void ContentBrowserDirectory::UpdateDrop(CBItemActionResult& actionResult)
@@ -245,12 +253,12 @@ namespace Vanta {
 
 	void ContentBrowserDirectory::Delete()
 	{
-		FileSystem::DeleteFile(m_DirectoryInfo->FilePath);
+		FileSystem::DeleteFile(m_DirectoryInfo->FilePath.string());
 	}
 
-	bool ContentBrowserDirectory::Move(const std::string& destination)
+	bool ContentBrowserDirectory::Move(const std::filesystem::path& destination)
 	{
-		bool wasMoved = FileSystem::MoveFile(m_DirectoryInfo->FilePath, destination);
+		bool wasMoved = FileSystem::MoveFile(m_DirectoryInfo->FilePath.string(), destination.string());
 		if (!wasMoved)
 			return false;
 
@@ -266,14 +274,14 @@ namespace Vanta {
 		return true;
 	}
 
-	void ContentBrowserDirectory::UpdateDirectoryPath(Ref<DirectoryInfo> directoryInfo, const std::string& newParentPath)
+	void ContentBrowserDirectory::UpdateDirectoryPath(Ref<DirectoryInfo> directoryInfo, const std::filesystem::path& newParentPath)
 	{
-		directoryInfo->FilePath = newParentPath + "/" + directoryInfo->Name;
+		directoryInfo->FilePath = newParentPath / directoryInfo->Name;
 
 		for (auto assetHandle : directoryInfo->Assets)
 		{
 			auto metadata = AssetManager::GetMetadata(assetHandle);
-			metadata.FilePath = directoryInfo->FilePath + "/" + metadata.FileName + "." + metadata.Extension;
+			metadata.FilePath = directoryInfo->FilePath / metadata.FilePath.filename();
 		}
 
 		for (auto[handle, subdirectory] : directoryInfo->SubDirectories)
@@ -281,7 +289,7 @@ namespace Vanta {
 	}
 
 	ContentBrowserAsset::ContentBrowserAsset(const AssetMetadata& assetInfo, const Ref<Texture2D>& icon)
-		: ContentBrowserItem(ContentBrowserItem::ItemType::Asset, assetInfo.Handle, assetInfo.FileName, icon), m_AssetInfo(assetInfo)
+		: ContentBrowserItem(ContentBrowserItem::ItemType::Asset, assetInfo.Handle, assetInfo.FilePath.stem().string(), icon), m_AssetInfo(assetInfo)
 	{
 	}
 
@@ -292,34 +300,32 @@ namespace Vanta {
 
 	void ContentBrowserAsset::Delete()
 	{
-		bool deleted = FileSystem::DeleteFile(m_AssetInfo.FilePath);
+		bool deleted = FileSystem::DeleteFile(m_AssetInfo.FilePath.string());
 		if (!deleted)
 		{
-			VA_CORE_ERROR("Couldn't delete {0}", m_AssetInfo.FilePath);
+			VA_CORE_ERROR("Couldn't delete {0}", m_AssetInfo.FilePath.string());
 			return;
 		}
 
-		std::filesystem::path currentPath = m_AssetInfo.FilePath;
-		auto currentDirectory = ContentBrowserPanel::Get().GetDirectory(currentPath.parent_path().string());
+		auto currentDirectory = ContentBrowserPanel::Get().GetDirectory(m_AssetInfo.FilePath.parent_path().string());
 		currentDirectory->Assets.erase(std::remove(currentDirectory->Assets.begin(), currentDirectory->Assets.end(), m_AssetInfo.Handle), currentDirectory->Assets.end());
 
 		AssetManager::OnAssetDeleted(m_AssetInfo.Handle);
 	}
 
-	bool ContentBrowserAsset::Move(const std::string& destination)
+	bool ContentBrowserAsset::Move(const std::filesystem::path& destination)
 	{
-		bool wasMoved = FileSystem::MoveFile(m_AssetInfo.FilePath, destination);
+		bool wasMoved = FileSystem::MoveFile(m_AssetInfo.FilePath.string(), destination.string());
 		if (!wasMoved)
 		{
-			VA_CORE_ERROR("Couldn't move {0} to {1}", m_AssetInfo.FilePath, destination);
+			VA_CORE_ERROR("Couldn't move {0} to {1}", m_AssetInfo.FilePath.string(), destination.string());
 			return false;
 		}
 
-		std::filesystem::path currentPath = m_AssetInfo.FilePath;
-		auto currentDirectory = ContentBrowserPanel::Get().GetDirectory(currentPath.parent_path().string());
-		currentDirectory->Assets.erase(std::remove(currentDirectory->Assets.begin(), currentDirectory->Assets.end(), m_AssetInfo.Handle), currentDirectory->Assets.end());
+		const auto& currentDirectory = ContentBrowserPanel::Get().GetDirectory(m_AssetInfo.FilePath.parent_path().string());
+		// currentDirectory->Assets.erase(std::remove(currentDirectory->Assets.begin(), currentDirectory->Assets.end(), m_AssetInfo.Handle), currentDirectory->Assets.end());
 
-		AssetManager::OnAssetMoved(m_AssetInfo.Handle, destination);
+		AssetManager::OnAssetMoved(m_AssetInfo.Handle, destination.string());
 
 		return true;
 	}
@@ -338,8 +344,7 @@ namespace Vanta {
 
 	void ContentBrowserAsset::OnRenamed(const std::string& newName, bool fromCallback)
 	{
-		std::filesystem::path path = m_AssetInfo.FilePath;
-		std::string newFilePath = path.parent_path().string() + "/" + newName + "." + m_AssetInfo.Extension;
+		std::string newFilePath = std::format("{0}/{1}.{2}", m_AssetInfo.FilePath.parent_path().string(), '.', m_AssetInfo.FilePath.extension().string());
 
 		if (!fromCallback)
 		{
@@ -349,12 +354,11 @@ namespace Vanta {
 				return;
 			}
 
-			FileSystem::Rename(m_AssetInfo.FilePath, newName);
+			FileSystem::Rename(m_AssetInfo.FilePath.string(), newName);
 			AssetManager::OnAssetRenamed(m_AssetInfo.Handle, newFilePath);
 		}
 
-		m_AssetInfo.FilePath = newFilePath;
-		m_AssetInfo.FileName = Utils::RemoveExtension(Utils::GetFilename(newFilePath));
+		m_AssetInfo.FilePath = AssetManager::GetRelativePath(newFilePath);
 	}
 
 }

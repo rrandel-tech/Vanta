@@ -1,5 +1,5 @@
 ﻿// -----------------------------
-// -- Hazel Engine PBR shader --
+// -- Vanta Engine PBR shader --
 // -----------------------------
 // Note: this shader is still very much in progress. There are likely many bugs and future additions that will go in.
 //       Currently heavily updated. 
@@ -108,7 +108,7 @@ layout (std140, binding = 2) uniform SceneData
 {
 	DirectionalLight u_DirectionalLights;
 	vec3 u_CameraPosition; // Offset = 32
-	bool u_HasEnvironmentMap;
+	float u_EnvironmentMapIntensity;
 };
 
 layout (std140, binding = 3) uniform RendererData
@@ -640,7 +640,7 @@ void main()
 #endif
 
 	vec3 lightContribution = Lighting(F0) * shadowAmount;
-	vec3 iblContribution = IBL(F0, Lr);
+	vec3 iblContribution = IBL(F0, Lr) * u_EnvironmentMapIntensity;
 
 	color = vec4(iblContribution + lightContribution, 1.0);
 

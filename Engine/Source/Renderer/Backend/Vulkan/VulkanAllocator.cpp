@@ -3,6 +3,8 @@
 
 #include "VulkanContext.hpp"
 
+#include "Utilities/StringUtils.hpp"
+
 #if VA_LOG_RENDERER_ALLOCATIONS
 #define VA_ALLOCATOR_LOG(...) VA_CORE_TRACE(__VA_ARGS__)
 #else
@@ -10,30 +12,6 @@
 #endif
 
 namespace Vanta {
-
-	namespace Utils {
-
-		std::string BytesToString(uint64_t bytes)
-		{
-			static const float gb = 1024 * 1024 * 1024;
-			static const float mb = 1024 * 1024;
-			static const float kb = 1024;
-
-			char buffer[16];
-
-			if (bytes > gb)
-				sprintf_s(buffer, "%.2f GB", bytes / gb);
-			else if (bytes > mb)
-				sprintf_s(buffer, "%.2f MB", bytes / mb);
-			else if (bytes > kb)
-				sprintf_s(buffer, "%.2f KB", bytes / kb);
-			else
-				sprintf_s(buffer, "%.2f bytes", bytes);
-
-			return std::string(buffer);
-		}
-
-	}
 
 	struct VulkanAllocatorData
 	{

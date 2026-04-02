@@ -22,8 +22,8 @@ namespace Vanta {
 		if (!m_Asset)
 			SetOpen(false);
 
-		float textureWidth = m_Asset->GetWidth();
-		float textureHeight = m_Asset->GetHeight();
+		float textureWidth =  (float)m_Asset->GetWidth();
+		float textureHeight =  (float)m_Asset->GetHeight();
 		//float bitsPerPixel = Texture::GetBPP(m_Asset->GetFormat());
 		float imageSize = ImGui::GetWindowWidth() - 40;
 		imageSize = glm::min(imageSize, 500.0f);

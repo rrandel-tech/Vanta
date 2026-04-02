@@ -235,7 +235,9 @@ namespace Vanta {
 
 		std::vector<uint32_t>& GetSubmeshes() { return m_Submeshes; }
 		const std::vector<uint32_t>& GetSubmeshes() const { return m_Submeshes; }
-		void SetSubmeshes(const std::vector<uint32_t>& submeshes) { m_Submeshes = submeshes; }
+
+		// Pass in an empty vector to set ALL submeshes for MeshSource
+		void SetSubmeshes(const std::vector<uint32_t>& submeshes);
 
 		Ref<MeshAsset> GetMeshAsset() { return m_MeshAsset; }
 		void SetMeshAsset(Ref<MeshAsset> meshAsset) { m_MeshAsset = meshAsset; }

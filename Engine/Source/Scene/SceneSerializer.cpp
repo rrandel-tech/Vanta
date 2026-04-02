@@ -268,6 +268,24 @@ namespace Vanta {
 			out << YAML::EndMap; // DirectionalLightComponent
 		}
 
+		if (entity.HasComponent<PointLightComponent>())
+		{
+			out << YAML::Key << "PointLightComponent";
+			out << YAML::BeginMap; // PointLightComponent
+
+			auto& directionalLightComponent = entity.GetComponent<PointLightComponent>();
+			out << YAML::Key << "Radiance" << YAML::Value << directionalLightComponent.Radiance;
+			out << YAML::Key << "Intensity" << YAML::Value << directionalLightComponent.Intensity;
+			out << YAML::Key << "CastShadows" << YAML::Value << directionalLightComponent.CastsShadows;
+			out << YAML::Key << "SoftShadows" << YAML::Value << directionalLightComponent.SoftShadows;
+			out << YAML::Key << "MinRadius" << YAML::Value << directionalLightComponent.MinRadius;
+			out << YAML::Key << "Radius" << YAML::Value << directionalLightComponent.Radius;
+			out << YAML::Key << "LightSize" << YAML::Value << directionalLightComponent.LightSize;
+			out << YAML::Key << "Falloff" << YAML::Value << directionalLightComponent.Falloff;
+
+			out << YAML::EndMap; // PointLightComponent
+		}
+
 		if (entity.HasComponent<SkyLightComponent>())
 		{
 			out << YAML::Key << "SkyLightComponent";
@@ -277,7 +295,9 @@ namespace Vanta {
 			if (skyLightComponent.SceneEnvironment)
 				out << YAML::Key << "EnvironmentMap" << YAML::Value << skyLightComponent.SceneEnvironment->Handle;
 			out << YAML::Key << "Intensity" << YAML::Value << skyLightComponent.Intensity;
-			out << YAML::Key << "Angle" << YAML::Value << skyLightComponent.Angle;
+			out << YAML::Key << "DynamicSky" << YAML::Value << skyLightComponent.DynamicSky;
+			if (skyLightComponent.DynamicSky)
+				out << YAML::Key << "TurbidityAzimuthInclination" << YAML::Value << skyLightComponent.TurbidityAzimuthInclination;
 
 			out << YAML::EndMap; // SkyLightComponent
 		}
@@ -306,7 +326,7 @@ namespace Vanta {
 		out << YAML::BeginMap; // Environment
 		out << YAML::Key << "AssetHandle" << YAML::Value << scene->GetEnvironment()->Handle;
 		const auto& light = scene->GetLight();
-		out << YAML::Key << "Light" << YAML::Value;
+		out << YAML::Key << "DirLight" << YAML::Value;
 		out << YAML::BeginMap; // Light
 		out << YAML::Key << "Direction" << YAML::Value << light.Direction;
 		out << YAML::Key << "Radiance" << YAML::Value << light.Radiance;
@@ -320,7 +340,7 @@ namespace Vanta {
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "Scene";
-		out << YAML::Value << "Scene Name";
+		out << YAML::Value << m_Scene->GetName();
 
 		if (m_Scene->GetEnvironment())
 			SerializeEnvironment(out, m_Scene);
@@ -362,6 +382,7 @@ namespace Vanta {
 
 		std::string sceneName = data["Scene"].as<std::string>();
 		VA_CORE_INFO("Deserializing scene '{0}'", sceneName);
+		m_Scene->SetName(sceneName);
 
 		auto entities = data["Entities"];
 		if (entities)
@@ -442,11 +463,12 @@ namespace Vanta {
 							component.Mesh = AssetManager::GetAsset<Mesh>(assetHandle);
 						else if (metadata.Type == AssetType::MeshAsset)
 						{
+							// Create new mesh
 							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetHandle);
-							std::filesystem::path meshPath = meshAsset->GetFilePath();
-							std::filesystem::path directoryPath = meshPath.parent_path();
-							std::string filename = std::format("{0}.vam", meshPath.stem().string());
-							Ref<Mesh> mesh = AssetManager::CreateNewAsset<Mesh>(filename, directoryPath.string(), meshAsset);
+							std::filesystem::path meshPath = metadata.FilePath;
+							std::filesystem::path meshDirectory = Project::GetMeshPath();
+							std::string filename = std::format("{0}.vmesh", meshPath.stem().string());
+							Ref<Mesh> mesh = AssetManager::CreateNewAsset<Mesh>(filename, meshDirectory.string(), meshAsset);
 							component.Mesh = mesh;
 							AssetImporter::Serialize(mesh);
 						}
@@ -499,14 +521,26 @@ namespace Vanta {
 					component.Primary = cameraComponent["Primary"].as<bool>();
 				}
 
-				auto directionalLightComponent = entity["DirectionalLightComponent"];
-				if (directionalLightComponent)
+				if (auto directionalLightComponent = entity["DirectionalLightComponent"]; directionalLightComponent)
 				{
 					auto& component = deserializedEntity.AddComponent<DirectionalLightComponent>();
 					component.Radiance = directionalLightComponent["Radiance"].as<glm::vec3>();
 					component.CastShadows = directionalLightComponent["CastShadows"].as<bool>();
 					component.SoftShadows = directionalLightComponent["SoftShadows"].as<bool>();
 					component.LightSize = directionalLightComponent["LightSize"].as<float>();
+				}
+
+				if (auto pointLightComponent = entity["PointLightComponent"]; pointLightComponent)
+				{
+					auto& component = deserializedEntity.AddComponent<PointLightComponent>();
+					component.Radiance = pointLightComponent["Radiance"].as<glm::vec3>();
+					component.Intensity = pointLightComponent["Intensity"].as<float>();
+					component.CastsShadows = pointLightComponent["CastShadows"].as<bool>();
+					component.SoftShadows = pointLightComponent["SoftShadows"].as<bool>();
+					component.LightSize = pointLightComponent["LightSize"].as<float>();
+					component.Radius = pointLightComponent["Radius"].as<float>();
+					component.MinRadius = pointLightComponent["MinRadius"].as<float>();
+					component.Falloff = pointLightComponent["Falloff"].as<float>();
 				}
 
 				auto skyLightComponent = entity["SkyLightComponent"];
@@ -537,7 +571,12 @@ namespace Vanta {
 					}
 
 					component.Intensity = skyLightComponent["Intensity"].as<float>();
-					component.Angle = skyLightComponent["Angle"].as<float>();
+					if (skyLightComponent["DynamicSky"])
+					{
+						component.DynamicSky = skyLightComponent["DynamicSky"].as<bool>();
+						if (component.DynamicSky)
+							component.TurbidityAzimuthInclination = skyLightComponent["TurbidityAzimuthInclination"].as<glm::vec3>();
+					}
 				}
 
 				auto spriteRendererComponent = entity["SpriteRendererComponent"];

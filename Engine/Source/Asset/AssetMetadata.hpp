@@ -2,7 +2,7 @@
 
 #include "Asset.hpp"
 
-#include <string>
+#include <filesystem>
 
 namespace Vanta {
 
@@ -11,9 +11,7 @@ namespace Vanta {
         AssetHandle Handle = 0;
         AssetType Type;
 
-        std::string FilePath;
-        std::string FileName;
-        std::string Extension;
+        std::filesystem::path FilePath;
         bool IsDataLoaded = false;
 
         bool IsValid() const { return Handle != 0; }

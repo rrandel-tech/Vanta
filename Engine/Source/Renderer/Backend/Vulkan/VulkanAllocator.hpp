@@ -3,16 +3,9 @@
 #include <string>
 #include "Vulkan.hpp"
 #include "VulkanDevice.hpp"
-
 #include "vk_mem_alloc.h"
 
 namespace Vanta {
-
-	namespace Utils {
-
-		std::string BytesToString(uint64_t bytes);
-
-	}
 
 	struct GPUMemoryStats
 	{
@@ -55,5 +48,6 @@ namespace Vanta {
 	private:
 		std::string m_Tag;
 	};
+
 
 }

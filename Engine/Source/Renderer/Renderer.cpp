@@ -130,6 +130,13 @@ namespace Vanta {
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Line.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Circle.glsl");
 
+		// Jump Flood Shaders
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Init.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Pass.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Composite.glsl");
+
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SelectedGeometry.glsl");
+
 		// Compile shaders
 		Renderer::WaitAndRender();
 
@@ -258,6 +265,11 @@ namespace Vanta {
 	void Renderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
 	{
 		s_RendererAPI->SubmitFullscreenQuad(renderCommandBuffer, pipeline, uniformBufferSet, material);
+	}
+
+	void Renderer::SubmitFullscreenQuadWithOverrides(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, Buffer vertexShaderOverrides, Buffer fragmentShaderOverrides)
+	{
+		s_RendererAPI->SubmitFullscreenQuadWithOverrides(renderCommandBuffer, pipeline, uniformBufferSet, material, vertexShaderOverrides, fragmentShaderOverrides);
 	}
 
 #if 0

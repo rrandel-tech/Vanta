@@ -111,11 +111,15 @@ namespace Vanta {
 
 		static AssetType GetStaticType() { return AssetType::Scene; }
 		virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
+		const std::string& GetName() const { return m_Name; }
+		void SetName(const std::string& name) { m_Name = name; }
 	private:
 		UUID m_SceneID;
 		entt::entity m_SceneEntity;
 		entt::registry m_Registry;
 
+		std::string m_Name = "UntitledScene";
 		std::string m_DebugName;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 

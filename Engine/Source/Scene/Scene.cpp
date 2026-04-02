@@ -114,11 +114,17 @@ namespace Vanta {
 
 		// TODO: only one sky light at the moment!
 		{
-			//m_Environment = Ref<Environment>::Create();
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
+			if (lights.empty())
+				m_Environment = Ref<Environment>::Create(Renderer::GetBlackCubeTexture(), Renderer::GetBlackCubeTexture());
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);
+				if (!skyLightComponent.SceneEnvironment && skyLightComponent.DynamicSky)
+				{
+					Ref<TextureCube> preethamEnv = Renderer::CreatePreethamSky(skyLightComponent.TurbidityAzimuthInclination.x, skyLightComponent.TurbidityAzimuthInclination.y, skyLightComponent.TurbidityAzimuthInclination.z);
+					skyLightComponent.SceneEnvironment = Ref<Environment>::Create(preethamEnv, preethamEnv);
+				}
 				m_Environment = skyLightComponent.SceneEnvironment;
 				m_EnvironmentIntensity = skyLightComponent.Intensity;
 				if (m_Environment)

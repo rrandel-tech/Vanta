@@ -127,6 +127,35 @@ namespace Vanta {
 			pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("Wireframe");
 			pipelineSpecification.DebugName = "Wireframe";
 			m_GeometryWireframePipeline = Pipeline::Create(pipelineSpecification);
+
+		}
+		
+		// Selected Geometry isolation (for outline pass)
+		{
+			PipelineSpecification pipelineSpecification;
+			pipelineSpecification.DebugName = "SelectedGeometry";
+			pipelineSpecification.Layout = {
+				{ ShaderDataType::Float3, "a_Position" },
+				{ ShaderDataType::Float3, "a_Normal" },
+				{ ShaderDataType::Float3, "a_Tangent" },
+				{ ShaderDataType::Float3, "a_Binormal" },
+				{ ShaderDataType::Float2, "a_TexCoord" },
+			};
+
+			FramebufferSpecification framebufferSpec;
+			framebufferSpec.DebugName = pipelineSpecification.DebugName;
+			framebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::Depth };
+			framebufferSpec.Samples = 1;
+			framebufferSpec.ClearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+			RenderPassSpecification renderPassSpec;
+			renderPassSpec.DebugName = pipelineSpecification.DebugName;
+			renderPassSpec.TargetFramebuffer = Framebuffer::Create(framebufferSpec);
+			pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("SelectedGeometry");
+			pipelineSpecification.RenderPass = RenderPass::Create(renderPassSpec);
+			m_SelectedGeometryPipeline = Pipeline::Create(pipelineSpecification);
+
+			m_SelectedGeometryMaterial = Material::Create(pipelineSpecification.Shader);
 		}
 
 		// Composite
@@ -180,6 +209,63 @@ namespace Vanta {
 			renderPassSpec.TargetFramebuffer = framebuffer;
 			renderPassSpec.DebugName = "External-Composite";
 			m_ExternalCompositeRenderPass = RenderPass::Create(renderPassSpec);
+		}
+
+		// Temporary framebuffers for re-use
+		{
+			FramebufferSpecification framebufferSpec;
+			framebufferSpec.Attachments = { ImageFormat::RGBA32F };
+			framebufferSpec.Samples = 1;
+			framebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
+			framebufferSpec.BlendMode = FramebufferBlendMode::OneZero;
+
+			for (uint32_t i = 0; i < 2; i++)
+				m_TempFramebuffers.emplace_back(Framebuffer::Create(framebufferSpec));
+		}
+
+		// Jump Flood (outline)
+		{
+			PipelineSpecification pipelineSpecification;
+			pipelineSpecification.Layout = {
+				{ ShaderDataType::Float3, "a_Position" },
+				{ ShaderDataType::Float2, "a_TexCoord" }
+			};
+			pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("JumpFlood_Init");
+			m_JumpFloodInitMaterial = Material::Create(pipelineSpecification.Shader, "JumpFlood-Init");
+
+			RenderPassSpecification renderPassSpec;
+			renderPassSpec.TargetFramebuffer = m_TempFramebuffers[0];
+			renderPassSpec.DebugName = "JumpFlood-Init";
+			pipelineSpecification.RenderPass = RenderPass::Create(renderPassSpec);
+			pipelineSpecification.DebugName = "JumpFlood-Init";
+			m_JumpFloodInitPipeline = Pipeline::Create(pipelineSpecification);
+
+			pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("JumpFlood_Pass");
+			m_JumpFloodPassMaterial[0] = Material::Create(pipelineSpecification.Shader, "JumpFloodPass-0");
+			m_JumpFloodPassMaterial[1] = Material::Create(pipelineSpecification.Shader, "JumpFloodPass-1");
+
+			const char* passName[2] = { "EvenPass", "OddPass" };
+			for (uint32_t i = 0; i < 2; i++)
+			{
+				renderPassSpec.TargetFramebuffer = m_TempFramebuffers[(i + 1) % 2];
+				renderPassSpec.DebugName = std::format("JumpFlood-{0}", passName[i]);
+
+				pipelineSpecification.RenderPass = RenderPass::Create(renderPassSpec);
+				pipelineSpecification.DebugName = renderPassSpec.DebugName;
+
+				m_JumpFloodPassPipeline[i] = Pipeline::Create(pipelineSpecification);
+			}
+
+			// Outline compositing
+			{
+				pipelineSpecification.RenderPass = m_CompositePipeline->GetSpecification().RenderPass;
+				pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("JumpFlood_Composite");
+				pipelineSpecification.DebugName = "JumpFlood-Composite";
+				pipelineSpecification.DepthTest = false;
+				m_JumpFloodCompositePipeline = Pipeline::Create(pipelineSpecification);
+
+				m_JumpFloodCompositeMaterial = Material::Create(pipelineSpecification.Shader, "JumpFlood-Composite");
+			}
 		}
 
 		// Grid
@@ -392,6 +478,10 @@ namespace Vanta {
 		{
 			m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+
+			for (auto& tempFB : m_TempFramebuffers)
+				tempFB->Resize(m_ViewportWidth, m_ViewportHeight);
+
 			if (m_ExternalCompositeRenderPass)
 				m_ExternalCompositeRenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 
@@ -427,6 +517,7 @@ namespace Vanta {
 		sceneData.lights.Radiance = directionalLight.Radiance;
 		sceneData.lights.Multiplier = directionalLight.Multiplier;
 		sceneData.u_CameraPosition = cameraPosition;
+		sceneData.EnvironmentMapIntensity = m_SceneData.SceneEnvironmentIntensity;
 		Renderer::Submit([instance, sceneData]() mutable
 		{
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
@@ -535,9 +626,17 @@ namespace Vanta {
 	{
 		VA_PROFILE_FUNC();
 
+		Renderer::BeginRenderPass(m_CommandBuffer, m_SelectedGeometryPipeline->GetSpecification().RenderPass);
+		for (auto& dc : m_SelectedMeshDrawList)
+		{
+			Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_SelectedGeometryPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform, m_SelectedGeometryMaterial);
+		}
+		Renderer::EndRenderPass(m_CommandBuffer);
+
 		Renderer::BeginRenderPass(m_CommandBuffer, m_GeometryPipeline->GetSpecification().RenderPass);
 		// Skybox
 		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SceneData.SkyboxLod);
+		m_SkyboxMaterial->Set("u_Uniforms.Intensity", m_SceneData.SceneEnvironmentIntensity);
 
 		Ref<TextureCube> radianceMap = m_SceneData.SceneEnvironment ? m_SceneData.SceneEnvironment->RadianceMap : Renderer::GetBlackCubeTexture();
 		m_SkyboxMaterial->Set("u_Texture", radianceMap);
@@ -581,7 +680,6 @@ namespace Vanta {
 		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass, true);
 
 		auto framebuffer = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
-		// float exposure = SceneData.SceneCamera.Camera.GetExposure();
 		float exposure = m_SceneData.SceneCamera.Camera.GetExposure();
 		int textureSamples = framebuffer->GetSpecification().Samples;
 
@@ -591,7 +689,49 @@ namespace Vanta {
 		CompositeMaterial->Set("u_Texture", framebuffer->GetImage());
 
 		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_CompositePipeline, nullptr, CompositeMaterial);
+		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_JumpFloodCompositePipeline, nullptr, m_JumpFloodCompositeMaterial);
 		Renderer::EndRenderPass(m_CommandBuffer);
+
+		//Renderer::BeginRenderPass(m_CommandBuffer, m_JumpFloodCompositePipeline->GetSpecification().RenderPass);
+		//Renderer::EndRenderPass(m_CommandBuffer);
+	}
+
+	void SceneRenderer::JumpFloodPass()
+	{
+		VA_PROFILE_FUNC();
+
+		Renderer::BeginRenderPass(m_CommandBuffer, m_JumpFloodInitPipeline->GetSpecification().RenderPass);
+
+		auto framebuffer = m_SelectedGeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
+		m_JumpFloodInitMaterial->Set("u_Texture", framebuffer->GetImage());
+
+		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_JumpFloodInitPipeline, nullptr, m_JumpFloodInitMaterial);
+		Renderer::EndRenderPass(m_CommandBuffer);
+
+		m_JumpFloodPassMaterial[0]->Set("u_Texture", m_TempFramebuffers[0]->GetImage());
+		m_JumpFloodPassMaterial[1]->Set("u_Texture", m_TempFramebuffers[1]->GetImage());
+
+		int steps = 2;
+		int step = std::round(std::pow(steps - 1, 2));
+		int index = 0;
+		Buffer vertexOverrides;
+		Ref<Framebuffer> passFB = m_JumpFloodPassPipeline[0]->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
+		glm::vec2 texelSize = { 1.0f / (float)passFB->GetWidth(), 1.0f / (float)passFB->GetHeight() };
+		vertexOverrides.Allocate(sizeof(glm::vec2) + sizeof(int));
+		vertexOverrides.Write(glm::value_ptr(texelSize), sizeof(glm::vec2));
+		while (step != 0)
+		{
+			vertexOverrides.Write(&step, sizeof(int), sizeof(glm::vec2));
+
+			Renderer::BeginRenderPass(m_CommandBuffer, m_JumpFloodPassPipeline[index]->GetSpecification().RenderPass);
+			Renderer::SubmitFullscreenQuadWithOverrides(m_CommandBuffer, m_JumpFloodPassPipeline[index], nullptr, m_JumpFloodPassMaterial[index], vertexOverrides, Buffer());
+			Renderer::EndRenderPass(m_CommandBuffer);
+			
+			index = (index + 1) % 2;
+			step /= 2;
+		}
+		
+		m_JumpFloodCompositeMaterial->Set("u_Texture", m_TempFramebuffers[1]->GetImage());
 	}
 
 	void SceneRenderer::BloomBlurPass()
@@ -652,6 +792,7 @@ namespace Vanta {
 			m_CommandBuffer->Begin();
 			ShadowMapPass();
 			GeometryPass();
+			JumpFloodPass();
 			CompositePass();
 			m_CommandBuffer->End();
 			m_CommandBuffer->Submit();

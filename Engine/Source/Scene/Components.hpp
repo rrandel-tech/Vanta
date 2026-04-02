@@ -119,11 +119,22 @@ namespace Vanta {
 		float LightSize = 0.5f; // For PCSS
 	};
 
+	struct PointLightComponent
+	{
+		glm::vec3 Radiance = { 1.0f, 1.0f, 1.0f };
+		float Intensity = 1.0f;
+		float LightSize = 0.5f; // For PCSS
+		float MinRadius = 1.f;
+		float Radius = 10.f;
+		bool CastsShadows = true;
+		bool SoftShadows = true;
+		float Falloff = 1.f;
+	};
+
 	struct SkyLightComponent
 	{
 		Ref<Environment> SceneEnvironment;
 		float Intensity = 1.0f;
-		float Angle = 0.0f;
 
 		bool DynamicSky = false;
 		glm::vec3 TurbidityAzimuthInclination = { 2.0, 0.0, 0.0 };

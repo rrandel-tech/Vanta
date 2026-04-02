@@ -11,12 +11,22 @@ namespace Vanta {
 
 	class Framebuffer;
 
+	enum class FramebufferBlendMode
+	{
+		None = 0,
+		OneZero,
+		SrcAlphaOneMinusSrcAlpha,
+		Additive
+	};
+
 	struct FramebufferTextureSpecification
 	{
 		FramebufferTextureSpecification() = default;
 		FramebufferTextureSpecification(ImageFormat format) : Format(format) {}
 
 		ImageFormat Format;
+		bool Blend = true;
+		FramebufferBlendMode BlendMode = FramebufferBlendMode::SrcAlphaOneMinusSrcAlpha;
 		// TODO: filtering/wrap
 	};
 
@@ -41,7 +51,12 @@ namespace Vanta {
 
 		// TODO: Temp, needs scale
 		bool NoResize = false;
-		
+
+		// Master switch (individual attachments can be disabled in FramebufferTextureSpecification)
+		bool Blend = true;
+		// None means use BlendMode in FramebufferTextureSpecification
+		FramebufferBlendMode BlendMode = FramebufferBlendMode::None;
+
 		// SwapChainTarget = screen buffer (i.e. no framebuffer)
 		bool SwapChainTarget = false;
 

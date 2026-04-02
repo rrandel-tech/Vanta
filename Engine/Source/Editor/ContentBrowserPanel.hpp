@@ -9,6 +9,10 @@
 
 #include <map>
 
+#ifdef RemoveDirectory
+#undef RemoveDirectory
+#endif
+
 #define MAX_INPUT_BUFFER_LENGTH 128
 
 namespace Vanta {
@@ -119,13 +123,13 @@ namespace Vanta {
 		const SelectionStack& GetSelectionStack() const { return m_SelectionStack; }
 		ContentBrowserItemList& GetCurrentItems() { return m_CurrentItems; }
 
-		Ref<DirectoryInfo> GetDirectory(const std::string& filepath) const;
+		Ref<DirectoryInfo> GetDirectory(const std::filesystem::path& filepath) const;
 
 	public:
 		static ContentBrowserPanel& Get() { return *s_Instance; }
 
 	private:
-		AssetHandle ProcessDirectory(const std::string& directoryPath, const Ref<DirectoryInfo>& parent);
+		AssetHandle ProcessDirectory(const std::filesystem::path& directoryPath, const Ref<DirectoryInfo>& parent);
 
 		void ChangeDirectory(Ref<DirectoryInfo>& directory);
 
@@ -160,7 +164,7 @@ namespace Vanta {
 		void OnAssetDeleted(AssetMetadata metadata, Ref<DirectoryInfo> directory);
 		void OnAssetRenamed(FileSystemChangedEvent event);
 
-		void UpdateDirectoryPath(Ref<DirectoryInfo>& directoryInfo, const std::string& newParentPath);
+		void UpdateDirectoryPath(Ref<DirectoryInfo>& directoryInfo, const std::filesystem::path& newParentPath);
 
 	private:
 		// NOTE: This should only be used within the ContentBrowserPanel!
@@ -168,7 +172,8 @@ namespace Vanta {
 		template<typename T, typename... Args>
 		Ref<T> CreateAsset(const std::string& filename, Args&&... args)
 		{
-			Ref<T> asset = AssetManager::CreateNewAsset<T>(filename, m_CurrentDirectory->FilePath, std::forward<Args>(args)...);
+			FileSystem::SkipNextFileSystemChange();
+			Ref<T> asset = AssetManager::CreateNewAsset<T>(filename, m_CurrentDirectory->FilePath.string(), std::forward<Args>(args)...);
 			if (!asset)
 				return nullptr;
 
@@ -210,6 +215,8 @@ namespace Vanta {
 
 		std::vector<Ref<DirectoryInfo>> m_BreadCrumbData;
 		bool m_UpdateNavigationPath = false;
+
+		bool m_IsContentBrowserHovered = false;
 
 	private:
 		static ContentBrowserPanel* s_Instance;

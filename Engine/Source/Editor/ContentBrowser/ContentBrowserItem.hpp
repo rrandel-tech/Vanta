@@ -20,7 +20,10 @@ namespace Vanta {
 		NavigateToThis		= BIT(6),
 		OpenDeleteDialogue	= BIT(7),
 		SelectToHere		= BIT(8),
-		Moved				= BIT(9)
+		Moved				= BIT(9),
+		ShowInExplorer		= BIT(10),
+		OpenExternal        = BIT(11),
+		Reload              = BIT(12)
 	};
 
 	struct CBItemActionResult
@@ -54,7 +57,7 @@ namespace Vanta {
 		void OnRenderEnd();
 
 		virtual void Delete() {}
-		virtual bool Move(const std::string& destination) { return false; }
+		virtual bool Move(const std::filesystem::path& destination) { return false; }
 
 		bool IsSelected() const { return m_IsSelected; }
 
@@ -66,7 +69,7 @@ namespace Vanta {
 
 		virtual void Activate(CBItemActionResult& actionResult) {}
 		void StartRenaming();
-		
+
 		void SetSelected(bool value);
 
 		void Rename(const std::string& newName, bool fromCallback = false);
@@ -98,7 +101,7 @@ namespace Vanta {
 		Ref<DirectoryInfo> Parent;
 
 		std::string Name;
-		std::string FilePath;
+		std::filesystem::path FilePath;
 
 		std::vector<AssetHandle> Assets;
 		std::unordered_map<AssetHandle, Ref<DirectoryInfo>> SubDirectories;
@@ -113,14 +116,14 @@ namespace Vanta {
 		Ref<DirectoryInfo>& GetDirectoryInfo() { return m_DirectoryInfo; }
 
 		virtual void Delete() override;
-		virtual bool Move(const std::string& destination) override;
+		virtual bool Move(const std::filesystem::path& destination) override;
 
 	private:
 		virtual void Activate(CBItemActionResult& actionResult) override;
 		virtual void OnRenamed(const std::string& newName, bool fromCallback) override;
 		virtual void UpdateDrop(CBItemActionResult& actionResult) override;
 
-		void UpdateDirectoryPath(Ref<DirectoryInfo> directoryInfo, const std::string& newParentPath);
+		void UpdateDirectoryPath(Ref<DirectoryInfo> directoryInfo, const std::filesystem::path& newParentPath);
 
 	private:
 		Ref<DirectoryInfo> m_DirectoryInfo;
@@ -135,7 +138,7 @@ namespace Vanta {
 		const AssetMetadata& GetAssetInfo() const { return m_AssetInfo; }
 
 		virtual void Delete() override;
-		virtual bool Move(const std::string& destination) override;
+		virtual bool Move(const std::filesystem::path& destination) override;
 
 	private:
 		virtual void Activate(CBItemActionResult& actionResult) override;

@@ -71,6 +71,7 @@ namespace Vanta {
 		void ClearPass();
 		void ShadowMapPass();
 		void GeometryPass();
+		void JumpFloodPass();
 		void CompositePass();
 		void BloomBlurPass();
 
@@ -126,6 +127,7 @@ namespace Vanta {
 		{
 			Light lights;
 			glm::vec3 u_CameraPosition;
+			float EnvironmentMapIntensity = 1.0f;
 		} SceneDataUB;
 
 		struct UBRendererData
@@ -148,9 +150,9 @@ namespace Vanta {
 		Ref<Shader> ShadowMapShader, ShadowMapAnimShader;
 		Ref<RenderPass> ShadowMapRenderPass[4];
 		float LightDistance = 0.1f;
-		float CascadeSplitLambda = 0.95f;
+		float CascadeSplitLambda = 0.92f;
 		glm::vec4 CascadeSplits;
-		float CascadeFarPlaneOffset = 15.0f, CascadeNearPlaneOffset = -15.0f;
+		float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
 
 		bool EnableBloom = false;
 		float BloomThreshold = 1.5f;
@@ -161,12 +163,25 @@ namespace Vanta {
 		Ref<Material> CompositeMaterial;
 
 		Ref<Pipeline> m_GeometryPipeline;
+		Ref<Pipeline> m_SelectedGeometryPipeline;
 		Ref<Pipeline> m_GeometryWireframePipeline;
 		Ref<Pipeline> m_CompositePipeline;
 		Ref<Pipeline> m_ShadowPassPipeline;
 		Ref<Material> m_ShadowPassMaterial;
 		Ref<Pipeline> m_SkyboxPipeline;
 		Ref<Material> m_SkyboxMaterial;
+
+		// Jump Flood Pass
+		Ref<Pipeline> m_JumpFloodInitPipeline;
+		Ref<Pipeline> m_JumpFloodPassPipeline[2];
+		Ref<Pipeline> m_JumpFloodCompositePipeline;
+
+		Ref<Material> m_JumpFloodInitMaterial, m_JumpFloodPassMaterial[2];
+		Ref<Material> m_JumpFloodCompositeMaterial;
+
+		Ref<Material> m_SelectedGeometryMaterial;
+
+		std::vector<Ref<Framebuffer>> m_TempFramebuffers;
 
 		Ref<RenderPass> m_ExternalCompositeRenderPass;
 

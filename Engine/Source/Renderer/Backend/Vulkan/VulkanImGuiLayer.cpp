@@ -129,6 +129,7 @@ namespace Vanta {
 			auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
 			VK_CHECK_RESULT(vkDeviceWaitIdle(device));
+
 			ImGui_ImplVulkan_Shutdown();
 			ImGui_ImplSDL3_Shutdown();
 			ImGui::DestroyContext();

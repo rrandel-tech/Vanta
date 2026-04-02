@@ -86,9 +86,13 @@ namespace Vanta {
 
 	static std::string wchar_to_string(wchar_t* input)
 	{
+		// Avoiding warnings and all the deprecated stuff
+		return std::filesystem::path(input).string();
+#if WRONG
 		std::wstring string_input(input);
 		std::string converted(string_input.begin(), string_input.end());
 		return converted;
+#endif
 	}
 
 	void FileSystem::SkipNextFileSystemChange()
@@ -130,10 +134,10 @@ namespace Vanta {
 
 		while (s_Watching)
 		{
-			DWORD status = ReadDirectoryChangesW(
+			const DWORD status = ReadDirectoryChangesW(
 				handle,
 				&buffer[0],
-				buffer.size(),
+				(uint32_t)buffer.size(),
 				TRUE,
 				FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME,
 				&bytesReturned,
@@ -163,13 +167,13 @@ namespace Vanta {
 				FILE_NOTIFY_INFORMATION& fni = *(FILE_NOTIFY_INFORMATION*)buf;
 				ZeroMemory(fileName, sizeof(fileName));
 				WideCharToMultiByte(CP_ACP, 0, fni.FileName, fni.FileNameLength / sizeof(WCHAR), fileName, sizeof(fileName), NULL, NULL);
-				std::filesystem::path filepath = "assets/" + std::string(fileName);
+				std::filesystem::path filepath = std::string(fileName);
 
 				FileSystemChangedEvent e;
-				e.FilePath = filepath.string();
+				e.FilePath = filepath;
 				e.NewName = filepath.filename().string();
 				e.OldName = filepath.filename().string();
-				e.IsDirectory = IsDirectory(e.FilePath);
+				e.IsDirectory = IsDirectory(e.FilePath.string());
 
 				switch (fni.Action)
 				{

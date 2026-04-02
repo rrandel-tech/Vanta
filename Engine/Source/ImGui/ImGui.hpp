@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <filesystem>
+
 #include "Asset/AssetManager.hpp"
 #include "Renderer/Texture.hpp"
 
@@ -34,6 +36,11 @@ namespace Vanta::UI {
 		ImGui::Columns(2);
 	}
 
+	static void Separator()
+	{
+		ImGui::Separator();
+	}
+
 	static bool Property(const char* label, std::string& value, bool error = false)
 	{
 		bool modified = false;
@@ -48,7 +55,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 
 		if (error)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.2f, 0.2f, 1.0f));
@@ -90,7 +97,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		ImGui::InputText(s_IDBuffer, (char*)value, 256, ImGuiInputTextFlags_ReadOnly);
 
 		ImGui::PopItemWidth();
@@ -108,7 +115,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::Checkbox(s_IDBuffer, &value))
 			modified = true;
 
@@ -129,7 +136,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::DragInt(s_IDBuffer, &value))
 			modified = true;
 
@@ -150,7 +157,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::SliderInt(s_IDBuffer, &value, min, max))
 			modified = true;
 
@@ -171,7 +178,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::SliderFloat(s_IDBuffer, &value, min, max))
 			modified = true;
 
@@ -192,7 +199,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::SliderFloat2(s_IDBuffer, glm::value_ptr(value), min, max))
 			modified = true;
 
@@ -213,7 +220,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::SliderFloat3(s_IDBuffer, glm::value_ptr(value), min, max))
 			modified = true;
 
@@ -234,7 +241,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::SliderFloat4(s_IDBuffer, glm::value_ptr(value), min, max))
 			modified = true;
 
@@ -255,7 +262,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 
 		if (!readOnly)
 		{
@@ -284,7 +291,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::DragFloat2(s_IDBuffer, glm::value_ptr(value), delta))
 			modified = true;
 
@@ -305,7 +312,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::ColorEdit3(s_IDBuffer, glm::value_ptr(value)))
 			modified = true;
 
@@ -326,7 +333,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::DragFloat3(s_IDBuffer, glm::value_ptr(value), delta))
 			modified = true;
 
@@ -347,7 +354,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::DragFloat4(s_IDBuffer, glm::value_ptr(value), delta))
 			modified = true;
 
@@ -366,12 +373,12 @@ namespace Vanta::UI {
 
 		bool changed = false;
 
-		std::string id = "##" + std::string(label);
+		const std::string id = "##" + std::string(label);
 		if (ImGui::BeginCombo(id.c_str(), current))
 		{
 			for (int i = 0; i < optionCount; i++)
 			{
-				bool is_selected = (current == options[i]);
+				const bool is_selected = (current == options[i]);
 				if (ImGui::Selectable(options[i], is_selected))
 				{
 					current = options[i];
@@ -399,12 +406,12 @@ namespace Vanta::UI {
 
 		bool changed = false;
 
-		std::string id = "##" + std::string(label);
+		const std::string id = "##" + std::string(label);
 		if (ImGui::BeginCombo(id.c_str(), current))
 		{
 			for (int i = 0; i < optionCount; i++)
 			{
-				bool is_selected = (current == options[i]);
+				const bool is_selected = (current == options[i]);
 				if (ImGui::Selectable(options[i].c_str(), is_selected))
 				{
 					current = options[i].c_str();
@@ -423,10 +430,20 @@ namespace Vanta::UI {
 		return changed;
 	}
 
+	enum class PropertyAssetReferenceError
+	{
+		None = 0, InvalidMetadata
+	};
+
+	// TODO: move this somewhere better when restructuring API
+	static AssetHandle s_PropertyAssetReferenceAssetHandle;
+
 	template<typename T>
-	static bool PropertyAssetReference(const char* label, Ref<T>& object)
+	static bool PropertyAssetReference(const char* label, Ref<T>& object, PropertyAssetReferenceError* outError = nullptr)
 	{
 		bool modified = false;
+		if (outError)
+			*outError = PropertyAssetReferenceError::None;
 
 		ImGui::Text(label);
 		ImGui::NextColumn();
@@ -437,8 +454,8 @@ namespace Vanta::UI {
 		{
 			if (!object->IsFlagSet(AssetFlag::Missing))
 			{
-				char* assetName = AssetManager::GetMetadata(object->Handle).FileName.data();
-				ImGui::InputText("##assetRef", assetName, 256, ImGuiInputTextFlags_ReadOnly);
+				auto assetFileName = AssetManager::GetMetadata(object->Handle).FilePath.stem().string();
+				ImGui::InputText("##assetRef", (char*)assetFileName.c_str(), 256, ImGuiInputTextFlags_ReadOnly);
 			}
 			else
 			{
@@ -457,6 +474,7 @@ namespace Vanta::UI {
 			if (data)
 			{
 				AssetHandle assetHandle = *(AssetHandle*)data->Data;
+				s_PropertyAssetReferenceAssetHandle = assetHandle;
 				Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
 				if (asset->GetAssetType() == T::GetStaticType())
 				{
@@ -469,6 +487,72 @@ namespace Vanta::UI {
 		ImGui::PopItemWidth();
 		ImGui::NextColumn();
 		return modified;
+	}
+
+	template<typename TAssetType, typename TConversionType, typename Fn>
+	static bool PropertyAssetReferenceWithConversion(const char* label, Ref<TAssetType>& object, Fn&& conversionFunc, PropertyAssetReferenceError* outError = nullptr)
+	{
+		bool succeeded = false;
+		if (outError)
+			*outError = PropertyAssetReferenceError::None;
+
+		ImGui::Text(label);
+		ImGui::NextColumn();
+		ImGui::PushItemWidth(-1);
+
+		char buffer[256] = {};
+		if (object)
+		{
+			if (!object->IsFlagSet(AssetFlag::Missing))
+			{
+				auto assetFileName = AssetManager::GetMetadata(object->Handle).FilePath.stem().string();
+				ImGui::InputText("##assetRef", (char*)assetFileName.c_str(), 256, ImGuiInputTextFlags_ReadOnly);
+			}
+			else
+			{
+				strncpy(buffer, "Missing", sizeof(buffer));
+			}
+		}
+		else
+		{
+			ImGui::InputText("##assetRef", (char*)"Null", 256, ImGuiInputTextFlags_ReadOnly);
+		}
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			auto data = ImGui::AcceptDragDropPayload("asset_payload");
+
+			if (data)
+			{
+				AssetHandle assetHandle = *(AssetHandle*)data->Data;
+				s_PropertyAssetReferenceAssetHandle = assetHandle;
+				Ref<Asset> asset = AssetManager::GetAsset<Asset>(assetHandle);
+				if (asset)
+				{
+					// No conversion necessary
+					if (asset->GetAssetType() == TAssetType::GetStaticType())
+					{
+						object = asset.As<TAssetType>();
+						succeeded = true;
+					}
+					// Convert
+					else if (asset->GetAssetType() == TConversionType::GetStaticType())
+					{
+						conversionFunc(asset.As<TConversionType>());
+						succeeded = false; // Must be handled my conversion function
+					}
+				}
+				else
+				{
+					if (outError)
+						*outError = PropertyAssetReferenceError::InvalidMetadata;
+				}
+			}
+		}
+
+		ImGui::PopItemWidth();
+		ImGui::NextColumn();
+		return succeeded;
 	}
 
 	static void EndPropertyGrid()
@@ -513,7 +597,7 @@ namespace Vanta::UI {
 		s_IDBuffer[0] = '#';
 		s_IDBuffer[1] = '#';
 		memset(s_IDBuffer + 2, 0, 14);
-		itoa(s_Counter++, s_IDBuffer + 2, 16);
+		sprintf_s(s_IDBuffer + 2, 14, "%o", s_Counter++);
 		if (ImGui::Checkbox(s_IDBuffer, &value))
 			modified = true;
 
@@ -528,8 +612,8 @@ namespace Vanta::UI {
 	}
 
 	void Image(const Ref<Image2D>& image, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& tint_col = ImVec4(1, 1, 1, 1), const ImVec4& border_col = ImVec4(0, 0, 0, 0));
-	void Image(const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& tint_col = ImVec4(1, 1, 1, 1), const ImVec4& border_col = ImVec4(0, 0, 0, 0));
 	void Image(const Ref<Image2D>& image, uint32_t layer, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& tint_col = ImVec4(1, 1, 1, 1), const ImVec4& border_col = ImVec4(0, 0, 0, 0));
+	void Image(const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& tint_col = ImVec4(1, 1, 1, 1), const ImVec4& border_col = ImVec4(0, 0, 0, 0));
 	bool ImageButton(const Ref<Image2D>& image, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& bg_col = ImVec4(0, 0, 0, 0), const ImVec4& tint_col = ImVec4(1, 1, 1, 1));
 	bool ImageButton(const char* stringID, const Ref<Image2D>& image, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& bg_col = ImVec4(0, 0, 0, 0), const ImVec4& tint_col = ImVec4(1, 1, 1, 1));
 	bool ImageButton(const Ref<Texture2D>& texture, const ImVec2& size, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& bg_col = ImVec4(0, 0, 0, 0), const ImVec4& tint_col = ImVec4(1, 1, 1, 1));

@@ -24,11 +24,14 @@ namespace Vanta {
 		void SetMinSize(uint32_t width, uint32_t height);
 		void SetMaxSize(uint32_t width, uint32_t height);
 
+		const std::string& GetTitle() const;
+		void SetTitle(const std::string& newTitle);
+
 	private:
 		virtual void OnClose() = 0;
 		virtual void Render() = 0;
 	private:
-		const char* m_Title;
+		std::string m_Title;
 		bool m_IsOpen = false;
 
 		ImGuiWindowFlags m_Flags = 0;

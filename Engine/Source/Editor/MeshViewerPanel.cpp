@@ -21,7 +21,7 @@
 namespace Vanta {
 
 	MeshViewerPanel::MeshViewerPanel()
-		: AssetEditor(nullptr)
+		: AssetEditor("MeshViewerPanel")
 	{
 	
 	}
@@ -316,10 +316,8 @@ namespace Vanta {
 		if (ImGui::Button("Create Mesh"))
 		{
 			std::filesystem::path meshPath = meshAsset->GetFilePath();
-			VA_CORE_WARN("Mesh Name = {0}", meshPath.stem().string());
-			VA_CORE_WARN("Output filename = {0}", std::format("{0}.vam", meshPath.stem().string()));
 			std::filesystem::path directoryPath = meshPath.parent_path();
-			std::string filename = std::format("{0}.vam", meshPath.stem().string());
+			std::string filename = std::format("{0}.vmesh", meshPath.stem().string());
 			Ref<Mesh> serializedMesh = AssetManager::CreateNewAsset<Mesh>(filename, directoryPath.string(), mesh);
 			AssetImporter::Serialize(serializedMesh);
 		}

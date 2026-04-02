@@ -4,9 +4,10 @@
 #include "yaml-cpp/yaml.h"
 
 #include "Asset/AssetManager.hpp"
+#include "Project/Project.hpp"
 
 namespace YAML {
-	
+
 	template<>
 	struct convert<std::vector<uint32_t>>
 	{
@@ -53,7 +54,8 @@ namespace Vanta {
 	{
 		// TODO: this needs to open up a Vanta Mesh file and make sure
 		//       the MeshAsset file is also loaded
-		std::ifstream stream(metadata.FilePath);
+		auto filepath = Project::GetAssetDirectory() / metadata.FilePath;
+		std::ifstream stream(filepath);
 		VA_CORE_ASSERT(stream);
 		std::stringstream strStream;
 		strStream << stream.rdbuf();
@@ -66,8 +68,11 @@ namespace Vanta {
 		if (!rootNode["MeshAsset"])
 			return false;
 
-		AssetHandle assetHandle = rootNode["MeshAsset"].as<uint64_t>();
-		Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetHandle);
+		AssetHandle meshSourceHandle = rootNode["MeshAsset"].as<uint64_t>();
+		Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(meshSourceHandle);
+		if (!meshAsset)
+			return false; // TODO: feedback to the user
+
 		auto submeshIndices = rootNode["SubmeshIndices"].as<std::vector<uint32_t>>();
 		Ref<Mesh> mesh = Ref<Mesh>::Create(meshAsset, submeshIndices);
 		mesh->Handle = metadata.Handle;
@@ -88,13 +93,17 @@ namespace Vanta {
 			out << YAML::Value << mesh->GetMeshAsset()->Handle;
 			out << YAML::Key << "SubmeshIndices";
 			out << YAML::Flow;
-			out << YAML::Value << mesh->GetSubmeshes();
+			if (mesh->GetSubmeshes().size() == mesh->GetMeshAsset()->GetSubmeshes().size())
+				out << YAML::Value << std::vector<uint32_t>();
+			else
+				out << YAML::Value << mesh->GetSubmeshes();
 			out << YAML::EndMap;
 		}
 		out << YAML::EndMap;
 
-		VA_CORE_WARN("Serializing to {0}", filepath);
-		std::ofstream fout(filepath);
+		auto serializePath = Project::GetActive()->GetAssetDirectory() / filepath;
+		VA_CORE_WARN("Serializing to {0}", serializePath.string());
+		std::ofstream fout(serializePath);
 		VA_CORE_ASSERT(fout.good());
 		if (fout.good())
 			fout << out.c_str();
@@ -103,7 +112,7 @@ namespace Vanta {
 	void MeshSerializer::Serialize(const AssetMetadata& metadata, const Ref<Asset>& asset) const
 	{
 		MeshSerializer serializer;
-		serializer.Serialize(asset.As<Mesh>(), metadata.FilePath);
+		serializer.Serialize(asset.As<Mesh>(), metadata.FilePath.string());
 	}
 
 	void MeshSerializer::SerializeRuntime(Ref<Mesh> mesh, const std::string& filepath)

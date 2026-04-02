@@ -3,6 +3,8 @@
 #include "Core/Buffer.hpp"
 
 #include <functional>
+#include <filesystem>
+#include <string>
 
 #ifdef CreateDirectory
 #undef CreateDirectory
@@ -16,10 +18,6 @@
 #undef MoveFile
 #endif
 
-#include <filesystem>
-
-#include <string>
-
 namespace Vanta {
 
     enum class FileSystemAction
@@ -30,7 +28,7 @@ namespace Vanta {
     struct FileSystemChangedEvent
     {
         FileSystemAction Action;
-        std::string FilePath;
+        std::filesystem::path FilePath;
         std::string OldName;
         std::string NewName;
         bool IsDirectory;
@@ -49,6 +47,9 @@ namespace Vanta {
         static bool MoveFile(const std::string& filepath, const std::string& dest);
         static bool IsDirectory(const std::string& filepath);
 
+        static bool ShowFileInExplorer(const std::filesystem::path& path);
+        static bool OpenDirectoryInExplorer(const std::filesystem::path& path);
+        static bool OpenExternally(const std::filesystem::path& path);
     public:
         using FileSystemChangedCallbackFn = std::function<void(FileSystemChangedEvent)>;
 

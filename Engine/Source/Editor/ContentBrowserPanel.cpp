@@ -20,28 +20,27 @@ namespace Vanta {
 
 		m_FileTex = Texture2D::Create("Resources/Editor/file.png");
 		m_FolderIcon = Texture2D::Create("Resources/Editor/folder.png");
-		m_AssetIconMap["fbx"] = Texture2D::Create("Resources/Editor/fbx.png");
-		m_AssetIconMap["obj"] = Texture2D::Create("Resources/Editor/obj.png");
-		m_AssetIconMap["wav"] = Texture2D::Create("Resources/Editor/wav.png");
-		m_AssetIconMap["lua"] = Texture2D::Create("Resources/Editor/lua.png");
-		m_AssetIconMap["png"] = Texture2D::Create("Resources/Editor/png.png");
-		m_AssetIconMap["vscene"] = Texture2D::Create("Resources/Editor/vanta.png");
+		m_AssetIconMap[".fbx"] = Texture2D::Create("Resources/Editor/fbx.png");
+		m_AssetIconMap[".obj"] = Texture2D::Create("Resources/Editor/obj.png");
+		m_AssetIconMap[".wav"] = Texture2D::Create("Resources/Editor/wav.png");
+		m_AssetIconMap[".lua"] = Texture2D::Create("Resources/Editor/lua.png");
+		m_AssetIconMap[".png"] = Texture2D::Create("Resources/Editor/png.png");
+		m_AssetIconMap[".vscene"] = Texture2D::Create("Resources/Editor/vanta.png");
 
 		m_BackbtnTex = Texture2D::Create("Resources/Editor/btn_back.png");
 		m_FwrdbtnTex = Texture2D::Create("Resources/Editor/btn_fwrd.png");
 		m_RefreshIcon = Texture2D::Create("Resources/Editor/refresh.png");
 
-		std::filesystem::path assetDirectory = project->GetAssetDirectory();
-		AssetHandle baseDirectoryHandle = ProcessDirectory(assetDirectory.string(), nullptr);
+		AssetHandle baseDirectoryHandle = ProcessDirectory(project->GetAssetDirectory().string(), nullptr);
 		m_BaseDirectory = m_Directories[baseDirectoryHandle];
 		ChangeDirectory(m_BaseDirectory);
 
 		memset(m_SearchBuffer, 0, MAX_INPUT_BUFFER_LENGTH);
 	}
 
-	AssetHandle ContentBrowserPanel::ProcessDirectory(const std::string& directoryPath, const Ref<DirectoryInfo>& parent)
+	AssetHandle ContentBrowserPanel::ProcessDirectory(const std::filesystem::path& directoryPath, const Ref<DirectoryInfo>& parent)
 	{
-		std::string fixedFilePath = directoryPath;
+		std::string fixedFilePath = directoryPath.string();
 		std::replace(fixedFilePath.begin(), fixedFilePath.end(), '\\', '/');
 		const auto& directory = GetDirectory(fixedFilePath);
 		if (directory)
@@ -50,9 +49,8 @@ namespace Vanta {
 		Ref<DirectoryInfo> directoryInfo = Ref<DirectoryInfo>::Create();
 		directoryInfo->Handle = AssetHandle();
 		directoryInfo->Parent = parent;
-		directoryInfo->FilePath = directoryPath;
-		std::replace(directoryInfo->FilePath.begin(), directoryInfo->FilePath.end(), '\\', '/');
-		directoryInfo->Name = Utils::GetFilename(directoryPath);
+		directoryInfo->FilePath = fixedFilePath;
+		directoryInfo->Name = directoryInfo->FilePath.filename().string();
 
 		for (auto entry : std::filesystem::directory_iterator(directoryPath))
 		{
@@ -63,13 +61,10 @@ namespace Vanta {
 				continue;
 			}
 
-
-			std::filesystem::path relativePath = std::filesystem::relative(entry.path(), Project::GetAssetDirectory());
-			auto& metadata = AssetManager::GetMetadata(relativePath.string());
-
+			auto& metadata = AssetManager::GetMetadata(entry.path().string());
 			if (!metadata.IsValid())
 			{
-				AssetType type = AssetManager::GetAssetTypeForFileType(Utils::GetExtension(entry.path().string()));
+				AssetType type = AssetManager::GetAssetTypeFromPath(entry.path());
 				if (type == AssetType::None)
 					continue;
 
@@ -104,7 +99,7 @@ namespace Vanta {
 			if (!metadata.IsValid())
 				invalidAssets.emplace_back(metadata.Handle);
 			else
-				m_CurrentItems.Items.push_back(Ref<ContentBrowserAsset>::Create(metadata, m_AssetIconMap.find(metadata.Extension) != m_AssetIconMap.end() ? m_AssetIconMap[metadata.Extension] : m_FileTex));
+				m_CurrentItems.Items.push_back(Ref<ContentBrowserAsset>::Create(metadata, m_AssetIconMap.find(metadata.FilePath.extension().string()) != m_AssetIconMap.end() ? m_AssetIconMap[metadata.FilePath.extension().string()] : m_FileTex));
 		}
 
 		for (auto invalidHandle : invalidAssets)
@@ -120,6 +115,9 @@ namespace Vanta {
 	void ContentBrowserPanel::OnImGuiRender()
 	{
 		ImGui::Begin("Content Browser", NULL, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
+
+		m_IsContentBrowserHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+
 		{
 			UI::BeginPropertyGrid();
 
@@ -152,7 +150,7 @@ namespace Vanta {
 						if (ImGui::BeginMenu("New"))
 						{
 							if (ImGui::MenuItem("Folder"))
-								FileSystem::CreateDirectory(m_CurrentDirectory->FilePath + "/New Folder");
+								FileSystem::CreateDirectory((m_CurrentDirectory->FilePath / "New Folder").string());
 
 							ImGui::EndMenu();
 						}
@@ -161,11 +159,16 @@ namespace Vanta {
 						{
 							std::string filepath = Application::Get().OpenFile();
 							if (!filepath.empty())
-								FileSystem::MoveFile(filepath, m_CurrentDirectory->FilePath);
+								FileSystem::MoveFile(filepath, m_CurrentDirectory->FilePath.string());
 						}
 
 						if (ImGui::MenuItem("Refresh"))
 							Refresh();
+
+						ImGui::Separator();
+
+						if (ImGui::MenuItem("Show in Explorer"))
+							FileSystem::OpenDirectoryInExplorer(m_CurrentDirectory->FilePath);
 
 						ImGui::EndPopup();
 					}
@@ -192,8 +195,12 @@ namespace Vanta {
 		ImGui::End();
 	}
 
-	Ref<DirectoryInfo> ContentBrowserPanel::GetDirectory(const std::string& filepath) const
+	Ref<DirectoryInfo> ContentBrowserPanel::GetDirectory(const std::filesystem::path& filepath) const
 	{
+		// TODO: we should store std::filesystem::path here instead of string
+		//            so that we don't have to do stuff like this v
+		//std::string path = filepath;
+		//std::replace(path.begin(), path.end(), '\\', '/');
 		for (const auto&[handle, directory] : m_Directories)
 		{
 			if (directory->FilePath == filepath)
@@ -301,7 +308,7 @@ namespace Vanta {
 
 			for (auto& directory : m_BreadCrumbData)
 			{
-				if (directory->Name != "assets")
+				if (directory->Name != Project::GetActive()->GetConfig().AssetDirectory)
 					ImGui::Text("/");
 
 				ImGui::SameLine();
@@ -364,13 +371,32 @@ namespace Vanta {
 				for (size_t i = firstIndex; i <= lastIndex; i++)
 				{
 					auto toSelect = m_CurrentItems[i];
-					item->SetSelected(true);
-					m_SelectionStack.Select(item->GetID());
+					toSelect->SetSelected(true);
+					m_SelectionStack.Select(toSelect->GetID());
 				}
 			}
 
+			if (result.IsSet(ContentBrowserAction::Reload))
+				AssetManager::ReloadData(item->GetID());
+
 			if (result.IsSet(ContentBrowserAction::OpenDeleteDialogue))
 				openDeleteDialogue = true;
+
+			if (result.IsSet(ContentBrowserAction::ShowInExplorer))
+			{
+				if (item->GetType() == ContentBrowserItem::ItemType::Directory)
+					FileSystem::ShowFileInExplorer(m_CurrentDirectory->FilePath / item->GetName());
+				else
+					FileSystem::ShowFileInExplorer(AssetManager::GetFileSystemPath(AssetManager::GetMetadata(item->GetID())));
+			}
+
+			if (result.IsSet(ContentBrowserAction::OpenExternal))
+			{
+				if (item->GetType() == ContentBrowserItem::ItemType::Directory)
+					FileSystem::OpenExternally(m_CurrentDirectory->FilePath / item->GetName());
+				else
+					FileSystem::OpenExternally(AssetManager::GetFileSystemPath(AssetManager::GetMetadata(item->GetID())));
+			}
 
 			if (result.IsSet(ContentBrowserAction::Hovered))
 				m_IsAnyItemHovered = true;
@@ -416,10 +442,18 @@ namespace Vanta {
 			{
 				const AssetMetadata& asset = AssetManager::GetMetadata(m_SelectionStack[0]);
 
+				std::string filepath;
 				if (asset.IsValid())
-					ImGui::Text(asset.FilePath.c_str());
+				{
+					filepath = asset.FilePath.string();
+				}
 				else if (m_Directories.find(m_SelectionStack[0]) != m_Directories.end())
-					ImGui::Text(m_Directories[m_SelectionStack[0]]->FilePath.c_str());
+				{
+					filepath = std::filesystem::relative(m_Directories[m_SelectionStack[0]]->FilePath, Project::GetAssetDirectory()).string();
+					std::replace(filepath.begin(), filepath.end(), '\\', '/');
+				}
+
+				ImGui::Text(filepath.c_str());
 			}
 			else if (m_SelectionStack.SelectionCount() > 1)
 			{
@@ -468,6 +502,9 @@ namespace Vanta {
 
 	void ContentBrowserPanel::UpdateInput()
 	{
+		if (!m_IsContentBrowserHovered)
+			return;
+
 		if ((!m_IsAnyItemHovered && ImGui::IsAnyMouseDown()) || Input::IsKeyPressed(KeyCode::Escape))
 			ClearSelections();
 
@@ -612,16 +649,16 @@ namespace Vanta {
 		for (auto& assetHandle : directoryInfo->Assets)
 		{
 			auto& asset = AssetManager::GetMetadata(assetHandle);
-			std::string filename = Utils::ToLower(asset.FileName);
+			std::string filename = Utils::ToLower(asset.FilePath.filename().string());
 
 			if (filename.find(queryLowerCase) != std::string::npos)
-				results.Items.push_back(Ref<ContentBrowserAsset>::Create(asset, m_AssetIconMap.find(asset.Extension) != m_AssetIconMap.end() ? m_AssetIconMap[asset.Extension] : m_FileTex));
+				results.Items.push_back(Ref<ContentBrowserAsset>::Create(asset, m_AssetIconMap.find(asset.FilePath.extension().string()) != m_AssetIconMap.end() ? m_AssetIconMap[asset.FilePath.extension().string()] : m_FileTex));
 
 			if (queryLowerCase[0] != '.')
 				continue;
 
-			if (asset.Extension.find(std::string(&queryLowerCase[1])) != std::string::npos)
-				results.Items.push_back(Ref<ContentBrowserAsset>::Create(asset, m_AssetIconMap.find(asset.Extension) != m_AssetIconMap.end() ? m_AssetIconMap[asset.Extension] : m_FileTex));
+			if (asset.FilePath.extension().string().find(std::string(&queryLowerCase[1])) != std::string::npos)
+				results.Items.push_back(Ref<ContentBrowserAsset>::Create(asset, m_AssetIconMap.find(asset.FilePath.extension().string()) != m_AssetIconMap.end() ? m_AssetIconMap[asset.FilePath.extension().string()] : m_FileTex));
 		}
 
 		return results;
@@ -629,8 +666,6 @@ namespace Vanta {
 
 	void ContentBrowserPanel::OnFileSystemChanged(FileSystemChangedEvent event)
 	{
-		VA_CORE_ERROR("OnFileSystemChanged");
-
 		std::lock_guard<std::mutex> lock(s_LockMutex);
 		switch (event.Action)
 		{
@@ -668,13 +703,11 @@ namespace Vanta {
 
 	void ContentBrowserPanel::OnAssetAdded(FileSystemChangedEvent event)
 	{
-		const auto& assetMetadata = AssetManager::GetMetadata(event.FilePath);
+		const auto& assetMetadata = AssetManager::GetMetadata(event.FilePath.string());
 		if (!assetMetadata.IsValid())
 			return;
 
-		std::filesystem::path path = assetMetadata.FilePath;
-		auto directory = GetDirectory(path.parent_path().string());
-
+		auto directory = GetDirectory(event.FilePath.parent_path());
 		if (!directory)
 			VA_CORE_ASSERT(false, "How did this even happen?");
 
@@ -685,12 +718,14 @@ namespace Vanta {
 
 	void ContentBrowserPanel::OnDirectoryAdded(FileSystemChangedEvent event)
 	{
-		std::filesystem::path path = event.FilePath;
-		auto parentDirectory = GetDirectory(path.parent_path().string());
+		// FileSystemChangedEvents are relative to asset directory, but some
+		// ContentBrowserPanel functions are relative to working directory
+		std::filesystem::path directoryPath = Project::GetActive()->GetAssetDirectory() / event.FilePath;
+		auto parentDirectory = GetDirectory(directoryPath.parent_path().string());
 		if (!parentDirectory)
 			VA_CORE_ASSERT(false, "How did this even happen?");
 
-		AssetHandle directoryHandle = ProcessDirectory(event.FilePath, parentDirectory);
+		AssetHandle directoryHandle = ProcessDirectory(directoryPath.string(), parentDirectory);
 		if (directoryHandle == 0)
 			return;
 
@@ -713,6 +748,7 @@ namespace Vanta {
 
 	void ContentBrowserPanel::OnAssetDeleted(FileSystemChangedEvent event)
 	{
+		std::filesystem::path directoryPath = Project::GetActive()->GetAssetDirectory() / event.FilePath;
 		AssetMetadata metadata;
 		Ref<DirectoryInfo> directory;
 		for (const auto& item : m_CurrentItems.Items)
@@ -725,7 +761,7 @@ namespace Vanta {
 				{
 					metadata = assetInfo;
 
-					std::string parentDirectory = std::filesystem::path(assetInfo.FilePath).parent_path().string();
+					std::string parentDirectory = directoryPath.parent_path().string();
 					directory = GetDirectory(parentDirectory);
 					break;
 				}
@@ -752,15 +788,14 @@ namespace Vanta {
 	{
 		if (!event.WasTracking)
 		{
-			auto& assetInfo = AssetManager::GetMetadata(event.FilePath);
-			std::filesystem::path path = event.FilePath;
-			auto directory = GetDirectory(path.parent_path().string());
+			auto& assetInfo = AssetManager::GetMetadata(event.FilePath.string());
+			auto directory = GetDirectory(event.FilePath.parent_path());
 			directory->Assets.push_back(assetInfo.Handle);
 			ChangeDirectory(m_CurrentDirectory);
 		}
 		else
 		{
-			auto& assetInfo = AssetManager::GetMetadata(event.FilePath);
+			auto& assetInfo = AssetManager::GetMetadata(event.FilePath.string());
 			if (!assetInfo.IsValid())
 				return;
 
@@ -800,8 +835,7 @@ namespace Vanta {
 
 	void ContentBrowserPanel::OnDirectoryRenamed(FileSystemChangedEvent event)
 	{
-		std::filesystem::path path = event.FilePath;
-		auto directory = GetDirectory(path.parent_path().string() + "/" + event.OldName);
+		auto directory = GetDirectory(event.FilePath.parent_path() / event.OldName);
 
 		size_t itemIndex = m_CurrentItems.FindItem(directory->Handle);
 		if (itemIndex != ContentBrowserItemList::InvalidItem)
@@ -811,20 +845,20 @@ namespace Vanta {
 		else
 		{
 			directory->Name = event.NewName;
-			UpdateDirectoryPath(directory, path.parent_path().string());
+			UpdateDirectoryPath(directory, event.FilePath.parent_path().string());
 		}
 
 		ChangeDirectory(m_CurrentDirectory);
 	}
 
-	void ContentBrowserPanel::UpdateDirectoryPath(Ref<DirectoryInfo>& directoryInfo, const std::string& newParentPath)
+	void ContentBrowserPanel::UpdateDirectoryPath(Ref<DirectoryInfo>& directoryInfo, const std::filesystem::path& newParentPath)
 	{
-		directoryInfo->FilePath = newParentPath + "/" + directoryInfo->Name;
+		directoryInfo->FilePath = newParentPath / directoryInfo->Name;
 
 		for (auto& assetHandle : directoryInfo->Assets)
 		{
 			auto& metadata = AssetManager::GetMetadata(assetHandle);
-			metadata.FilePath = directoryInfo->FilePath + "/" + metadata.FileName + "." + metadata.Extension;
+			metadata.FilePath = directoryInfo->FilePath / metadata.FilePath.filename();
 		}
 
 		for (auto& [handle, subdirectory] : directoryInfo->SubDirectories)
