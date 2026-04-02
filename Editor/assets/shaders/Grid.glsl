@@ -51,5 +51,7 @@ void main()
 {
 	float x = grid(v_TexCoord * u_Settings.Scale, u_Settings.Size);
 	color = vec4(vec3(0.2), 0.5) * (1.0 - x);
+	if (color.a == 0.0)
+	discard;
 	unused = vec4(0.0);
 }

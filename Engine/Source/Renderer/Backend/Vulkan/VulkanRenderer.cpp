@@ -602,6 +602,10 @@ namespace Vanta {
 			uint32_t width = framebuffer->GetWidth();
 			uint32_t height = framebuffer->GetHeight();
 
+			VkViewport viewport = {};
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+
 			VkRenderPassBeginInfo renderPassBeginInfo = {};
 			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderPassBeginInfo.pNext = nullptr;
@@ -611,11 +615,48 @@ namespace Vanta {
 			renderPassBeginInfo.renderArea.extent.width = width;
 			renderPassBeginInfo.renderArea.extent.height = height;
 
+			if (framebuffer->GetSpecification().SwapChainTarget)
+			{
+				VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
+				width = swapChain.GetWidth();
+				height = swapChain.GetHeight();
+				renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				renderPassBeginInfo.pNext = nullptr;
+				renderPassBeginInfo.renderPass = framebuffer->GetRenderPass();
+				renderPassBeginInfo.renderArea.offset.x = 0;
+				renderPassBeginInfo.renderArea.offset.y = 0;
+				renderPassBeginInfo.renderArea.extent.width = width;
+				renderPassBeginInfo.renderArea.extent.height = height;
+				renderPassBeginInfo.framebuffer = swapChain.GetCurrentFramebuffer();
+
+				viewport.x = 0.0f;
+				viewport.y = height;
+				viewport.width = (float)width;
+				viewport.height = -(float)height;
+			}
+			else
+			{
+				width = framebuffer->GetWidth();
+				height = framebuffer->GetHeight();
+				renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				renderPassBeginInfo.pNext = nullptr;
+				renderPassBeginInfo.renderPass = framebuffer->GetRenderPass();
+				renderPassBeginInfo.renderArea.offset.x = 0;
+				renderPassBeginInfo.renderArea.offset.y = 0;
+				renderPassBeginInfo.renderArea.extent.width = width;
+				renderPassBeginInfo.renderArea.extent.height = height;
+				renderPassBeginInfo.framebuffer = framebuffer->GetVulkanFramebuffer();
+
+				viewport.x = 0.0f;
+				viewport.y = 0.0f;
+				viewport.width = (float)width;
+				viewport.height = (float)height;
+			}
+
 			// TODO: Does our framebuffer have a depth attachment?
 			const auto& clearValues = framebuffer->GetVulkanClearValues();
 			renderPassBeginInfo.clearValueCount = (uint32_t)clearValues.size();
 			renderPassBeginInfo.pClearValues = clearValues.data();
-			renderPassBeginInfo.framebuffer = framebuffer->GetVulkanFramebuffer();
 
 			vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -653,13 +694,6 @@ namespace Vanta {
 			}
 
 			// Update dynamic viewport state
-			VkViewport viewport = {};
-			viewport.x = 0.0f;
-			viewport.y = 0.0f;
-			viewport.height = (float)height;
-			viewport.width = (float)width;
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
 			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
 			// Update dynamic scissor state

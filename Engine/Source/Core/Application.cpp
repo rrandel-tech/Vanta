@@ -16,6 +16,8 @@
 #include "imgui_internal.h"
 #include <glad/glad.h>
 
+#include <filesystem>
+
 extern bool g_ApplicationRunning;
 extern ImGuiContext* GImGui;
 
@@ -27,6 +29,9 @@ namespace Vanta {
         : m_Specification(specification)
     {
         s_Instance = this;
+
+        if (!specification.WorkingDirectory.empty())
+            std::filesystem::current_path(specification.WorkingDirectory);
 
         m_Profiler = new PerformanceProfiler();
 
@@ -47,7 +52,7 @@ namespace Vanta {
         Renderer::Init();
         Renderer::WaitAndRender();
 
-        if (m_EnableImGui)
+        if (m_Specification.EnableImGui)
         {
             m_ImGuiLayer = ImGuiLayer::Create();
             PushOverlay(m_ImGuiLayer);
@@ -165,7 +170,7 @@ namespace Vanta {
 
                 // Render ImGui on render thread
                 Application* app = this;
-                if (m_EnableImGui)
+                if (m_Specification.EnableImGui)
                 {
                     Renderer::Submit([app]() { app->RenderImGui(); });
                     Renderer::Submit([=]() {m_ImGuiLayer->End(); });

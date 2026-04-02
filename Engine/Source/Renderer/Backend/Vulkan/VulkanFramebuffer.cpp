@@ -21,6 +21,40 @@ namespace Vanta {
 			m_Height = spec.Height;
 		}
 
+		// Create all image objects immediately so we can start referencing them
+		// elsewhere
+		uint32_t attachmentIndex = 0;
+		if (!m_Specification.ExistingFramebuffer)
+		{
+			for (auto attachmentSpec : m_Specification.Attachments.Attachments)
+			{
+				if (m_Specification.ExistingImages.find(attachmentIndex) != m_Specification.ExistingImages.end())
+				{
+					if (!Utils::IsDepthFormat(attachmentSpec.Format))
+						m_AttachmentImages.emplace_back(); // This will be set later
+				}
+				else if (Utils::IsDepthFormat(attachmentSpec.Format))
+				{
+					ImageSpecification spec;
+					spec.Format = attachmentSpec.Format;
+					spec.Usage = ImageUsage::Attachment;
+					spec.Width = m_Width;
+					spec.Height = m_Height;
+					m_DepthAttachmentImage = Image2D::Create(spec);
+				}
+				else
+				{
+					ImageSpecification spec;
+					spec.Format = attachmentSpec.Format;
+					spec.Usage = ImageUsage::Attachment;
+					spec.Width = m_Width;
+					spec.Height = m_Height;
+					m_AttachmentImages.emplace_back(Image2D::Create(spec));
+				}
+				attachmentIndex++;
+			}
+		}
+
 		VA_CORE_ASSERT(spec.Attachments.Attachments.size());
 		Resize(m_Width * spec.Scale, m_Height * spec.Scale, true);
 	}
@@ -44,6 +78,9 @@ namespace Vanta {
 		{
 			VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
 			m_RenderPass = swapChain.GetRenderPass();
+
+			m_ClearValues.clear();
+			m_ClearValues.emplace_back().color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		}
 
 		for (auto& callback : m_ResizeCallbacks)
@@ -82,11 +119,23 @@ namespace Vanta {
 			// Don't free the images if we don't own them
 			if (!m_Specification.ExistingFramebuffer)
 			{
+				uint32_t attachmentIndex = 0;
 				for (auto image : m_AttachmentImages)
+				{
+					if (m_Specification.ExistingImages.find(attachmentIndex) != m_Specification.ExistingImages.end())
+						continue;
+
 					image->Release();
+					attachmentIndex++;
+				}
 
 				if (m_DepthAttachmentImage)
-					m_DepthAttachmentImage->Release();
+				{
+					// Do we own the depth image?
+					if (m_Specification.ExistingImages.find(m_Specification.Attachments.Attachments.size() - 1) == m_Specification.ExistingImages.end())
+						m_DepthAttachmentImage->Release();
+				}
+
 			}
 		}
 
@@ -109,38 +158,36 @@ namespace Vanta {
 		{
 			if (Utils::IsDepthFormat(attachmentSpec.Format))
 			{
-				if (!m_Specification.ExistingFramebuffer)
+				if (m_Specification.ExistingImage)
 				{
-					if (!m_Specification.ExistingImage)
-					{
-						if (createImages)
-						{
-							ImageSpecification spec;
-							spec.Format = attachmentSpec.Format;
-							spec.Usage = ImageUsage::Attachment;
-							spec.Width = m_Width;
-							spec.Height = m_Height;
-							m_DepthAttachmentImage = Image2D::Create(spec);
-						}
-						else
-						{
-							ImageSpecification& spec = m_DepthAttachmentImage->GetSpecification();
-							spec.Width = m_Width;
-							spec.Height = m_Height;
-						}
-
-						Ref<VulkanImage2D> depthAttachmentImage = m_DepthAttachmentImage.As<VulkanImage2D>();
-						depthAttachmentImage->RT_Invalidate(); // Create immediately
-					}
-					else
-					{
-						m_DepthAttachmentImage = m_Specification.ExistingImage;
-					}
+					m_DepthAttachmentImage = m_Specification.ExistingImage;
 				}
-				else
+				else if (m_Specification.ExistingFramebuffer)
 				{
 					Ref<VulkanFramebuffer> existingFramebuffer = m_Specification.ExistingFramebuffer.As<VulkanFramebuffer>();
 					m_DepthAttachmentImage = existingFramebuffer->GetDepthImage();
+				}
+				else if (m_Specification.ExistingImages.find(attachmentIndex) != m_Specification.ExistingImages.end())
+				{
+					Ref<Image2D> existingImage = m_Specification.ExistingImages.at(attachmentIndex);
+					VA_CORE_ASSERT(Utils::IsDepthFormat(existingImage->GetSpecification().Format), "Trying to attach non-depth image as depth attachment");
+					m_DepthAttachmentImage = existingImage;
+				}
+				else
+				{
+					if (createImages)
+					{
+						ImageSpecification spec;
+						spec.Format = attachmentSpec.Format;
+						spec.Usage = ImageUsage::Attachment;
+						spec.Width = m_Width;
+						spec.Height = m_Height;
+						m_DepthAttachmentImage = Image2D::Create(spec);
+						VA_CORE_VERIFY(false);
+					}
+
+					Ref<VulkanImage2D> depthAttachmentImage = m_DepthAttachmentImage.As<VulkanImage2D>();
+					depthAttachmentImage->RT_Invalidate(); // Create immediately
 				}
 
 				VkAttachmentDescription& attachmentDescription = attachmentDescriptions.emplace_back();
@@ -171,7 +218,20 @@ namespace Vanta {
 				VA_CORE_ASSERT(!m_Specification.ExistingImage, "Not supported for color attachments");
 
 				Ref<VulkanImage2D> colorAttachment;
-				if (!m_Specification.ExistingFramebuffer)
+				if (m_Specification.ExistingFramebuffer)
+				{
+					Ref<VulkanFramebuffer> existingFramebuffer = m_Specification.ExistingFramebuffer.As<VulkanFramebuffer>();
+					Ref<Image2D> existingImage = existingFramebuffer->GetImage(attachmentIndex);
+					colorAttachment = m_AttachmentImages.emplace_back(existingImage).As<VulkanImage2D>();
+				}
+				else if (m_Specification.ExistingImages.find(attachmentIndex) != m_Specification.ExistingImages.end())
+				{
+					Ref<Image2D> existingImage = m_Specification.ExistingImages[attachmentIndex];
+					VA_CORE_ASSERT(!Utils::IsDepthFormat(existingImage->GetSpecification().Format), "Trying to attach depth image as color attachment");
+					colorAttachment = existingImage.As<VulkanImage2D>();
+					m_AttachmentImages[attachmentIndex] = existingImage;
+				}
+				else
 				{
 					if (createImages)
 					{
@@ -181,6 +241,8 @@ namespace Vanta {
 						spec.Width = m_Width;
 						spec.Height = m_Height;
 						colorAttachment = m_AttachmentImages.emplace_back(Image2D::Create(spec)).As<VulkanImage2D>();
+						VA_CORE_VERIFY(false);
+
 					}
 					else
 					{
@@ -193,13 +255,6 @@ namespace Vanta {
 
 					colorAttachment->RT_Invalidate(); // Create immediately
 				}
-				else
-				{
-					Ref<VulkanFramebuffer> existingFramebuffer = m_Specification.ExistingFramebuffer.As<VulkanFramebuffer>();
-					Ref<Image2D> existingImage = existingFramebuffer->GetImage(attachmentIndex);
-					colorAttachment = m_AttachmentImages.emplace_back(existingImage).As<VulkanImage2D>();
-				}
-
 
 				VkAttachmentDescription& attachmentDescription = attachmentDescriptions.emplace_back();
 				attachmentDescription.flags = 0;
@@ -297,6 +352,7 @@ namespace Vanta {
 		{
 			Ref<VulkanImage2D> image = m_AttachmentImages[i].As<VulkanImage2D>();
 			attachments[i] = image->GetImageInfo().ImageView;
+			VA_CORE_ASSERT(attachments[i]);
 		}
 
 		if (m_DepthAttachmentImage)
@@ -305,26 +361,25 @@ namespace Vanta {
 			if (m_Specification.ExistingImage)
 			{
 				attachments.emplace_back(image->GetLayerImageView(m_Specification.ExistingImageLayer));
+				VA_CORE_ASSERT(attachments.back());
 			}
 			else
 			{
 				attachments.emplace_back(image->GetImageInfo().ImageView);
+				VA_CORE_ASSERT(attachments.back());
 			}
 		}
 
-		//if (!m_Specification.ExistingFramebuffer)
-		{
-			VkFramebufferCreateInfo framebufferCreateInfo = {};
-			framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			framebufferCreateInfo.renderPass = m_RenderPass;
-			framebufferCreateInfo.attachmentCount = attachments.size();
-			framebufferCreateInfo.pAttachments = attachments.data();
-			framebufferCreateInfo.width = m_Width;
-			framebufferCreateInfo.height = m_Height;
-			framebufferCreateInfo.layers = 1;
+		VkFramebufferCreateInfo framebufferCreateInfo = {};
+		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferCreateInfo.renderPass = m_RenderPass;
+		framebufferCreateInfo.attachmentCount = attachments.size();
+		framebufferCreateInfo.pAttachments = attachments.data();
+		framebufferCreateInfo.width = m_Width;
+		framebufferCreateInfo.height = m_Height;
+		framebufferCreateInfo.layers = 1;
 
-			VK_CHECK_RESULT(vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &m_Framebuffer));
-		}
+		VK_CHECK_RESULT(vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &m_Framebuffer));
 	}
 
 }

@@ -31,7 +31,7 @@ namespace Vanta {
 		virtual Ref<Image2D> GetImage(uint32_t attachmentIndex = 0) const override { VA_CORE_ASSERT(attachmentIndex < m_AttachmentImages.size()); return m_AttachmentImages[attachmentIndex]; }
 		virtual Ref<Image2D> GetDepthImage() const override { return m_DepthAttachmentImage; }
 		bool HasDepthAttachment() const { return (bool)m_DepthAttachmentImage; }
-		size_t GetColorAttachmentCount() const { return m_AttachmentImages.size(); }
+		size_t GetColorAttachmentCount() const { return m_Specification.SwapChainTarget ? 1 : m_AttachmentImages.size(); }
 		VkRenderPass GetRenderPass() const { return m_RenderPass; }
 		VkFramebuffer GetVulkanFramebuffer() const { return m_Framebuffer; }
 		const std::vector<VkClearValue>& GetVulkanClearValues() const { return m_ClearValues; }

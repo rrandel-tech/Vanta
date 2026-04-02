@@ -20,7 +20,7 @@ namespace Vanta {
 
 		void Init(VkInstance instance, const Ref<VulkanDevice>& device);
 		void InitSurface(SDL_Window* windowHandle);
-		void Create(uint32_t* width, uint32_t* height, bool vsync = false);
+		void Create(uint32_t* width, uint32_t* height, bool vsync);
 
 		void OnResize(uint32_t width, uint32_t height);
 
@@ -35,7 +35,7 @@ namespace Vanta {
 		VkRenderPass GetRenderPass() { return m_RenderPass; }
 
 		VkFramebuffer GetCurrentFramebuffer() { return GetFramebuffer(m_CurrentImageIndex); }
-		VkCommandBuffer GetCurrentDrawCommandBuffer() { return GetDrawCommandBuffer(m_CurrentImageIndex); }
+		VkCommandBuffer GetCurrentDrawCommandBuffer() { return GetDrawCommandBuffer(m_CurrentBufferIndex); }
 
 		VkFormat GetColorFormat() { return m_ColorFormat; }
 
@@ -51,6 +51,8 @@ namespace Vanta {
 			return m_CommandBuffers[index];
 		}
 
+		VkSemaphore GetRenderCompleteSemaphore() { return m_Semaphores.RenderComplete; }
+
 		void Cleanup();
 	private:
 		VkResult AcquireNextImage(VkSemaphore presentCompleteSemaphore, uint32_t* imageIndex);
@@ -62,6 +64,7 @@ namespace Vanta {
 	private:
 		VkInstance m_Instance;
 		Ref<VulkanDevice> m_Device;
+		bool m_VSync = false;
 
 		VkFormat m_ColorFormat;
 		VkColorSpaceKHR m_ColorSpace;

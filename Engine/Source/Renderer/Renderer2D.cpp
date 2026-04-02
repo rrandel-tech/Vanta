@@ -71,6 +71,7 @@ namespace Vanta {
 
 		// Lines
 		Ref<Pipeline> LinePipeline;
+		Ref<Pipeline> LineOnTopPipeline;
 		Ref<VertexBuffer> LineVertexBuffer;
 		Ref<IndexBuffer> LineIndexBuffer;
 		Ref<Material> LineMaterial;
@@ -175,6 +176,8 @@ namespace Vanta {
 				{ ShaderDataType::Float4, "a_Color" }
 			};
 			s_Data->LinePipeline = Pipeline::Create(pipelineSpecification);
+			pipelineSpecification.DepthTest = false;
+			s_Data->LineOnTopPipeline = Pipeline::Create(pipelineSpecification);
 
 			s_Data->LineVertexBuffer = VertexBuffer::Create(s_Data->MaxLineVertices * sizeof(LineVertex));
 			s_Data->LineVertexBufferBase = new LineVertex[s_Data->MaxLineVertices];
@@ -276,7 +279,7 @@ namespace Vanta {
 				VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 				vkCmdSetLineWidth(commandBuffer, s_Data->LineWidth);
 			});
-			Renderer::RenderGeometry(s_Data->CommandBuffer, s_Data->LinePipeline, s_Data->UniformBufferSet, s_Data->LineMaterial, s_Data->LineVertexBuffer, s_Data->LineIndexBuffer, glm::mat4(1.0f), s_Data->LineIndexCount);
+			Renderer::RenderGeometry(s_Data->CommandBuffer, s_Data->LineOnTopPipeline, s_Data->UniformBufferSet, s_Data->LineMaterial, s_Data->LineVertexBuffer, s_Data->LineIndexBuffer, glm::mat4(1.0f), s_Data->LineIndexCount);
 
 			s_Data->Stats.DrawCalls++;
 		}

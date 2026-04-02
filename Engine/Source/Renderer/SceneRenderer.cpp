@@ -10,6 +10,7 @@
 
 #include "Renderer2D.hpp"
 #include "UniformBuffer.hpp"
+#include "Debug/Profiler.hpp"
 
 #include "ImGui/ImGui.hpp"
 
@@ -17,8 +18,8 @@ namespace Vanta {
 
 	static std::vector<std::thread> s_ThreadPool;
 
-	SceneRenderer::SceneRenderer(Ref<Scene> scene)
-		: m_Scene(scene)
+	SceneRenderer::SceneRenderer(Ref<Scene> scene, SceneRendererSpecification specification)
+		: m_Scene(scene), m_Specification(specification)
 	{
 		Init();
 	}
@@ -31,7 +32,10 @@ namespace Vanta {
 	{
 		VA_SCOPE_TIMER("SceneRenderer::Init");
 
-		m_CommandBuffer = RenderCommandBuffer::Create(0, "SceneRenderer");
+		if (m_Specification.SwapChainTarget)
+			m_CommandBuffer = RenderCommandBuffer::CreateFromSwapChain("SceneRenderer");
+		else
+			m_CommandBuffer = RenderCommandBuffer::Create(0, "SceneRenderer");
 
 		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
 		m_UniformBufferSet = UniformBufferSet::Create(framesInFlight);
@@ -130,6 +134,7 @@ namespace Vanta {
 			FramebufferSpecification compFramebufferSpec;
 			compFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
 			compFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
+			compFramebufferSpec.SwapChainTarget = m_Specification.SwapChainTarget;
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(compFramebufferSpec);
 
@@ -138,6 +143,7 @@ namespace Vanta {
 				{ ShaderDataType::Float3, "a_Position" },
 				{ ShaderDataType::Float2, "a_TexCoord" }
 			};
+			pipelineSpecification.BackfaceCulling = false;
 			pipelineSpecification.Shader = Renderer::GetShaderLibrary()->Get("SceneComposite");
 
 			RenderPassSpecification renderPassSpec;
@@ -150,12 +156,18 @@ namespace Vanta {
 		}
 
 		// External compositing
+		if (!m_Specification.SwapChainTarget)
 		{
 			FramebufferSpecification extCompFramebufferSpec;
 			extCompFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
 			extCompFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 			extCompFramebufferSpec.ClearOnLoad = false;
-			extCompFramebufferSpec.ExistingFramebuffer = m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
+
+			// Use the color buffer from the final compositing pass, but the depth buffer from
+			// the actual 3D geometry pass, incase we want to composite elements behind meshes
+			// in the scene
+			extCompFramebufferSpec.ExistingImages[0] = m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetImage();
+			extCompFramebufferSpec.ExistingImages[1] = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage();
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(extCompFramebufferSpec);
 
@@ -373,7 +385,11 @@ namespace Vanta {
 		{
 			m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
-			m_ExternalCompositeRenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+			if (m_ExternalCompositeRenderPass)
+				m_ExternalCompositeRenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+
+			if (m_Specification.SwapChainTarget)
+				m_CommandBuffer = RenderCommandBuffer::CreateFromSwapChain("SceneRenderer");
 			m_NeedsResize = false;
 		}
 
@@ -625,11 +641,26 @@ namespace Vanta {
 			m_CommandBuffer->Submit();
 			//	BloomBlurPass();
 		}
+		else
+		{
+			m_CommandBuffer->Begin();
+			ClearPass();
+			m_CommandBuffer->End();
+			m_CommandBuffer->Submit();
+		}
 
 		m_DrawList.clear();
 		m_SelectedMeshDrawList.clear();
 		m_ShadowPassDrawList.clear();
 		m_SceneData = {};
+	}
+
+	void SceneRenderer::ClearPass()
+	{
+		VA_PROFILE_FUNC();
+
+		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass, true);
+		Renderer::EndRenderPass(m_CommandBuffer);
 	}
 
 	Ref<RenderPass> SceneRenderer::GetFinalRenderPass()

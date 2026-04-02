@@ -5,6 +5,8 @@
 #include "Renderer/RendererTypes.hpp"
 #include "Image.hpp"
 
+#include <map>
+
 namespace Vanta {
 
 	class Framebuffer;
@@ -43,8 +45,13 @@ namespace Vanta {
 		// SwapChainTarget = screen buffer (i.e. no framebuffer)
 		bool SwapChainTarget = false;
 
+		// Note: these are used to attach multi-layered depth images
 		Ref<Image2D> ExistingImage;
 		uint32_t ExistingImageLayer;
+
+		// Specify existing images to attach instead of creating
+		// new images. attachment index -> image
+		std::map<uint32_t, Ref<Image2D>> ExistingImages;
 
 		// At the moment this will just create a new render pass
 		// with an existing framebuffer
