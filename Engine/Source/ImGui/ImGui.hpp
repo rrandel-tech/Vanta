@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Asset/Asset.hpp"
+#include "Asset/AssetMetadata.hpp"
 
 #include "imgui.h"
 
@@ -63,6 +63,22 @@ namespace Vanta::UI {
 		ImGui::NextColumn();
 
 		return modified;
+	}
+
+	static void Property(const char* label, const std::string& value)
+	{
+		ImGui::Text(label);
+		ImGui::NextColumn();
+		ImGui::PushItemWidth(-1);
+
+		s_IDBuffer[0] = '#';
+		s_IDBuffer[1] = '#';
+		memset(s_IDBuffer + 2, 0, 14);
+		itoa(s_Counter++, s_IDBuffer + 2, 16);
+
+		ImGui::InputText(s_IDBuffer, (char*)value.c_str(), value.size(), ImGuiInputTextFlags_ReadOnly);
+		ImGui::PopItemWidth();
+		ImGui::NextColumn();
 	}
 
 	static void Property(const char* label, const char* value)

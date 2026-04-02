@@ -6,7 +6,7 @@ namespace Vanta {
 
 	ObjectsPanel::ObjectsPanel()
 	{
-		m_CubeImage = Texture2D::Create("assets/editor/asset.png");
+		m_CubeImage = Texture2D::Create("Resources/Editor/asset.png");
 	}
 
 	void ObjectsPanel::DrawObject(const char* label, AssetHandle handle)
@@ -30,6 +30,7 @@ namespace Vanta {
 
 	void ObjectsPanel::OnImGuiRender()
 	{
+#if 0
 		static const AssetHandle CubeHandle = AssetManager::GetAssetHandleFromFilePath("assets/meshes/Default/Cube.fbx");
 		static const AssetHandle CapsuleHandle = AssetManager::GetAssetHandleFromFilePath("assets/meshes/Default/Capsule.fbx");
 		static const AssetHandle SphereHandle = AssetManager::GetAssetHandleFromFilePath("assets/meshes/Default/Sphere.fbx");
@@ -51,6 +52,9 @@ namespace Vanta {
 			ImGui::EndChild();
 		}
 
+		ImGui::End();
+#endif
+		ImGui::Begin("Objects");
 		ImGui::End();
 	}
 

@@ -11,9 +11,9 @@
 
 #include "ImGui/ImGui.hpp"
 #include "Asset/MeshSerializer.hpp"
+#include "Asset/AssetManager.hpp"
 
 #include <stack>
-#include <format>
 
 #include <assimp/scene.h>
 #include <filesystem>
@@ -156,9 +156,9 @@ namespace Vanta {
 
 	void MeshViewerPanel::SetAsset(const Ref<Asset>& asset)
 	{
-		Ref<MeshAsset> mesh = (Ref<MeshAsset>)asset;
+		Ref<MeshAsset> meshAsset = (Ref<MeshAsset>)asset;
 
-		const std::string& path = mesh->GetFilePath();
+		const std::string& path = meshAsset->GetFilePath();
 		size_t found = path.find_last_of("/\\");
 		std::string name = found != std::string::npos ? path.substr(found + 1) : path;
 		found = name.find_last_of(".");
@@ -172,11 +172,12 @@ namespace Vanta {
 		}
 
 		auto& sceneData = m_OpenMeshes[name] = std::make_shared<MeshScene>();
-		sceneData->m_Mesh = mesh;
+		sceneData->m_MeshAsset = meshAsset;
 		sceneData->m_Name = name;
 		sceneData->m_Scene = Ref<Scene>::Create("MeshViewerPanel", true);
 		sceneData->m_MeshEntity = sceneData->m_Scene->CreateEntity("Mesh");
-		sceneData->m_MeshEntity.AddComponent<MeshComponent>(Ref<Mesh>::Create(sceneData->m_Mesh));
+		sceneData->m_Mesh = Ref<Mesh>::Create(sceneData->m_MeshAsset);
+		sceneData->m_MeshEntity.AddComponent<MeshComponent>(sceneData->m_Mesh);
 		sceneData->m_MeshEntity.AddComponent<SkyLightComponent>().DynamicSky = true;
 
 		sceneData->m_DirectionaLight = sceneData->m_Scene->CreateEntity("DirectionalLight");
@@ -296,7 +297,7 @@ namespace Vanta {
 
 			{
 				ImGui::Begin(propertiesPanelName.c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
-				DrawMeshNode(sceneData->m_Mesh);
+				DrawMeshNode(sceneData->m_MeshAsset, sceneData->m_Mesh);
 				ImGui::End();
 			}
 
@@ -306,24 +307,21 @@ namespace Vanta {
 		ImGui::PopID();
 	}
 
-	void MeshViewerPanel::DrawMeshNode(const Ref<MeshAsset>& mesh)
+	void MeshViewerPanel::DrawMeshNode(const Ref<MeshAsset>& meshAsset, const Ref<Mesh>& mesh)
 	{
 		// Mesh Hierarchy
-		auto rootNode = mesh->m_Scene->mRootNode;
-		MeshNodeHierarchy(mesh, rootNode);
+		auto rootNode = meshAsset->m_Scene->mRootNode;
+		MeshNodeHierarchy(meshAsset, mesh, rootNode);
 
 		if (ImGui::Button("Create Mesh"))
 		{
-			// TODO: AssetManager::CreateNewAsset()
-#if 0
-			MeshSerializer serializer(Ref<Mesh>::Create(mesh));
-			std::filesystem::path meshPath = mesh->GetFilePath();
+			std::filesystem::path meshPath = meshAsset->GetFilePath();
 			VA_CORE_WARN("Mesh Name = {0}", meshPath.stem().string());
-			VA_CORE_WARN("Output filename = {0}", fmt::format("{0}.hzm", meshPath.stem().string()));
-			std::filesystem::path path = meshPath.parent_path() / fmt::format("{0}.hzm", meshPath.stem().string());
-			serializer.Serialize(path.string());
-#endif
-			VA_CORE_ASSERT(false, "See above");
+			VA_CORE_WARN("Output filename = {0}", std::format("{0}.vam", meshPath.stem().string()));
+			std::filesystem::path directoryPath = meshPath.parent_path();
+			std::string filename = std::format("{0}.vam", meshPath.stem().string());
+			Ref<Mesh> serializedMesh = AssetManager::CreateNewAsset<Mesh>(filename, directoryPath.string(), mesh);
+			AssetImporter::Serialize(serializedMesh);
 		}
 	}
 
@@ -339,14 +337,30 @@ namespace Vanta {
 	}
 
 
-	void MeshViewerPanel::MeshNodeHierarchy(const Ref<MeshAsset>& mesh, aiNode* node, const glm::mat4& parentTransform, uint32_t level)
+	void MeshViewerPanel::MeshNodeHierarchy(const Ref<MeshAsset>& meshAsset, Ref<Mesh> mesh, aiNode* node, const glm::mat4& parentTransform, uint32_t level)
 	{
 		glm::mat4 localTransform = Mat4FromAssimpMat4(node->mTransformation);
 		glm::mat4 transform = parentTransform * localTransform;
 
-		static bool checked = true;
-		ImGui::Checkbox("##checkbox", &checked);
-		ImGui::SameLine();
+		VA_CORE_ASSERT(meshAsset->m_NodeMap.find(node) != meshAsset->m_NodeMap.end());
+		auto& meshIndices = meshAsset->m_NodeMap.at(node);
+		if (!meshIndices.empty())
+		{
+			ImGui::PushID(node->mName.C_Str());
+			uint32_t meshIndex = meshIndices.front();
+			auto& submeshes = mesh->GetSubmeshes();
+
+			bool checked = std::find(submeshes.begin(), submeshes.end(), meshIndex) != submeshes.end();
+			if (ImGui::Checkbox("##checkbox", &checked))
+			{
+				if (checked)
+					submeshes.emplace_back(meshIndex);
+				else
+					submeshes.erase(std::find(submeshes.begin(), submeshes.end(), meshIndex));
+			}
+			ImGui::PopID();
+			ImGui::SameLine();
+		}
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnDoubleClick;
 		if (node->mNumChildren == 0)
 			flags |= ImGuiTreeNodeFlags_Leaf;
@@ -370,7 +384,7 @@ namespace Vanta {
 #endif
 
 			for (uint32_t i = 0; i < node->mNumChildren; i++)
-				MeshNodeHierarchy(mesh, node->mChildren[i], transform, level + 1);
+				MeshNodeHierarchy(meshAsset, mesh, node->mChildren[i], transform, level + 1);
 
 			ImGui::TreePop();
 		}

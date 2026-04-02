@@ -1,6 +1,6 @@
 #include "vapch.hpp"
 #include "AssetImporter.hpp"
-
+#include "AssetManager.hpp"
 #include "MeshSerializer.hpp"
 
 namespace Vanta {
@@ -22,6 +22,12 @@ namespace Vanta {
         }
 
         s_Serializers[asset->GetAssetType()]->Serialize(metadata, asset);
+    }
+
+    void AssetImporter::Serialize(const Ref<Asset>& asset)
+    {
+        const AssetMetadata& metadata = AssetManager::GetMetadata(asset->Handle);
+        Serialize(metadata, asset);
     }
 
     bool AssetImporter::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset)

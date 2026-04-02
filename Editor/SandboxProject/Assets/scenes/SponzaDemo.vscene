@@ -1,0 +1,91 @@
+Scene: Scene Name
+Environment:
+  AssetHandle: 597469570829358954
+  Light:
+    Direction: [0, 0, 0]
+    Radiance: [0, 0, 0]
+    Multiplier: 1
+Entities:
+  - Entity: 12392346523579991874
+    Parent: 5561134054991576534
+    Children:
+      []
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Position: [0, 0.5, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 55
+        PerspectiveNear: 0.100000001
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+  - Entity: 5561134054991576534
+    Parent: 0
+    Children:
+      - Handle: 12392346523579991874
+    TagComponent:
+      Tag: Player
+    TransformComponent:
+      Position: [0, 6.31091785, 4.11461163]
+      Rotation: [0, 0, 0]
+      Scale: [0.5, 0.5, 0.5]
+  - Entity: 5471747392929574277
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Sponza
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [0.00999999978, 0.00999999978, 0.00999999978]
+    MeshComponent:
+      AssetID: 10693910477118101954
+  - Entity: 2143608321399101581
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Sky Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkyLightComponent:
+      EnvironmentMap: 597469570829358954
+      Intensity: 1
+      Angle: 0
+  - Entity: 13882838760121718506
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Directional Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [2.35444903, 0, -0.441568285]
+      Scale: [1, 1, 1]
+    DirectionalLightComponent:
+      Radiance: [1, 1, 1]
+      CastShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 5503248384331396990
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Torus
+    TransformComponent:
+      Position: [0, 3.24900579, 0]
+      Rotation: [0.580988586, -0.212728336, 0.311113209]
+      Scale: [2.6000011, 2.59999943, 2.59999943]
+    MeshComponent:
+      AssetID: 17913219005894682090

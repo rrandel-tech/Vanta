@@ -1,5 +1,6 @@
 set(UTILITIES_SOURCES
         StringUtils.cpp
+        FileSystem.cpp
 )
 
 set(UTILITIES_HEADERS

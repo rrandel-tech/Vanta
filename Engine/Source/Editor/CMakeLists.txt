@@ -6,6 +6,8 @@ set(EDITOR_SOURCES
 		DefaultAssetEditors.cpp
 		ObjectsPanel.cpp
 		MeshViewerPanel.cpp
+
+		ContentBrowser/ContentBrowserItem.cpp
 )
 
 set(EDITOR_HEADERS
@@ -16,6 +18,8 @@ set(EDITOR_HEADERS
 		DefaultAssetEditors.hpp
 		ObjectsPanel.hpp
 		MeshViewerPanel.hpp
+
+		ContentBrowser/ContentBrowserItem.hpp
 )
 
 target_sources(Vanta

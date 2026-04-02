@@ -10,9 +10,9 @@
 
 #include "Renderer2D.hpp"
 #include "UniformBuffer.hpp"
-#include "Debug/Profiler.hpp"
 
 #include "ImGui/ImGui.hpp"
+#include "Debug/Profiler.hpp"
 
 namespace Vanta {
 
@@ -94,7 +94,7 @@ namespace Vanta {
 			m_ShadowPassPipeline = Pipeline::Create(pipelineSpec);
 			m_ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
 		}
-
+		
 		// Geometry
 		{
 			FramebufferSpecification geoFramebufferSpec;
@@ -132,9 +132,14 @@ namespace Vanta {
 		// Composite
 		{
 			FramebufferSpecification compFramebufferSpec;
-			compFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
+			compFramebufferSpec.DebugName = "SceneComposite";
 			compFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 			compFramebufferSpec.SwapChainTarget = m_Specification.SwapChainTarget;
+			// No depth for swapchain
+			if (m_Specification.SwapChainTarget)
+				compFramebufferSpec.Attachments = { ImageFormat::RGBA };
+			else
+				compFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(compFramebufferSpec);
 
@@ -148,7 +153,7 @@ namespace Vanta {
 
 			RenderPassSpecification renderPassSpec;
 			renderPassSpec.TargetFramebuffer = framebuffer;
-			renderPassSpec.DebugName = "Composite";
+			renderPassSpec.DebugName = "SceneComposite";
 			pipelineSpecification.RenderPass = RenderPass::Create(renderPassSpec);
 			pipelineSpecification.DebugName = "SceneComposite";
 			pipelineSpecification.DepthWrite = false;
@@ -162,7 +167,7 @@ namespace Vanta {
 			extCompFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
 			extCompFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 			extCompFramebufferSpec.ClearOnLoad = false;
-
+			
 			// Use the color buffer from the final compositing pass, but the depth buffer from
 			// the actual 3D geometry pass, incase we want to composite elements behind meshes
 			// in the scene
@@ -241,7 +246,7 @@ namespace Vanta {
 			m_NeedsResize = true;
 		}
 	}
-
+	
 	void SceneRenderer::CalculateCascades(SceneRenderer::CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection)
 	{
 		struct FrustumBounds
@@ -366,6 +371,8 @@ namespace Vanta {
 
 	void SceneRenderer::BeginScene(const SceneRendererCamera& camera)
 	{
+		VA_PROFILE_FUNC();
+
 		VA_CORE_ASSERT(m_Scene);
 		VA_CORE_ASSERT(!m_Active);
 		m_Active = true;
@@ -390,6 +397,7 @@ namespace Vanta {
 
 			if (m_Specification.SwapChainTarget)
 				m_CommandBuffer = RenderCommandBuffer::CreateFromSwapChain("SceneRenderer");
+
 			m_NeedsResize = false;
 		}
 
@@ -424,7 +432,7 @@ namespace Vanta {
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
 			instance->m_UniformBufferSet->Get(2, 0, bufferIndex)->RT_SetData(&sceneData, sizeof(sceneData));
 		});
-
+		
 		CascadeData cascades[4];
 		CalculateCascades(cascades, sceneCamera, directionalLight.Direction);
 
@@ -452,6 +460,8 @@ namespace Vanta {
 
 	void SceneRenderer::EndScene()
 	{
+		VA_PROFILE_FUNC();
+
 		VA_CORE_ASSERT(m_Active);
 #if MULTI_THREAD
 		Ref<SceneRenderer> instance = this;
@@ -459,7 +469,7 @@ namespace Vanta {
 		{
 			instance->FlushDrawList();
 		}));
-#else
+#else 
 		FlushDrawList();
 #endif
 
@@ -489,6 +499,8 @@ namespace Vanta {
 
 	void SceneRenderer::ShadowMapPass()
 	{
+		VA_PROFILE_FUNC();
+
 		auto& directionalLights = m_SceneData.SceneLightEnvironment.DirectionalLights;
 		if (directionalLights[0].Multiplier == 0.0f || !directionalLights[0].CastShadows)
 		{
@@ -507,7 +519,7 @@ namespace Vanta {
 			Renderer::BeginRenderPass(m_CommandBuffer, ShadowMapRenderPass[i]);
 
 			// static glm::mat4 scaleBiasMatrix = glm::scale(glm::mat4(1.0f), { 0.5f, 0.5f, 0.5f }) * glm::translate(glm::mat4(1.0f), { 1, 1, 1 });
-
+			
 			// Render entities
 			Buffer cascade(&i, sizeof(uint32_t));
 			for (auto& dc : m_ShadowPassDrawList)
@@ -518,9 +530,11 @@ namespace Vanta {
 			Renderer::EndRenderPass(m_CommandBuffer);
 		}
 	}
-
+	
 	void SceneRenderer::GeometryPass()
 	{
+		VA_PROFILE_FUNC();
+
 		Renderer::BeginRenderPass(m_CommandBuffer, m_GeometryPipeline->GetSpecification().RenderPass);
 		// Skybox
 		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SceneData.SkyboxLod);
@@ -562,6 +576,8 @@ namespace Vanta {
 
 	void SceneRenderer::CompositePass()
 	{
+		VA_PROFILE_FUNC();
+
 		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass, true);
 
 		auto framebuffer = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
@@ -683,6 +699,8 @@ namespace Vanta {
 
 	void SceneRenderer::OnImGuiRender()
 	{
+		VA_PROFILE_FUNC();
+
 		ImGui::Begin("Scene Renderer");
 
 		if (ImGui::TreeNode("Shaders"))

@@ -36,38 +36,39 @@ namespace Vanta {
 	void VulkanImGuiLayer::OnAttach()
 	{
 		IMGUI_CHECKVERSION();
-    	ImGui::CreateContext();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO(); (void)io;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    	ImGuiIO& io = ImGui::GetIO();
-    	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		io.Fonts->AddFontFromFileTTF("Resources/Fonts/opensans/OpenSans-Bold.ttf", 18.0f);
+		io.Fonts->AddFontFromFileTTF("Resources/Fonts/opensans/OpenSans-Regular.ttf", 24.0f);
+		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/opensans/OpenSans-Regular.ttf", 18.0f);
 
-		io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Bold.ttf", 18.0f);
-		io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 24.0f);
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 18.0f);
+		ImGui::StyleColorsDark();
+		SetDarkThemeColors();
 
-    	ImGui::StyleColorsDark();
-    	SetDarkThemeColors();
+		ImGuiStyle& style = ImGui::GetStyle();
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			style.WindowRounding = 0.0f;
+			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+		}
+		style.Colors[ImGuiCol_WindowBg] = ImVec4(0.15f, 0.15f, 0.15f, style.Colors[ImGuiCol_WindowBg].w);
 
-    	ImGuiStyle& style = ImGui::GetStyle();
-    	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    	{
-    	    style.WindowRounding = 0.0f;
-    	    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    	}
+		VulkanImGuiLayer* instance = this;
+		Renderer::Submit([instance]()
+		{
+			Application& app = Application::Get();
+			SDL_Window* window = static_cast<SDL_Window*>(app.GetWindow().GetNativeWindow());
 
-    	Renderer::Submit([this]()
-    	{
-    	    Application& app = Application::Get();
-    	    SDL_Window* window = static_cast<SDL_Window*>(app.GetWindow().GetNativeWindow());
+			auto vulkanContext = VulkanContext::Get();
+			auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
-    	    auto vulkanContext = VulkanContext::Get();
-    	    auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			VkDescriptorPool descriptorPool;
 
-    		VkDescriptorPool descriptorPool;
-
-    		// Create Descriptor Pool
+			// Create Descriptor Pool
 			VkDescriptorPoolSize pool_sizes[] =
 			{
 				{ VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
@@ -85,40 +86,40 @@ namespace Vanta {
 			VkDescriptorPoolCreateInfo pool_info = {};
 			pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    		pool_info.maxSets = 100 * IM_ARRAYSIZE(pool_sizes);
+			pool_info.maxSets = 100 * IM_ARRAYSIZE(pool_sizes);
 			pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
 			pool_info.pPoolSizes = pool_sizes;
-    		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
+			VK_CHECK_RESULT(vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool));
 
-    	    // Init ImGui backends
-    	    ImGui_ImplSDL3_InitForVulkan(window);
+			// Setup Platform/Renderer bindings
+			ImGui_ImplSDL3_InitForVulkan(window);
+			ImGui_ImplVulkan_InitInfo init_info = {};
+			init_info.Instance = VulkanContext::GetInstance();
+			init_info.PhysicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetVulkanPhysicalDevice();
+			init_info.Device = device;
+			init_info.QueueFamily = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetQueueFamilyIndices().Graphics;
+			init_info.Queue = VulkanContext::GetCurrentDevice()->GetGraphicsQueue();
+			init_info.PipelineCache = nullptr;
+			init_info.DescriptorPool = descriptorPool;
+			init_info.Allocator = nullptr;
+			init_info.MinImageCount = 2;
+			VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
+			init_info.ImageCount = swapChain.GetImageCount();
+			init_info.CheckVkResultFn = Utils::VulkanCheckResult;
 
-    	    ImGui_ImplVulkan_InitInfo init_info{};
-    	    init_info.ApiVersion = VK_API_VERSION_1_3;
-    	    init_info.Instance = VulkanContext::GetInstance();
-    	    init_info.PhysicalDevice = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetVulkanPhysicalDevice();
-    	    init_info.Device = device;
-    	    init_info.QueueFamily = VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetQueueFamilyIndices().Graphics;
-    		init_info.Queue = VulkanContext::GetCurrentDevice()->GetGraphicsQueue();
-    	    init_info.DescriptorPool = descriptorPool;
-    	    init_info.MinImageCount = 2;
-    		VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
-    		init_info.ImageCount = swapChain.GetImageCount();
-    		init_info.CheckVkResultFn = Utils::VulkanCheckResult;
+			init_info.PipelineInfoMain = {};
+			init_info.PipelineInfoMain.RenderPass = swapChain.GetRenderPass();
+			init_info.PipelineInfoMain.Subpass = 0;
 
-    	    init_info.PipelineInfoMain = {};
-    	    init_info.PipelineInfoMain.RenderPass = swapChain.GetRenderPass();
-    	    init_info.PipelineInfoMain.Subpass = 0;
+			init_info.UseDynamicRendering = false;
 
-    	    init_info.UseDynamicRendering = false;
+			ImGui_ImplVulkan_Init(&init_info);
 
-    	    ImGui_ImplVulkan_Init(&init_info);
-
-    		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+			uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
 			s_ImGuiCommandBuffers.resize(framesInFlight);
 			for (uint32_t i = 0; i < framesInFlight; i++)
 				s_ImGuiCommandBuffers[i] = VulkanContext::GetCurrentDevice()->CreateSecondaryCommandBuffer();
-    	});
+		});
 	}
 
 	void VulkanImGuiLayer::OnDetach()

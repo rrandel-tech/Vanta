@@ -1,0 +1,7 @@
+Project:
+    Name: Sandbox
+    AssetDirectory: Assets
+    AssetRegistry: Assets/AssetRegistry.var
+    MeshPath: Assets/meshes
+    MeshSourcePath: Assets/meshes/Source
+    StartScene: Assets/scenes/ShadowTest.vscene

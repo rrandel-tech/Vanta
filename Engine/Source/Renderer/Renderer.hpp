@@ -110,6 +110,7 @@ namespace Vanta {
 		static void SubmitQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Material> material, const glm::mat4& transform = glm::mat4(1.0f));
 
 		static Ref<Texture2D> GetWhiteTexture();
+		static Ref<Texture2D> GetBRDFLutTexture();
 		static Ref<TextureCube> GetBlackCubeTexture();
 		static Ref<Environment> GetEmptyEnvironment();
 

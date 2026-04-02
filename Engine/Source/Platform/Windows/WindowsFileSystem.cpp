@@ -9,42 +9,13 @@ namespace Vanta {
 
 	FileSystem::FileSystemChangedCallbackFn FileSystem::s_Callback;
 
-	static bool s_Watching = false;
+	static bool s_Watching = true;
 	static bool s_IgnoreNextChange = false;
 	static HANDLE s_WatcherThread;
 
 	void FileSystem::SetChangeCallback(const FileSystemChangedCallbackFn& callback)
 	{
 		s_Callback = callback;
-	}
-
-	bool FileSystem::CreateFolder(const std::string& filepath)
-	{
-		BOOL created = CreateDirectoryA(filepath.c_str(), NULL);
-		if (!created)
-		{
-			DWORD error = GetLastError();
-
-			if (error == ERROR_ALREADY_EXISTS)
-				VA_CORE_ERROR("{0} already exists!", filepath);
-
-			if (error == ERROR_PATH_NOT_FOUND)
-				VA_CORE_ERROR("{0}: One or more directories don't exist.", filepath);
-
-			return false;
-		}
-
-		return true;
-	}
-
-	bool FileSystem::Exists(const std::string& filepath)
-	{
-		DWORD attribs = GetFileAttributesA(filepath.c_str());
-
-		if (attribs == INVALID_FILE_ATTRIBUTES)
-			return false;
-
-		return true;
 	}
 
 	std::string FileSystem::Rename(const std::string& filepath, const std::string& newName)
@@ -62,9 +33,9 @@ namespace Vanta {
 		s_IgnoreNextChange = true;
 		std::filesystem::path p = filepath;
 		std::string destFilePath = dest + "/" + p.filename().string();
-		BOOL result = MoveFileA(filepath.c_str(), destFilePath.c_str());
+		BOOL result = MoveFileA(filepath.c_str(), destFilePath.c_str()) != 0;
 		s_IgnoreNextChange = false;
-		return result != 0;
+		return result;
 	}
 
 	bool FileSystem::DeleteFile(const std::string& filepath)
@@ -120,17 +91,22 @@ namespace Vanta {
 		return converted;
 	}
 
+	void FileSystem::SkipNextFileSystemChange()
+	{
+		s_IgnoreNextChange = true;
+	}
+
 	unsigned long FileSystem::Watch(void* param)
 	{
-		LPCWSTR	filepath = L"assets";
+		std::string assetDirectory = Project::GetActive()->GetAssetDirectory().string();
 		std::vector<BYTE> buffer;
 		buffer.resize(10 * 1024);
 		OVERLAPPED overlapped = { 0 };
 		HANDLE handle = NULL;
 		DWORD bytesReturned = 0;
 
-		handle = CreateFileW(
-			filepath,
+		handle = CreateFileA(
+			assetDirectory.c_str(),
 			FILE_LIST_DIRECTORY,
 			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 			NULL,
@@ -173,7 +149,10 @@ namespace Vanta {
 				continue;
 
 			if (s_IgnoreNextChange)
+			{
+				s_IgnoreNextChange = false;
 				continue;
+			}
 
 			std::string oldName;
 			char fileName[MAX_PATH * 10] = "";

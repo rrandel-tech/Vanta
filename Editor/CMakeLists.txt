@@ -17,4 +17,5 @@ target_include_directories(Vanta-Editor PUBLIC ${EDITOR_SRC_DIR})
 target_link_libraries(Vanta-Editor PRIVATE Vanta)
 
 vanta_enable_lto(Vanta-Editor)
-vanta_copy_directory(Vanta-Editor Editor/assets assets)
+vanta_copy_directory(Vanta-Editor Editor/Resources Resources)
+vanta_copy_directory(Vanta-Editor Editor/SandboxProject SandboxProject)

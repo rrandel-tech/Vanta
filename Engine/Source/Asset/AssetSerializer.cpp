@@ -1,5 +1,7 @@
 #include "vapch.hpp"
 #include "AssetSerializer.hpp"
+
+#include "AssetManager.hpp"
 #include "Utilities/StringUtils.hpp"
 #include "Utilities/FileSystem.hpp"
 #include "Renderer/Mesh.hpp"
@@ -25,14 +27,14 @@ namespace Vanta {
 	bool MeshAssetSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset) const
 	{
 		Ref<Asset> temp = asset;
-		asset = Ref<MeshAsset>::Create(metadata.FilePath);
+		asset = Ref<MeshAsset>::Create(AssetManager::GetFileSystemPath(metadata));
 		asset->Handle = metadata.Handle;
 		return (asset.As<MeshAsset>())->GetStaticVertices().size() > 0; // Maybe?
 	}
 
 	bool EnvironmentSerializer::TryLoadData(const AssetMetadata& metadata, Ref<Asset>& asset) const
 	{
-		auto [radiance, irradiance] = Renderer::CreateEnvironmentMap(metadata.FilePath);
+		auto [radiance, irradiance] = Renderer::CreateEnvironmentMap(AssetManager::GetFileSystemPath(metadata));
 
 		if (!radiance || !irradiance)
 			return false;

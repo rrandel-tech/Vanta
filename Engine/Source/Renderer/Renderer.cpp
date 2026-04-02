@@ -11,11 +11,16 @@
 #include "Renderer2D.hpp"
 
 #include "Core/Timer.hpp"
+#include "Debug/Profiler.hpp"
 
 #include "Renderer/Backend/OpenGL/OpenGLRenderer.hpp"
 #include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
 
 #include "Renderer/Backend/Vulkan/VulkanContext.hpp"
+
+#include "Project/Project.hpp"
+
+#include <filesystem>
 
 namespace Vanta {
 
@@ -74,6 +79,7 @@ namespace Vanta {
 		Ref<ShaderLibrary> m_ShaderLibrary;
 
 		Ref<Texture2D> WhiteTexture;
+		Ref<Texture2D> BRDFLutTexture;
 		Ref<TextureCube> BlackCubeTexture;
 		Ref<Environment> EmptyEnvironment;
 	};
@@ -105,30 +111,36 @@ namespace Vanta {
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
 
 		// Compute shaders
-		Renderer::GetShaderLibrary()->Load("assets/shaders/EnvironmentMipFilter.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/EquirectangularToCubeMap.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/EnvironmentIrradiance.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/PreethamSky.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EquirectangularToCubeMap.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentIrradiance.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreethamSky.glsl");
 
-		Renderer::GetShaderLibrary()->Load("assets/shaders/Grid.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/SceneComposite.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Static.glsl");
-		//Renderer::GetShaderLibrary()->Load("assets/shaders/VantaPBR_Anim.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Grid.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SceneComposite.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VantaPBR_Static.glsl");
+		//Renderer::GetShaderLibrary()->LoadResources/Shaders("assets/shaders/VantaPBR_Anim.glsl");
 		//Renderer::GetShaderLibrary()->Load("assets/shaders/Outline.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/Wireframe.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/Skybox.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/ShadowMap.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Wireframe.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Skybox.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowMap.glsl");
 
 		// Renderer2D Shaders
-		Renderer::GetShaderLibrary()->Load("assets/shaders/Renderer2D.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/Renderer2D_Line.glsl");
-		Renderer::GetShaderLibrary()->Load("assets/shaders/Renderer2D_Circle.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Line.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Circle.glsl");
 
 		// Compile shaders
 		Renderer::WaitAndRender();
 
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data->WhiteTexture = Texture2D::Create(ImageFormat::RGBA, 1, 1, &whiteTextureData);
+
+		{
+			TextureProperties props;
+			props.SamplerWrap = TextureWrap::Clamp;
+			s_Data->BRDFLutTexture = Texture2D::Create("Resources/Renderer/BRDF_LUT.tga", props);
+		}
 
 		uint32_t blackTextureData[6] = { 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000 };
 		s_Data->BlackCubeTexture = TextureCube::Create(ImageFormat::RGBA, 1, 1, &blackTextureData);
@@ -162,6 +174,7 @@ namespace Vanta {
 
 	void Renderer::WaitAndRender()
 	{
+		VA_PROFILE_FUNC();
 		VA_SCOPE_PERF("Renderer::WaitAndRender");
 		s_CommandQueue->Execute();
 	}
@@ -283,6 +296,11 @@ namespace Vanta {
 	Ref<Texture2D> Renderer::GetWhiteTexture()
 	{
 		return s_Data->WhiteTexture;
+	}
+
+	Ref<Texture2D> Renderer::GetBRDFLutTexture()
+	{
+		return s_Data->BRDFLutTexture;
 	}
 
 	Ref<TextureCube> Renderer::GetBlackCubeTexture()

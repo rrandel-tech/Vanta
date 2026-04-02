@@ -187,6 +187,9 @@ namespace Vanta {
 					}
 
 					Ref<VulkanImage2D> depthAttachmentImage = m_DepthAttachmentImage.As<VulkanImage2D>();
+					auto& spec = depthAttachmentImage->GetSpecification();
+					spec.Width = m_Width;
+					spec.Height = m_Height;
 					depthAttachmentImage->RT_Invalidate(); // Create immediately
 				}
 

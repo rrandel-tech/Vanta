@@ -1,0 +1,81 @@
+Scene: Scene Name
+Environment:
+  AssetHandle: 597469570829358954
+  Light:
+    Direction: [0, 0, 0]
+    Radiance: [0, 0, 0]
+    Multiplier: 1
+Entities:
+  - Entity: 15547206608783364829
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Directional Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [1.39626336, 0.17453292, 0]
+      Scale: [1, 1, 1]
+    DirectionalLightComponent:
+      Radiance: [1, 1, 1]
+      CastShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 8714298519950371179
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Position: [0, 1.4825381, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshComponent:
+      AssetID: 5512307203916005574
+  - Entity: 12984092959234517976
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Plane
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [8.92000008, 8.92000008, 8.92000008]
+    MeshComponent:
+      AssetID: 10123238112042323640
+  - Entity: 11454923107030377596
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Sky Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkyLightComponent:
+      EnvironmentMap: 597469570829358954
+      Intensity: 1
+      Angle: 0
+  - Entity: 7152063910955143558
+    Parent: 0
+    Children:
+      []
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Position: [-0.892950118, 3.47620153, -7.11166811]
+      Rotation: [2.92622781, -0.147751227, -3.14159226]
+      Scale: [1.0000006, 0.999999881, 1.00000024]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 55
+        PerspectiveNear: 0.100000001
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true

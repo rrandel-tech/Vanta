@@ -20,7 +20,7 @@ namespace Vanta {
 		static const char* GetCacheDirectory()
 		{
 			// TODO: make sure the assets directory is valid
-			return "assets/cache/shader/vulkan";
+			return "Resources/Cache/Shader/Vulkan";
 		}
 
 		static void CreateCacheDirectoryIfNeeded()
@@ -111,7 +111,7 @@ namespace Vanta {
 			instance->m_TypeCounts.clear();
 
 			Utils::CreateCacheDirectoryIfNeeded();
-
+			
 			// Vertex and Fragment for now
 			std::string source = ReadShaderFromFile(instance->m_AssetPath);
 
@@ -209,7 +209,7 @@ namespace Vanta {
 				UniformBuffer* uniformBuffer = s_UniformBuffers.at(descriptorSet).at(binding);
 				if (size > uniformBuffer->Size)
 					uniformBuffer->Size = size;
-
+				
 			}
 
 			shaderDescriptorSet.UniformBuffers[binding] = s_UniformBuffers.at(descriptorSet).at(binding);
@@ -310,7 +310,7 @@ namespace Vanta {
 
 		VA_CORE_TRACE("===========================");
 
-
+	
 	}
 
 	void VulkanShader::CreateDescriptors()
@@ -360,8 +360,8 @@ namespace Vanta {
 			//////////////////////////////////////////////////////////////////////
 			// Descriptor Set Layout
 			//////////////////////////////////////////////////////////////////////
-
-
+		
+		
 			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 			for (auto& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
 			{
@@ -576,7 +576,7 @@ namespace Vanta {
 			VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &m_DescriptorPool));
 		}
 #endif
-
+		
 		// TODO: remove
 		result.Pool = nullptr;
 

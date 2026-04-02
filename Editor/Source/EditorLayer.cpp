@@ -4,6 +4,9 @@
 #include "Renderer/Renderer2D.hpp"
 #include "Editor/AssetEditorPanel.hpp"
 
+#include "Project/Project.hpp"
+#include "Project/ProjectSerializer.hpp"
+
 #include <filesystem>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -15,6 +18,7 @@
 #include "Utilities/FileSystem.hpp"
 
 #include "Renderer/RendererAPI.hpp"
+#include "Renderer/Backend/OpenGL/OpenGLFramebuffer.hpp"
 
 #include "imgui_internal.h"
 #include "ImGui/ImGui.hpp"
@@ -35,7 +39,7 @@ namespace Vanta {
 	}*/
 
 	EditorLayer::EditorLayer()
-		: m_SceneType(SceneType::Model), m_EditorCamera(glm::perspectiveFov(glm::radians(45.0f), 1280.0f, 720.0f, 0.1f, 1000.0f)), m_SecondEditorCamera(glm::perspectiveFov(glm::radians(45.0f), 1280.0f, 720.0f, 0.1f, 1000.0f))
+		: m_SceneType(SceneType::Model)
 	{
 	}
 
@@ -49,27 +53,25 @@ namespace Vanta {
 		using namespace glm;
 
 		// Editor
-		m_CheckerboardTex = Texture2D::Create("assets/editor/Checkerboard.tga");
-		m_PlayButtonTex = Texture2D::Create("assets/editor/PlayButton.png");
-		m_PauseButtonTex = Texture2D::Create("assets/editor/PauseButton.png");
-		m_StopButtonTex = Texture2D::Create("assets/editor/StopButton.png");
+		m_CheckerboardTex = Texture2D::Create("Resources/Editor/Checkerboard.tga");
+		m_PlayButtonTex = Texture2D::Create("Resources/Editor/PlayButton.png");
+		m_PauseButtonTex = Texture2D::Create("Resources/Editor/PauseButton.png");
+		m_StopButtonTex = Texture2D::Create("Resources/Editor/StopButton.png");
 
 		m_SceneHierarchyPanel = CreateScope<SceneHierarchyPanel>(m_EditorScene);
 		m_SceneHierarchyPanel->SetSelectionChangedCallback(std::bind(&EditorLayer::SelectEntity, this, std::placeholders::_1));
 		m_SceneHierarchyPanel->SetEntityDeletedCallback(std::bind(&EditorLayer::OnEntityDeleted, this, std::placeholders::_1));
 
-		m_ContentBrowserPanel = CreateScope<ContentBrowserPanel>();
-		m_ObjectsPanel = CreateScope<ObjectsPanel>();
-
 		Renderer2D::SetLineWidth(m_LineWidth);
 
-		NewScene();
+		OpenProject("SandboxProject/Sandbox.vproj");
+		
+		m_ObjectsPanel = CreateScope<ObjectsPanel>();
 		m_ViewportRenderer = Ref<SceneRenderer>::Create(m_CurrentScene);
 		m_SecondViewportRenderer = Ref<SceneRenderer>::Create(m_CurrentScene);
 		m_FocusedRenderer = m_ViewportRenderer;
 
 		AssetEditorPanel::RegisterDefaultEditors();
-		FileSystem::StartWatching();
 
 		UpdateSceneRendererSettings();
 	}
@@ -110,7 +112,7 @@ namespace Vanta {
 	void EditorLayer::UpdateWindowTitle(const std::string& sceneName)
 	{
 		std::string rendererAPI = RendererAPI::Current() == RendererAPIType::Vulkan ? "Vulkan" : "OpenGL";
-		std::string title = sceneName + " - Vanta-Editor - " + Application::GetPlatformName() + " (" + Application::GetConfigurationName() + ") Renderer: " + rendererAPI;
+		std::string title = std::format("{0} ({1}) - Vanta-Editor - {2} ({3}) Renderer: {4}", sceneName, Project::GetActive()->GetConfig().Name, Application::GetPlatformName(), Application::GetConfigurationName(), rendererAPI);
 		Application::Get().GetWindow().SetTitle(title);
 	}
 
@@ -143,7 +145,7 @@ namespace Vanta {
 			SceneRendererOptions& options = renderer->GetOptions();
 			options.ShowSelectedInWireframe = m_ShowSelectedWireframe;
 		}
-
+		
 		//m_SecondViewportRenderer
 	}
 
@@ -354,14 +356,6 @@ namespace Vanta {
 		m_CurrentScene = m_EditorScene;
 	}
 
-	void EditorLayer::OpenScene()
-	{
-		auto& app = Application::Get();
-		std::string filepath = app.OpenFile("Vanta Scene (*.vscene)\0*.vscene\0");
-		if (!filepath.empty())
-			OpenScene(filepath);
-	}
-
 	void EditorLayer::OpenScene(const std::string& filepath)
 	{
 		Ref<Scene> newScene = Ref<Scene>::Create("New Scene", true);
@@ -378,6 +372,48 @@ namespace Vanta {
 		m_SelectionContext.clear();
 
 		m_CurrentScene = m_EditorScene;
+	}
+
+	void EditorLayer::OpenScene(const AssetMetadata& assetMetadata)
+	{
+		std::filesystem::path workingDirPath = Project::GetAssetDirectory() / assetMetadata.FilePath;
+		OpenScene(workingDirPath.string());
+	}
+
+	void EditorLayer::OpenProject()
+	{
+		auto& app = Application::Get();
+		std::string filepath = app.OpenFile("Vanta Project (*.vproj)\0*.vproj\0");
+
+		if (!filepath.empty())
+			OpenProject(filepath);
+	}
+
+	void EditorLayer::OpenProject(const std::string& filepath)
+	{
+		if (Project::GetActive())
+		{
+			FileSystem::StopWatching();
+		}
+
+		Ref<Project> project = Ref<Project>::Create();
+		ProjectSerializer serializer(project);
+		serializer.Deserialize(filepath);
+		Project::SetActive(project);
+
+		if (m_EditorScene)
+			m_EditorScene->SetSelectedEntity({});
+		m_SelectionContext.clear();
+
+		m_ContentBrowserPanel = CreateScope<ContentBrowserPanel>(project);
+		FileSystem::StartWatching();
+
+		// Reset cameras
+		m_EditorCamera = EditorCamera(glm::perspectiveFov(glm::radians(45.0f), 1280.0f, 720.0f, 0.1f, 1000.0f));
+		m_SecondEditorCamera = EditorCamera(glm::perspectiveFov(glm::radians(45.0f), 1280.0f, 720.0f, 0.1f, 1000.0f));
+
+		if (!project->GetConfig().StartScene.empty())
+			OpenScene((Project::GetProjectDirectory() / project->GetConfig().StartScene).string());
 	}
 
 	void EditorLayer::SaveScene()
@@ -533,7 +569,7 @@ namespace Vanta {
 			UI::PropertySlider("Exposure", m_EditorCamera.GetExposure(), 0.0f, 5.0f);
 			UI::PropertySlider("Env Map Rotation", m_EnvMapRotation, -360.0f, 360.0f);
 
-			if (UI::Property("Line Width", m_LineWidth, 0.25f, 0.5f, 5.0f))
+			if (UI::Property("Line Width", m_LineWidth, 0.5f, 1.0f, 10.0f))
 				Renderer2D::SetLineWidth(m_LineWidth);
 
 			UI::Property("Show Bounding Boxes", m_ShowBoundingBoxes);
@@ -544,6 +580,7 @@ namespace Vanta {
 
 			if (UI::Property("Show Selected Wireframe", m_ShowSelectedWireframe))
 				UpdateSceneRendererSettings();
+
 
 			UI::EndPropertyGrid();
 
@@ -580,7 +617,7 @@ namespace Vanta {
 			UI::EndPropertyGrid();
 		}
 		ImGui::End();
-
+		
 		m_ContentBrowserPanel->OnImGuiRender();
 		m_ObjectsPanel->OnImGuiRender();
 
@@ -735,12 +772,12 @@ namespace Vanta {
 				for (int i = 0; i < count; i++)
 				{
 					AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
-					const auto& assetData = AssetManager::GetMetadata(assetHandle);
+					const AssetMetadata& assetData = AssetManager::GetMetadata(assetHandle);
 
 					// We can't really support dragging and dropping scenes when we're dropping multiple assets
 					if (count == 1 && assetData.Type == AssetType::Scene)
 					{
-						OpenScene(assetData.FilePath);
+						OpenScene(assetData);
 						break;
 					}
 
@@ -749,6 +786,12 @@ namespace Vanta {
 					{
 						Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
 						entity.AddComponent<MeshComponent>(Ref<Mesh>::Create(asset.As<MeshAsset>()));
+						SelectEntity(entity);
+					}
+					else if (asset->GetAssetType() == AssetType::Mesh)
+					{
+						Entity entity = m_EditorScene->CreateEntity(assetData.FileName);
+						entity.AddComponent<MeshComponent>(asset.As<Mesh>());
 						SelectEntity(entity);
 					}
 				}
@@ -897,8 +940,8 @@ namespace Vanta {
 			{
 				if (ImGui::MenuItem("New Scene", "Ctrl+N"))
 					NewScene();
-				if (ImGui::MenuItem("Open Scene...", "Ctrl+O"))
-					OpenScene();
+				if (ImGui::MenuItem("Open Project...", "Ctrl+O"))
+					OpenProject();
 				ImGui::Separator();
 				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
 					SaveScene();
@@ -930,7 +973,7 @@ namespace Vanta {
 		}
 
 		m_SceneHierarchyPanel->OnImGuiRender();
-
+		
 		ImGui::Begin("Materials");
 		if (m_SelectionContext.size())
 		{
@@ -1246,6 +1289,23 @@ namespace Vanta {
 			m_FocusedRenderer = m_SecondViewportRenderer;
 		m_FocusedRenderer->OnImGuiRender();
 
+		// Project panel
+		{
+			ImGui::Begin("Project");
+			Ref<Project> project = Project::GetActive();
+			const auto& config = project->GetConfig();
+			UI::BeginPropertyGrid();
+			UI::Property("Name", config.Name);
+			UI::Property("Asset Directory", config.AssetDirectory);
+			UI::Property("Asset Registry Path", config.AssetRegistryPath);
+			UI::Property("Mesh Path", config.MeshPath);
+			UI::Property("Mesh Source Path", config.MeshSourcePath);
+			UI::Property("Start Scene", config.StartScene);
+			UI::Property("Project Directory", config.ProjectDirectory);
+			UI::EndPropertyGrid();
+			ImGui::End();
+		}
+
 		ImGui::End();
 
 		UI_WelcomePopup();
@@ -1254,37 +1314,37 @@ namespace Vanta {
 		AssetEditorPanel::OnImGuiRender();
 	}
 
-	void EditorLayer::OnEvent(Event& event)
+	void EditorLayer::OnEvent(Event& e)
 	{
 		if (m_SceneState == SceneState::Edit)
 		{
 			if (m_ViewportPanelMouseOver)
-				m_EditorCamera.OnEvent(event);
+				m_EditorCamera.OnEvent(e);
 
 			if (m_ViewportPanel2MouseOver)
-				m_SecondEditorCamera.OnEvent(event);
+				m_SecondEditorCamera.OnEvent(e);
 
-			m_EditorScene->OnEvent(event);
+			m_EditorScene->OnEvent(e);
 		}
 		else if (m_SceneState == SceneState::Play)
 		{
-			m_RuntimeScene->OnEvent(event);
+			m_RuntimeScene->OnEvent(e);
 		}
 
-		EventDispatcher dispatcher(event);
+		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<KeyPressedEvent>(VA_BIND_EVENT_FN(EditorLayer::OnKeyPressedEvent));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(VA_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
 
-		AssetEditorPanel::OnEvent(event);
+		AssetEditorPanel::OnEvent(e);
 	}
 
-	bool EditorLayer::OnKeyPressedEvent(KeyPressedEvent& event)
+	bool EditorLayer::OnKeyPressedEvent(KeyPressedEvent& e)
 	{
 		if (GImGui->ActiveId == 0)
 		{
 			if (m_ViewportPanelMouseOver || m_ViewportPanel2MouseOver)
 			{
-				switch (event.GetKeyCode())
+				switch (e.GetKeyCode())
 				{
 				case KeyCode::Q:
 					m_GizmoType = -1;
@@ -1310,7 +1370,7 @@ namespace Vanta {
 				}
 
 			}
-			switch (event.GetKeyCode())
+			switch (e.GetKeyCode())
 			{
 			case KeyCode::Escape:
 				if (m_SelectionContext.size())
@@ -1334,7 +1394,7 @@ namespace Vanta {
 
 		if (Input::IsKeyPressed(VA_KEY_LEFT_CONTROL))
 		{
-			switch (event.GetKeyCode())
+			switch (e.GetKeyCode())
 			{
 				case KeyCode::B:
 					// Toggle bounding boxes 
@@ -1355,7 +1415,7 @@ namespace Vanta {
 					NewScene();
 					break;
 				case KeyCode::O:
-					OpenScene();
+					OpenProject();
 					break;
 				case KeyCode::S:
 					SaveScene();
@@ -1364,7 +1424,7 @@ namespace Vanta {
 
 			if (Input::IsKeyPressed(VA_KEY_LEFT_SHIFT))
 			{
-				switch (event.GetKeyCode())
+				switch (e.GetKeyCode())
 				{
 				case KeyCode::S:
 					SaveSceneAs();
@@ -1376,10 +1436,10 @@ namespace Vanta {
 		return false;
 	}
 
-	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& event)
+	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& e)
 	{
 		auto [mx, my] = Input::GetMousePosition();
-		if (event.GetMouseButton() == MouseButton::Left && m_ViewportPanelMouseOver && !Input::IsKeyPressed(KeyCode::LeftAlt) && !ImGuizmo::IsOver() && m_SceneState != SceneState::Play)
+		if (e.GetMouseButton() == MouseButton::Left && (m_ViewportPanelMouseOver || m_ViewportPanel2MouseOver) && !Input::IsKeyPressed(KeyCode::LeftAlt) && !ImGuizmo::IsOver() && m_SceneState != SceneState::Play)
 		{
 			auto [mouseX, mouseY] = GetMouseViewportSpace(m_ViewportPanelMouseOver);
 			if (mouseX > -1.0f && mouseX < 1.0f && mouseY > -1.0f && mouseY < 1.0f)

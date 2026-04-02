@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssetImporter.hpp"
+#include "Project/Project.hpp"
 #include "Utilities/FileSystem.hpp"
 #include "Utilities/StringUtils.hpp"
 
@@ -8,6 +9,15 @@
 #include <unordered_map>
 
 namespace Vanta {
+	// Deserialized from project file - these are just defaults
+	class AssetManagerConfig
+	{
+		std::string AssetDirectory = "Assets/";
+		std::string AssetRegistryPath = "Assets/AssetRegistry.var";
+
+		std::string MeshPath = "Assets/Meshes/";
+		std::string MeshSourcePath = "Assets/Meshes/Source/";
+	};
 
 	class AssetManager
 	{
@@ -21,12 +31,10 @@ namespace Vanta {
 		static AssetMetadata& GetMetadata(AssetHandle handle);
 		static AssetMetadata& GetMetadata(const std::string& filepath);
 
+		static std::string GetFileSystemPath(const AssetMetadata& metadata) { return (Project::GetAssetDirectory() / metadata.FilePath).string(); }
+
 		static AssetHandle GetAssetHandleFromFilePath(const std::string& filepath);
 		static bool IsAssetHandleValid(AssetHandle assetHandle) { return GetMetadata(assetHandle).IsValid(); }
-
-		static void Rename(AssetHandle assetHandle, const std::string& newName);
-		//static void MoveAsset(AssetHandle assetHandle, const std::string& filepath);
-		static void RemoveAsset(AssetHandle assetHandle);
 
 		static AssetType GetAssetTypeForFileType(const std::string& extension);
 
@@ -37,6 +45,8 @@ namespace Vanta {
 		{
 			static_assert(std::is_base_of<Asset, T>::value, "CreateNewAsset only works for types derived from Asset");
 
+			FileSystem::SkipNextFileSystemChange();
+
 			AssetMetadata metadata;
 			metadata.Handle = AssetHandle();
 			metadata.FilePath = directoryPath + "/" + filename;
@@ -44,6 +54,33 @@ namespace Vanta {
 			metadata.Extension = Utils::GetExtension(filename);
 			metadata.IsDataLoaded = true;
 			metadata.Type = T::GetStaticType();
+			
+			if (FileSystem::Exists(metadata.FilePath))
+			{
+				bool foundAvailableFileName = false;
+				int current = 1;
+
+				while (!foundAvailableFileName)
+				{
+					std::string nextFilePath = directoryPath + "/" + metadata.FileName;
+					if (current < 10)
+						nextFilePath += " (0" + std::to_string(current) + ")";
+					else
+						nextFilePath += " (" + std::to_string(current) + ")";
+					nextFilePath += "." + metadata.Extension;
+
+					if (!FileSystem::Exists(nextFilePath))
+					{
+						foundAvailableFileName = true;
+						metadata.FilePath = nextFilePath;
+						metadata.FileName = Utils::RemoveExtension(Utils::GetFilename(metadata.FilePath));
+						break;
+					}
+
+					current++;
+				}
+			}
+
 			s_AssetRegistry[metadata.FilePath] = metadata;
 
 			WriteRegistryToFile();
@@ -90,11 +127,16 @@ namespace Vanta {
 
 		static void OnFileSystemChanged(FileSystemChangedEvent e);
 		static void OnAssetRenamed(AssetHandle assetHandle, const std::string& newFilePath);
+		static void OnAssetMoved(AssetHandle assetHandle, const std::string& destinationPath);
+		static void OnAssetDeleted(AssetHandle assetHandle);
 
 	private:
 		static std::unordered_map<AssetHandle, Ref<Asset>> s_LoadedAssets;
 		static std::unordered_map<std::string, AssetMetadata> s_AssetRegistry;
 		static AssetsChangeEventFn s_AssetsChangeCallback;
-	};
 
+	private:
+		friend class ContentBrowserPanel;
+		friend class ContentBrowserAsset;
+	};
 }

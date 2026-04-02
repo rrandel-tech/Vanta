@@ -57,8 +57,6 @@ namespace Vanta {
             m_ImGuiLayer = ImGuiLayer::Create();
             PushOverlay(m_ImGuiLayer);
         }
-
-        AssetManager::Init();
     }
 
     Application::~Application()

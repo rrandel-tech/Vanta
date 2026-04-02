@@ -3,14 +3,13 @@
 
 #include "Renderer/Mesh.hpp"
 #include "Renderer/SceneRenderer.hpp"
+#include "Project/Project.hpp"
 
 #include "yaml-cpp/yaml.h"
 
 #include <filesystem>
 
 namespace Vanta {
-
-	static const char* s_AssetRegistryPath = "assets/AssetRegistry.var";
 
 	void AssetManager::Init()
 	{
@@ -39,33 +38,42 @@ namespace Vanta {
 	{
 		e.NewName = Utils::RemoveExtension(e.NewName);
 
-		s_AssetsChangeCallback(e);
-
-		switch (e.Action)
+		if (!e.IsDirectory)
 		{
-		case FileSystemAction::Added:
-			if (!e.IsDirectory)
+			switch (e.Action)
+			{
+			case FileSystemAction::Added:
 				ImportAsset(e.FilePath);
-			break;
-		case FileSystemAction::Delete:
-			RemoveAsset(GetAssetHandleFromFilePath(e.FilePath));
-			break;
-		case FileSystemAction::Modified:
-			// TODO: Reload data if loaded
-			break;
-		case FileSystemAction::Rename:
-		{
-			if (e.IsDirectory)
-				return;
+				break;
+			case FileSystemAction::Delete:
+				OnAssetDeleted(GetAssetHandleFromFilePath(e.FilePath));
+				break;
+			case FileSystemAction::Modified:
+				// TODO: Reload data if loaded
+				break;
+			case FileSystemAction::Rename:
+			{
+				AssetType previousType = GetAssetTypeForFileType(Utils::GetExtension(e.OldName));
+				AssetType newType = GetAssetTypeForFileType(Utils::GetExtension(e.FilePath));
 
-			std::filesystem::path oldFilePath = e.FilePath;
-			oldFilePath = oldFilePath.parent_path() / e.OldName;
-			OnAssetRenamed(GetAssetHandleFromFilePath(oldFilePath.string()), e.FilePath);
+				std::filesystem::path oldFilePath = e.FilePath;
 
-			s_AssetsChangeCallback(e);
-			break;
+				if (previousType == AssetType::None && newType != AssetType::None)
+				{
+					ImportAsset(e.FilePath);
+				}
+				else
+				{
+					oldFilePath = oldFilePath.parent_path() / e.OldName;
+					OnAssetRenamed(GetAssetHandleFromFilePath(oldFilePath.string()), e.FilePath);
+					e.WasTracking = true;
+				}
+				break;
+			}
+			}
 		}
-		}
+
+		s_AssetsChangeCallback(e);
 	}
 
 	// NOTE: Most likely temporary
@@ -104,13 +112,6 @@ namespace Vanta {
 		return 0;
 	}
 
-	void AssetManager::Rename(AssetHandle assetHandle, const std::string& newName)
-	{
-		AssetMetadata metadata = GetMetadata(assetHandle);
-		std::string newFilePath = FileSystem::Rename(metadata.FilePath, newName);
-		OnAssetRenamed(assetHandle, newFilePath);
-	}
-
 	void AssetManager::OnAssetRenamed(AssetHandle assetHandle, const std::string& newFilePath)
 	{
 		AssetMetadata metadata = GetMetadata(assetHandle);
@@ -121,33 +122,19 @@ namespace Vanta {
 		WriteRegistryToFile();
 	}
 
-	/*void AssetManager::MoveAsset(AssetHandle assetHandle, const std::string& filepath)
+	// Moving the actual asset file isn't the AssetManagers job
+	void AssetManager::OnAssetMoved(AssetHandle assetHandle, const std::string& destinationPath)
 	{
-		Ref<Asset>& asset = s_LoadedAssets[assetHandle];
-		Ref<Directory> directory = s_LoadedAssets[newDirectory].As<Directory>();
-		Ref<Directory> currentDirectory = s_LoadedAssets[asset->ParentDirectory].As<Directory>();
-		AssetMetadata metadata = s_AssetRegistry[asset->FilePath];
-
-		bool result = FileSystem::MoveFile(asset->FilePath, directory->FilePath);
-
-		if (!result)
-			return;
-
-		asset->FilePath = directory->FilePath + "/" + asset->FileName + "." + asset->Extension;
-
-		s_AssetRegistry.erase(metadata.FilePath);
-		metadata.FilePath = asset->FilePath;
-
-		s_AssetRegistry[metadata.FilePath] = metadata;
-
-		asset->ParentDirectory = currentDirectory->Handle;
-		directory->Assets.push_back(assetHandle);
-		currentDirectory->Assets.erase(std::remove(currentDirectory->Assets.begin(), currentDirectory->Assets.end(), assetHandle), currentDirectory->Assets.end());
+		AssetMetadata assetInfo = GetMetadata(assetHandle);
+		
+		s_AssetRegistry.erase(assetInfo.FilePath);
+		assetInfo.FilePath = destinationPath + "/" + assetInfo.FileName + "." + assetInfo.Extension;
+		s_AssetRegistry[assetInfo.FilePath] = assetInfo;
 
 		WriteRegistryToFile();
-	}*/
+	}
 
-	void AssetManager::RemoveAsset(AssetHandle assetHandle)
+	void AssetManager::OnAssetDeleted(AssetHandle assetHandle)
 	{
 		AssetMetadata metadata = GetMetadata(assetHandle);
 		s_AssetRegistry.erase(metadata.FilePath);
@@ -171,10 +158,11 @@ namespace Vanta {
 
 	void AssetManager::LoadAssetRegistry()
 	{
-		if (!FileSystem::Exists(s_AssetRegistryPath))
+		const std::string& assetRegistryPath = Project::GetAssetRegistryPath().string();
+		if (!FileSystem::Exists(assetRegistryPath))
 			return;
-
-		std::ifstream stream(s_AssetRegistryPath);
+		 
+		std::ifstream stream(assetRegistryPath);
 		VA_CORE_ASSERT(stream);
 		std::stringstream strStream;
 		strStream << stream.rdbuf();
@@ -200,14 +188,15 @@ namespace Vanta {
 			if (metadata.Type == AssetType::None)
 				continue;
 
-			if (!FileSystem::Exists(metadata.FilePath))
+
+			if (!FileSystem::Exists(AssetManager::GetFileSystemPath(metadata)))
 			{
 				VA_CORE_WARN("Missing asset '{0}' detected in registry file, trying to locate...", metadata.FilePath);
 
 				std::string mostLikelyCandiate;
 				uint32_t bestScore = 0;
 
-				for (auto& pathEntry : std::filesystem::recursive_directory_iterator("assets/"))
+				for (auto& pathEntry : std::filesystem::recursive_directory_iterator(Project::GetAssetDirectory()))
 				{
 					const std::filesystem::path& path = pathEntry.path();
 
@@ -263,7 +252,8 @@ namespace Vanta {
 
 	AssetHandle AssetManager::ImportAsset(const std::string& filepath)
 	{
-		std::string fixedFilePath = filepath;
+		std::filesystem::path relativePath = std::filesystem::relative(filepath, Project::GetAssetDirectory());
+		std::string fixedFilePath = relativePath.string();
 		std::replace(fixedFilePath.begin(), fixedFilePath.end(), '\\', '/');
 
 		// Already in the registry
@@ -272,7 +262,6 @@ namespace Vanta {
 
 		AssetType type = GetAssetTypeForFileType(Utils::GetExtension(fixedFilePath));
 
-		// TODO: Improve this
 		if (type == AssetType::None)
 			return 0;
 
@@ -300,7 +289,7 @@ namespace Vanta {
 
 	void AssetManager::ReloadAssets()
 	{
-		ProcessDirectory("assets");
+		ProcessDirectory(Project::GetAssetDirectory().string());
 		WriteRegistryToFile();
 	}
 
@@ -321,7 +310,8 @@ namespace Vanta {
 		out << YAML::EndSeq;
 		out << YAML::EndMap;
 
-		std::ofstream fout(s_AssetRegistryPath);
+		const std::string& assetRegistryPath = Project::GetAssetRegistryPath().string();
+		std::ofstream fout(assetRegistryPath);
 		fout << out.c_str();
 	}
 

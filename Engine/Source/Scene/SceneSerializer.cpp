@@ -224,8 +224,7 @@ namespace Vanta {
 			auto mesh = entity.GetComponent<MeshComponent>().Mesh;
 			if (mesh)
 			{
-				auto meshAsset = mesh->GetMeshAsset();
-				out << YAML::Key << "AssetID" << YAML::Value << meshAsset->Handle;
+				out << YAML::Key << "AssetID" << YAML::Value << mesh->Handle;
 			}
 			else
 				out << YAML::Key << "AssetID" << YAML::Value << 0;
@@ -275,7 +274,8 @@ namespace Vanta {
 			out << YAML::BeginMap; // SkyLightComponent
 
 			auto& skyLightComponent = entity.GetComponent<SkyLightComponent>();
-			out << YAML::Key << "EnvironmentMap" << YAML::Value << skyLightComponent.SceneEnvironment->Handle;
+			if (skyLightComponent.SceneEnvironment)
+				out << YAML::Key << "EnvironmentMap" << YAML::Value << skyLightComponent.SceneEnvironment->Handle;
 			out << YAML::Key << "Intensity" << YAML::Value << skyLightComponent.Intensity;
 			out << YAML::Key << "Angle" << YAML::Value << skyLightComponent.Angle;
 
@@ -437,7 +437,19 @@ namespace Vanta {
 
 					if (AssetManager::IsAssetHandleValid(assetHandle))
 					{
-						component.Mesh = Ref<Mesh>::Create(AssetManager::GetAsset<MeshAsset>(assetHandle));
+						const AssetMetadata& metadata = AssetManager::GetMetadata(assetHandle);
+						if (metadata.Type == AssetType::Mesh)
+							component.Mesh = AssetManager::GetAsset<Mesh>(assetHandle);
+						else if (metadata.Type == AssetType::MeshAsset)
+						{
+							Ref<MeshAsset> meshAsset = AssetManager::GetAsset<MeshAsset>(assetHandle);
+							std::filesystem::path meshPath = meshAsset->GetFilePath();
+							std::filesystem::path directoryPath = meshPath.parent_path();
+							std::string filename = std::format("{0}.vam", meshPath.stem().string());
+							Ref<Mesh> mesh = AssetManager::CreateNewAsset<Mesh>(filename, directoryPath.string(), meshAsset);
+							component.Mesh = mesh;
+							AssetImporter::Serialize(mesh);
+						}
 					}
 					else
 					{
@@ -502,23 +514,26 @@ namespace Vanta {
 				{
 					auto& component = deserializedEntity.AddComponent<SkyLightComponent>();
 
-					AssetHandle assetHandle = 0;
-					if (skyLightComponent["EnvironmentAssetPath"])
-						assetHandle = AssetManager::GetAssetHandleFromFilePath(skyLightComponent["EnvironmentAssetPath"].as<std::string>());
-					else
-						assetHandle = skyLightComponent["EnvironmentMap"].as<uint64_t>();
-
-					if (AssetManager::IsAssetHandleValid(assetHandle))
+					if (skyLightComponent["EnvironmentMap"])
 					{
-						component.SceneEnvironment = AssetManager::GetAsset<Environment>(assetHandle);
-					}
-					else
-					{
-						std::string filepath = meshComponent["EnvironmentAssetPath"] ? meshComponent["EnvironmentAssetPath"].as<std::string>() : "";
-						if (filepath.empty())
-							VA_CORE_ERROR("Tried to load non-existent environment map in Entity: {0}", (uint64_t)deserializedEntity.GetUUID());
+						AssetHandle assetHandle = 0;
+						if (skyLightComponent["EnvironmentAssetPath"])
+							assetHandle = AssetManager::GetAssetHandleFromFilePath(skyLightComponent["EnvironmentAssetPath"].as<std::string>());
 						else
-							VA_CORE_ERROR("Tried to load invalid environment map '{0}' in Entity {1}", filepath, (uint64_t)deserializedEntity.GetUUID());
+							assetHandle = skyLightComponent["EnvironmentMap"].as<uint64_t>();
+
+						if (AssetManager::IsAssetHandleValid(assetHandle))
+						{
+							component.SceneEnvironment = AssetManager::GetAsset<Environment>(assetHandle);
+						}
+						else
+						{
+							std::string filepath = meshComponent["EnvironmentAssetPath"] ? meshComponent["EnvironmentAssetPath"].as<std::string>() : "";
+							if (filepath.empty())
+								VA_CORE_ERROR("Tried to load non-existent environment map in Entity: {0}", (uint64_t)deserializedEntity.GetUUID());
+							else
+								VA_CORE_ERROR("Tried to load invalid environment map '{0}' in Entity {1}", filepath, (uint64_t)deserializedEntity.GetUUID());
+						}
 					}
 
 					component.Intensity = skyLightComponent["Intensity"].as<float>();

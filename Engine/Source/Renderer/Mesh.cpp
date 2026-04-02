@@ -576,12 +576,14 @@ namespace Vanta {
 	void MeshAsset::TraverseNodes(aiNode* node, const glm::mat4& parentTransform, uint32_t level)
 	{
 		glm::mat4 transform = parentTransform * Mat4FromAssimpMat4(node->mTransformation);
+		m_NodeMap[node].resize(node->mNumMeshes);
 		for (uint32_t i = 0; i < node->mNumMeshes; i++)
 		{
 			uint32_t mesh = node->mMeshes[i];
 			auto& submesh = m_Submeshes[mesh];
 			submesh.NodeName = node->mName.C_Str();
 			submesh.Transform = transform;
+			m_NodeMap[node][i] = mesh;
 		}
 
 		// VA_MESH_LOG("{0} {1}", LevelToSpaces(level), node->mName.C_Str());
@@ -806,6 +808,11 @@ namespace Vanta {
 		// TODO: we should actually copy materials in most cases
 		for (const auto& material : meshAsset->GetMaterials())
 			m_Materials.push_back(material);
+	}
+
+	Mesh::Mesh(const Ref<Mesh>& other)
+		: m_MeshAsset(other->m_MeshAsset), m_Submeshes(other->m_Submeshes), m_Materials(other->m_Materials)
+	{
 	}
 
 	Mesh::~Mesh()

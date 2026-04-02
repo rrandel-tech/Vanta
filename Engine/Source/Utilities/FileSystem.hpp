@@ -4,6 +4,20 @@
 
 #include <functional>
 
+#ifdef CreateDirectory
+#undef CreateDirectory
+#endif
+
+#ifdef DeleteFile
+#undef DeleteFile
+#endif
+
+#ifdef MoveFile
+#undef MoveFile
+#endif
+
+#include <filesystem>
+
 #include <string>
 
 namespace Vanta {
@@ -20,12 +34,15 @@ namespace Vanta {
         std::string OldName;
         std::string NewName;
         bool IsDirectory;
+        bool WasTracking = false;
     };
 
     class FileSystem
     {
     public:
-        static bool CreateFolder(const std::string& filepath);
+        static bool CreateDirectory(const std::filesystem::path& directory);
+        static bool CreateDirectory(const std::string& directory);
+        static bool Exists(const std::filesystem::path& filepath);
         static bool Exists(const std::string& filepath);
         static std::string Rename(const std::string& filepath, const std::string& newName);
         static bool DeleteFile(const std::string& filepath);
@@ -38,6 +55,8 @@ namespace Vanta {
         static void SetChangeCallback(const FileSystemChangedCallbackFn& callback);
         static void StartWatching();
         static void StopWatching();
+
+        static void SkipNextFileSystemChange();
 
     private:
         static unsigned long Watch(void* param);

@@ -25,6 +25,7 @@
 
 #include "VulkanComputePipeline.hpp"
 #include "Core/Timer.hpp"
+#include "Debug/Profiler.hpp"
 
 #include <glm/glm.hpp>
 
@@ -144,12 +145,7 @@ namespace Vanta {
 		uint32_t indices[6] = { 0, 1, 2, 2, 3, 0, };
 		s_Data->QuadIndexBuffer = IndexBuffer::Create(indices, 6 * sizeof(uint32_t));
 
-		{
-			TextureProperties props;
-			props.SamplerWrap = TextureWrap::Clamp;
-			s_Data->BRDFLut = Texture2D::Create("assets/textures/BRDF_LUT.tga", props);
-		}
-
+		s_Data->BRDFLut = Renderer::GetBRDFLutTexture();
 	}
 
 	void VulkanRenderer::Shutdown()
@@ -165,6 +161,8 @@ namespace Vanta {
 
 	static const std::vector<std::vector<VkWriteDescriptorSet>>& RT_RetrieveOrCreateWriteDescriptors(Ref<UniformBufferSet> uniformBufferSet, Ref<VulkanMaterial> vulkanMaterial)
 	{
+		VA_PROFILE_FUNC();
+
 		size_t shaderHash = vulkanMaterial->GetShader()->GetHash();
 		if (s_Data->UniformBufferWriteDescriptorCache.find(uniformBufferSet.Raw()) != s_Data->UniformBufferWriteDescriptorCache.end())
 		{
@@ -200,7 +198,7 @@ namespace Vanta {
 						writeDescriptors[frame].push_back(writeDescriptorSet);
 					}
 				}
-
+			
 			}
 		}
 
@@ -211,6 +209,7 @@ namespace Vanta {
 	{
 		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, mesh, transform]() mutable
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::RenderMesh");
 			VA_SCOPE_PERF("VulkanRenderer::RenderMesh");
 
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
@@ -280,6 +279,7 @@ namespace Vanta {
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
 		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, mesh, vulkanMaterial, transform, pushConstantBuffer]() mutable
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::RenderMeshWithMaterial");
 			VA_SCOPE_PERF("VulkanRenderer::RenderMeshWithMaterial");
 
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
@@ -335,6 +335,8 @@ namespace Vanta {
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
 		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, vulkanMaterial, transform]() mutable
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::RenderQuad");
+
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
@@ -353,7 +355,7 @@ namespace Vanta {
 
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
+			
 			const auto& writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
 			vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
 
@@ -378,6 +380,8 @@ namespace Vanta {
 
 		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, vulkanMaterial, vertexBuffer, indexBuffer, transform, indexCount]() mutable
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::RenderGeometry");
+
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
@@ -416,6 +420,8 @@ namespace Vanta {
 
 	VkDescriptorSet VulkanRenderer::RT_AllocateDescriptorSet(VkDescriptorSetAllocateInfo& allocInfo)
 	{
+		VA_PROFILE_FUNC();
+
 		uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
 		allocInfo.descriptorPool = s_Data->DescriptorPools[bufferIndex];
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -456,6 +462,8 @@ namespace Vanta {
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
 		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, vulkanMaterial]() mutable
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::SubmitFullscreenQuad");
+
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
@@ -505,6 +513,8 @@ namespace Vanta {
 
 		Renderer::Submit([sceneRenderer, environment, shadow]() mutable
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::SetSceneEnvironment");
+			
 			auto shader = Renderer::GetShaderLibrary()->Get("VantaPBR_Static");
 			Ref<VulkanShader> pbrShader = shader.As<VulkanShader>();
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
@@ -525,7 +535,7 @@ namespace Vanta {
 
 			Ref<VulkanTextureCube> radianceMap = environment->RadianceMap.As<VulkanTextureCube>();
 			Ref<VulkanTextureCube> irradianceMap = environment->IrradianceMap.As<VulkanTextureCube>();
-
+		
 			writeDescriptors[0] = *pbrShader->GetDescriptorSet("u_EnvRadianceTex", 1);
 			writeDescriptors[0].dstSet = descriptorSet;
 			const auto& radianceMapImageInfo = radianceMap->GetVulkanDescriptorInfo();
@@ -555,6 +565,8 @@ namespace Vanta {
 	{
 		Renderer::Submit([]()
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::BeginFrame");
+
 			VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
 
 			// Reset descriptor pools here
@@ -592,6 +604,8 @@ namespace Vanta {
 	{
 		Renderer::Submit([renderCommandBuffer, renderPass, explicitClear]()
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::BeginRenderPass");
+			
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
@@ -614,7 +628,6 @@ namespace Vanta {
 			renderPassBeginInfo.renderArea.offset.y = 0;
 			renderPassBeginInfo.renderArea.extent.width = width;
 			renderPassBeginInfo.renderArea.extent.height = height;
-
 			if (framebuffer->GetSpecification().SwapChainTarget)
 			{
 				VulkanSwapChain& swapChain = Application::Get().GetWindow().GetSwapChain();
@@ -710,6 +723,8 @@ namespace Vanta {
 	{
 		Renderer::Submit([renderCommandBuffer]()
 		{
+			VA_PROFILE_FUNC("VulkanRenderer::EndRenderPass");
+
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
@@ -730,7 +745,7 @@ namespace Vanta {
 
 		Ref<TextureCube> envUnfiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
 		Ref<TextureCube> envFiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
-
+		
 		// Convert equirectangular to cubemap
 		Ref<Shader> equirectangularConversionShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
 		Ref<VulkanComputePipeline> equirectangularConversionPipeline = Ref<VulkanComputePipeline>::Create(equirectangularConversionShader);

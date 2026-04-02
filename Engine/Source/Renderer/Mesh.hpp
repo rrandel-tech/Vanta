@@ -195,6 +195,7 @@ namespace Vanta {
 		std::vector<AnimatedVertex> m_AnimatedVertices;
 		std::vector<Index> m_Indices;
 		std::unordered_map<std::string, uint32_t> m_BoneMapping;
+		std::unordered_map<aiNode*, std::vector<uint32_t>> m_NodeMap;
 		std::vector<glm::mat4> m_BoneTransforms;
 		const aiScene* m_Scene;
 
@@ -227,10 +228,12 @@ namespace Vanta {
 	public:
 		explicit Mesh(Ref<MeshAsset> meshAsset);
 		Mesh(Ref<MeshAsset> meshAsset, const std::vector<uint32_t>& submeshes);
+		Mesh(const Ref<Mesh>& other);
 		virtual ~Mesh();
 
 		void OnUpdate(Timestep ts);
 
+		std::vector<uint32_t>& GetSubmeshes() { return m_Submeshes; }
 		const std::vector<uint32_t>& GetSubmeshes() const { return m_Submeshes; }
 		void SetSubmeshes(const std::vector<uint32_t>& submeshes) { m_Submeshes = submeshes; }
 
