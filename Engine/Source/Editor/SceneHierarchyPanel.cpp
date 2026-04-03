@@ -160,13 +160,6 @@ namespace Vanta {
 						newEntity.GetComponent<TransformComponent>().Rotation = glm::radians(glm::vec3{ 80.0f, 10.0f, 0.0f });
 						SetSelected(newEntity);
 					}
-					if (ImGui::MenuItem("Point Light"))
-					{
-						auto newEntity = m_Context->CreateEntity("Point Light");
-						newEntity.AddComponent<PointLightComponent>();
-						newEntity.GetComponent<TransformComponent>().Translation = glm::vec3{ 0 };
-						SetSelected(newEntity);
-					}
 					if (ImGui::MenuItem("Sky Light"))
 					{
 						auto newEntity = m_Context->CreateEntity("Sky Light");
@@ -489,14 +482,6 @@ namespace Vanta {
 					ImGui::CloseCurrentPopup();
 				}
 			}
-			if (!m_SelectionContext.HasComponent<PointLightComponent>())
-			{
-				if (ImGui::Button("Point Light"))
-				{
-					m_SelectionContext.AddComponent<PointLightComponent>();
-					ImGui::CloseCurrentPopup();
-				}
-			}
 			if (!m_SelectionContext.HasComponent<SkyLightComponent>())
 			{
 				if (ImGui::Button("Sky Light"))
@@ -617,20 +602,6 @@ namespace Vanta {
 				UI::Property("Cast Shadows", dlc.CastShadows);
 				UI::Property("Soft Shadows", dlc.SoftShadows);
 				UI::Property("Source Size", dlc.LightSize);
-				UI::EndPropertyGrid();
-			});
-
-		DrawComponent<PointLightComponent>("Point Light", entity, [](PointLightComponent& dlc)
-			{
-				UI::BeginPropertyGrid();
-				UI::PropertyColor("Radiance", dlc.Radiance);
-				UI::Property("Intensity", dlc.Intensity, 0.05f, 0.f, 500.f);
-				//UI::Property("Source Size", dlc.LightSize, 0.05f, 0.f, std::numeric_limits<float>::max());
-				UI::Property("Min Radius", dlc.MinRadius, 0.05f, 0.f, std::numeric_limits<float>::max());
-				UI::Property("Radius", dlc.Radius, 0.1f, 0.f, std::numeric_limits<float>::max());
-				//UI::Property("Cast Shadows", dlc.CastsShadows);
-				//UI::Property("Soft Shadows", dlc.SoftShadows);
-				UI::Property("Falloff", dlc.Falloff, 0.005f, 0.f, 1.f);
 				UI::EndPropertyGrid();
 			});
 

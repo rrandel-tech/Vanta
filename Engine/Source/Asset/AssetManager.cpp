@@ -317,7 +317,7 @@ namespace Vanta {
 		for (auto& [filepath, metadata] : s_AssetRegistry)
 		{
 			std::string pathToSerialize = metadata.FilePath.string();
-			// NOTE(Yan): if Windows
+			// NOTE: if Windows
 			std::replace(pathToSerialize.begin(), pathToSerialize.end(), '\\', '/');
 			VA_CORE_ASSERT(pathToSerialize.find("Sandbox") == std::string::npos);
 			out << YAML::BeginMap;

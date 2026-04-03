@@ -8,7 +8,7 @@
 
 #if VA_ENABLE_PROFILING
 #define VA_PROFILE_MARK_FRAME			FrameMark;
-// NOTE(Peter): Use VA_PROFILE_FUNC ONLY at the top of a function
+// NOTE: Use VA_PROFILE_FUNC ONLY at the top of a function
 //				Use VA_PROFILE_SCOPE / VA_PROFILE_SCOPE_DYNAMIC for an inner scope
 #define VA_PROFILE_FUNC(...)			ZoneScoped##__VA_OPT__(N(__VA_ARGS__))
 #define VA_PROFILE_SCOPE(...)			VA_PROFILE_FUNC(__VA_ARGS__)

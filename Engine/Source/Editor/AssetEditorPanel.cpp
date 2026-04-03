@@ -18,7 +18,7 @@ namespace Vanta {
 			return;
 
 		bool was_open = m_IsOpen;
-		// NOTE(Peter): SetNextWindowSizeConstraints requires a max constraint that's above 0. For now we're just setting it to a large value
+		// NOTE: SetNextWindowSizeConstraints requires a max constraint that's above 0. For now we're just setting it to a large value
 		ImGui::SetNextWindowSizeConstraints(m_MinSize, m_MaxSize);
 		ImGui::Begin(m_Title.c_str(), &m_IsOpen, m_Flags);
 		Render();

@@ -177,6 +177,7 @@ namespace Vanta {
 		// RENDER 3D SCENE
 		/////////////////////////////////////////////////////////////////////
 
+		// Lighting
 		{
 			m_LightEnvironment = LightEnvironment();
 			auto lights = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
@@ -199,7 +200,6 @@ namespace Vanta {
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			if (lights.empty())
 				m_Environment = Ref<Environment>::Create(Renderer::GetBlackCubeTexture(), Renderer::GetBlackCubeTexture());
-
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);
@@ -239,7 +239,6 @@ namespace Vanta {
 		}
 
 		renderer->EndScene();
-		/////////////////////////////////////////////////////////////////////
 
 #if 0
 		// Render all sprites

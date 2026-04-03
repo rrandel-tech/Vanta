@@ -268,24 +268,6 @@ namespace Vanta {
 			out << YAML::EndMap; // DirectionalLightComponent
 		}
 
-		if (entity.HasComponent<PointLightComponent>())
-		{
-			out << YAML::Key << "PointLightComponent";
-			out << YAML::BeginMap; // PointLightComponent
-
-			auto& directionalLightComponent = entity.GetComponent<PointLightComponent>();
-			out << YAML::Key << "Radiance" << YAML::Value << directionalLightComponent.Radiance;
-			out << YAML::Key << "Intensity" << YAML::Value << directionalLightComponent.Intensity;
-			out << YAML::Key << "CastShadows" << YAML::Value << directionalLightComponent.CastsShadows;
-			out << YAML::Key << "SoftShadows" << YAML::Value << directionalLightComponent.SoftShadows;
-			out << YAML::Key << "MinRadius" << YAML::Value << directionalLightComponent.MinRadius;
-			out << YAML::Key << "Radius" << YAML::Value << directionalLightComponent.Radius;
-			out << YAML::Key << "LightSize" << YAML::Value << directionalLightComponent.LightSize;
-			out << YAML::Key << "Falloff" << YAML::Value << directionalLightComponent.Falloff;
-
-			out << YAML::EndMap; // PointLightComponent
-		}
-
 		if (entity.HasComponent<SkyLightComponent>())
 		{
 			out << YAML::Key << "SkyLightComponent";
@@ -528,19 +510,6 @@ namespace Vanta {
 					component.CastShadows = directionalLightComponent["CastShadows"].as<bool>();
 					component.SoftShadows = directionalLightComponent["SoftShadows"].as<bool>();
 					component.LightSize = directionalLightComponent["LightSize"].as<float>();
-				}
-
-				if (auto pointLightComponent = entity["PointLightComponent"]; pointLightComponent)
-				{
-					auto& component = deserializedEntity.AddComponent<PointLightComponent>();
-					component.Radiance = pointLightComponent["Radiance"].as<glm::vec3>();
-					component.Intensity = pointLightComponent["Intensity"].as<float>();
-					component.CastsShadows = pointLightComponent["CastShadows"].as<bool>();
-					component.SoftShadows = pointLightComponent["SoftShadows"].as<bool>();
-					component.LightSize = pointLightComponent["LightSize"].as<float>();
-					component.Radius = pointLightComponent["Radius"].as<float>();
-					component.MinRadius = pointLightComponent["MinRadius"].as<float>();
-					component.Falloff = pointLightComponent["Falloff"].as<float>();
 				}
 
 				auto skyLightComponent = entity["SkyLightComponent"];
