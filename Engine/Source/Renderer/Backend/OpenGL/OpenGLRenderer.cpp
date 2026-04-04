@@ -81,7 +81,7 @@ namespace Vanta {
 				VA_CORE_WARN("[OpenGL Debug MEDIUM] {0}", message);
 				break;
 			case GL_DEBUG_SEVERITY_LOW:
-				VA_CORE_INFO("[OpenGL Debug LOW] {0}", message);
+				//VA_CORE_INFO("[OpenGL Debug LOW] {0}", message);
 				break;
 			case GL_DEBUG_SEVERITY_NOTIFICATION:
 				// VA_CORE_TRACE("[OpenGL Debug NOTIFICATION] {0}", message);
@@ -189,47 +189,6 @@ namespace Vanta {
 	{
 	}
 
-	void OpenGLRenderer::BeginRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer, const Ref<RenderPass>& renderPass, bool explicitClear)
-	{
-		s_Data->ActiveRenderPass = renderPass;
-
-		renderPass->GetSpecification().TargetFramebuffer->Bind();
-		if (explicitClear)
-		{
-			const glm::vec4& clearColor = renderPass->GetSpecification().TargetFramebuffer->GetSpecification().ClearColor;
-			Renderer::Submit([=]() {
-				Utils::Clear(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
-			});
-		}
-	}
-
-	void OpenGLRenderer::EndRenderPass(Ref<RenderCommandBuffer> renderCommandBuffer)
-	{
-		s_Data->ActiveRenderPass = nullptr;
-	}
-
-	void OpenGLRenderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
-	{
-		const auto& shader = material->GetShader();
-
-		bool depthTest = true;
-		Ref<OpenGLMaterial> glMaterial = material.As<OpenGLMaterial>();
-		if (material)
-		{
-			glMaterial->UpdateForRendering();
-			depthTest = material->GetFlag(MaterialFlag::DepthTest);
-		}
-
-		s_Data->m_FullscreenQuadVertexBuffer->Bind();
-		pipeline->Bind();
-		s_Data->m_FullscreenQuadIndexBuffer->Bind();
-		Renderer::Submit([depthTest]()
-		{
-			Utils::DrawIndexed(6, PrimitiveType::Triangles, depthTest);
-		});
-
-	}
-
 	void OpenGLRenderer::SetSceneEnvironment(Ref<SceneRenderer> sceneRenderer, Ref<Environment> environment, Ref<Image2D> shadow)
 	{
 		if (!environment)
@@ -237,9 +196,9 @@ namespace Vanta {
 
 		Renderer::Submit([environment, shadow]() mutable
 		{
-			auto shader = Renderer::GetShaderLibrary()->Get("VantaPBR_Static");
+			auto shader = Renderer::GetShaderLibrary()->Get("HazelPBR_Static");
 			Ref<OpenGLShader> pbrShader = shader.As<OpenGLShader>();
-			
+
 			if (auto resource = pbrShader->GetShaderResource("u_EnvRadianceTex"))
 			{
 				Ref<OpenGLTextureCube> radianceMap = environment->RadianceMap.As<OpenGLTextureCube>();
@@ -306,16 +265,16 @@ namespace Vanta {
 
 		Renderer::Submit([envFilteringShader, envUnfiltered, envFiltered, cubemapSize]() {
 
-			const float deltaRoughness = 1.0f / glm::max((float)(envFiltered->GetMipLevelCount() - 1.0f), 1.0f);
-			for (int level = 1, size = cubemapSize / 2; level < envFiltered->GetMipLevelCount(); level++, size /= 2) // <= ?
+			const float deltaRoughness = 1.0f / glm::max(float(envFiltered->GetMipLevelCount()) - 1.0f, 1.0f);
+			for (uint32_t level = 1, size = cubemapSize / 2; level < envFiltered->GetMipLevelCount(); level++, size /= 2) // <= ?
 			{
 				glBindImageTexture(0, envFiltered->GetRendererID(), level, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-				GLint roughnessUniformLocation = glGetUniformLocation(envFilteringShader->GetRendererID(), "u_Uniforms.Roughness");
+				const GLint roughnessUniformLocation = glGetUniformLocation(envFilteringShader->GetRendererID(), "u_Uniforms.Roughness");
 				VA_CORE_ASSERT(roughnessUniformLocation != -1);
 				glUniform1f(roughnessUniformLocation, (float)level * deltaRoughness);
 
-				const GLuint numGroups = glm::max(1, size / 32);
+				const GLuint numGroups = glm::max(1u, size / 32);
 				glDispatchCompute(numGroups, numGroups, 6);
 				glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			}
@@ -330,9 +289,9 @@ namespace Vanta {
 		{
 			glBindImageTexture(0, irradianceMap->GetRendererID(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-			GLint samplesUniformLocation = glGetUniformLocation(envIrradianceShader->GetRendererID(), "u_Uniforms.Samples");
+			const GLint samplesUniformLocation = glGetUniformLocation(envIrradianceShader->GetRendererID(), "u_Uniforms.Samples");
 			VA_CORE_ASSERT(samplesUniformLocation != -1);
-			uint32_t samples = Renderer::GetConfig().IrradianceMapComputeSamples;
+			const uint32_t samples = Renderer::GetConfig().IrradianceMapComputeSamples;
 			glUniform1ui(samplesUniformLocation, samples);
 
 			glDispatchCompute(irradianceMap->GetWidth() / 32, irradianceMap->GetHeight() / 32, 6);

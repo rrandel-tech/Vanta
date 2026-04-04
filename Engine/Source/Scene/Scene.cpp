@@ -11,6 +11,8 @@
 
 #include "Renderer/Renderer2D.hpp"
 
+#include "Debug/Profiler.hpp"
+
 #include "Math/Math.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -81,6 +83,8 @@ namespace Vanta {
 
 	void Scene::OnRenderRuntime(Ref<SceneRenderer> renderer, Timestep ts)
 	{
+		VA_PROFILE_FUNC();
+
 		/////////////////////////////////////////////////////////////////////
 		// RENDER 3D SCENE
 		/////////////////////////////////////////////////////////////////////
@@ -96,19 +100,23 @@ namespace Vanta {
 		// Process lights
 		{
 			m_LightEnvironment = LightEnvironment();
-			auto lights = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
-			uint32_t directionalLightIndex = 0;
-			for (auto entity : lights)
+			// Directional Lights
 			{
-				auto [transformComponent, lightComponent] = lights.get<TransformComponent, DirectionalLightComponent>(entity);
-				glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.GetTransform()) * glm::vec3(1.0f));
-				m_LightEnvironment.DirectionalLights[directionalLightIndex++] =
+				auto lights = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
+				uint32_t directionalLightIndex = 0;
+				for (auto entity : lights)
 				{
-					direction,
-					lightComponent.Radiance,
-					lightComponent.Intensity,
-					lightComponent.CastShadows
-				};
+					auto [transformComponent, lightComponent] = lights.get<TransformComponent, DirectionalLightComponent>(entity);
+					glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.GetTransform()) * glm::vec3(1.0f));
+					m_LightEnvironment.DirectionalLights[directionalLightIndex++] =
+					{
+						direction,
+						lightComponent.Radiance,
+						lightComponent.Intensity,
+						lightComponent.CastShadows
+					};
+				}
+
 			}
 		}
 
@@ -117,6 +125,7 @@ namespace Vanta {
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			if (lights.empty())
 				m_Environment = Ref<Environment>::Create(Renderer::GetBlackCubeTexture(), Renderer::GetBlackCubeTexture());
+
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);
@@ -173,6 +182,8 @@ namespace Vanta {
 
 	void Scene::OnRenderEditor(Ref<SceneRenderer> renderer, Timestep ts, const EditorCamera& editorCamera)
 	{
+		VA_PROFILE_FUNC();
+
 		/////////////////////////////////////////////////////////////////////
 		// RENDER 3D SCENE
 		/////////////////////////////////////////////////////////////////////
@@ -180,19 +191,22 @@ namespace Vanta {
 		// Lighting
 		{
 			m_LightEnvironment = LightEnvironment();
-			auto lights = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
-			uint32_t directionalLightIndex = 0;
-			for (auto entity : lights)
+			//Directional Lights
 			{
-				auto [transformComponent, lightComponent] = lights.get<TransformComponent, DirectionalLightComponent>(entity);
-				glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.GetTransform()) * glm::vec3(1.0f));
-				m_LightEnvironment.DirectionalLights[directionalLightIndex++] =
+				auto dirLights = m_Registry.group<DirectionalLightComponent>(entt::get<TransformComponent>);
+				uint32_t directionalLightIndex = 0;
+				for (auto entity : dirLights)
 				{
-					direction,
-					lightComponent.Radiance,
-					lightComponent.Intensity,
-					lightComponent.CastShadows
-				};
+					auto [transformComponent, lightComponent] = dirLights.get<TransformComponent, DirectionalLightComponent>(entity);
+					glm::vec3 direction = -glm::normalize(glm::mat3(transformComponent.GetTransform()) * glm::vec3(1.0f));
+					m_LightEnvironment.DirectionalLights[directionalLightIndex++] =
+					{
+						direction,
+						lightComponent.Radiance,
+						lightComponent.Intensity,
+						lightComponent.CastShadows
+					};
+				}
 			}
 		}
 
@@ -200,6 +214,7 @@ namespace Vanta {
 			auto lights = m_Registry.group<SkyLightComponent>(entt::get<TransformComponent>);
 			if (lights.empty())
 				m_Environment = Ref<Environment>::Create(Renderer::GetBlackCubeTexture(), Renderer::GetBlackCubeTexture());
+
 			for (auto entity : lights)
 			{
 				auto [transformComponent, skyLightComponent] = lights.get<TransformComponent, SkyLightComponent>(entity);

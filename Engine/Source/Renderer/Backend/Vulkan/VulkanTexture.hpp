@@ -57,8 +57,9 @@ namespace Vanta {
 		VulkanTextureCube(const std::string& path, TextureProperties properties);
 		virtual ~VulkanTextureCube();
 
-		virtual const std::string& GetPath() const override { return ""; }
-
+#if EMPTY
+		virtual const std::string& GetPath() const override { return std::string(); }
+#endif
 		virtual void Bind(uint32_t slot = 0) const override {}
 
 		virtual ImageFormat GetFormat() const { return m_Format; }

@@ -16,6 +16,7 @@ namespace Vanta {
 
 		static AssetType GetStaticType() { return AssetType::EnvMap; }
 		virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
 	};
 
 

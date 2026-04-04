@@ -91,7 +91,8 @@ namespace Vanta {
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		Application& app = Application::Get();
-		io.DisplaySize = ImVec2(app.GetWindow().GetWidth(), app.GetWindow().GetHeight());
+		auto [width, height] = app.GetWindow().GetSize();
+		io.DisplaySize = ImVec2(float(width), float(width));
 
 		// Render to swapchain... how do we handle this better?
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);

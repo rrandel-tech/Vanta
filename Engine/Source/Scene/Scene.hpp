@@ -17,7 +17,7 @@ namespace Vanta {
 
 	class SceneRenderer;
 
-	struct Light
+	struct DirLight
 	{
 		glm::vec3 Direction = { 0.0f, 0.0f, 0.0f };
 		glm::vec3 Radiance = { 0.0f, 0.0f, 0.0f };
@@ -67,8 +67,8 @@ namespace Vanta {
 		const Ref<Environment>& GetEnvironment() const { return m_Environment; }
 		void SetSkybox(const Ref<TextureCube>& skybox);
 
-		Light& GetLight() { return m_Light; }
-		const Light& GetLight() const { return m_Light; }
+		DirLight& GetLight() { return m_Light; }
+		const DirLight& GetLight() const { return m_Light; }
 
 		Entity GetMainCameraEntity();
 
@@ -125,7 +125,7 @@ namespace Vanta {
 
 		EntityMap m_EntityIDMap;
 
-		Light m_Light;
+		DirLight m_Light;
 		float m_LightMultiplier = 0.3f;
 
 		LightEnvironment m_LightEnvironment;

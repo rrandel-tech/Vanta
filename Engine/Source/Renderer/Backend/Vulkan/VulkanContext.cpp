@@ -27,7 +27,7 @@ namespace Vanta {
 	VulkanContext::~VulkanContext()
 	{
 		m_Device->Destroy();
-
+		
 		vkDestroyInstance(s_VulkanInstance, nullptr);
 		s_VulkanInstance = nullptr;
 	}

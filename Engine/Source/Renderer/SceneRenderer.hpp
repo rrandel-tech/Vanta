@@ -7,8 +7,11 @@
 
 #include "Renderer/UniformBufferSet.hpp"
 #include "Renderer/RenderCommandBuffer.hpp"
+#include "Renderer/PipelineCompute.hpp"
 
 #include <map>
+
+#include "StorageBufferSet.hpp"
 
 namespace Vanta {
 
@@ -81,7 +84,7 @@ namespace Vanta {
 			glm::mat4 View;
 			float SplitDepth;
 		};
-		void CalculateCascades(CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection);
+		void CalculateCascades(CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection) const;
 	private:
 		Ref<Scene> m_Scene;
 		SceneRendererSpecification m_Specification;
@@ -96,7 +99,7 @@ namespace Vanta {
 			float SkyboxLod = 0.0f;
 			float SceneEnvironmentIntensity;
 			LightEnvironment SceneLightEnvironment;
-			Light ActiveLight;
+			DirLight ActiveLight;
 		} m_SceneData;
 
 		Ref<Shader> m_CompositeShader;
@@ -107,6 +110,7 @@ namespace Vanta {
 		{
 			glm::mat4 ViewProjection;
 			glm::mat4 InverseViewProjection;
+			glm::mat4 Projection;
 			glm::mat4 View;
 		} CameraData;
 
@@ -115,7 +119,7 @@ namespace Vanta {
 			glm::mat4 ViewProjection[4];
 		} ShadowData;
 
-		struct Light
+		struct DirLight
 		{
 			glm::vec3 Direction;
 			float Padding = 0.0f;
@@ -125,14 +129,14 @@ namespace Vanta {
 
 		struct UBScene
 		{
-			Light lights;
+			DirLight lights;
 			glm::vec3 u_CameraPosition;
 			float EnvironmentMapIntensity = 1.0f;
 		} SceneDataUB;
 
 		struct UBRendererData
 		{
-			glm::vec4 u_CascadeSplits;
+			glm::vec4 CascadeSplits;
 			bool ShowCascades = false;
 			char Padding0[3] = { 0,0,0 }; // Bools are 4-bytes in GLSL
 			bool SoftShadows = true;
@@ -143,9 +147,11 @@ namespace Vanta {
 			bool CascadeFading = true;
 			char Padding2[3] = { 0,0,0 };
 			float CascadeTransitionFade = 1.0f;
+			char Padding3[3] = { 0,0,0 };
 		} RendererDataUB;
 
 		Ref<UniformBufferSet> m_UniformBufferSet;
+		Ref<StorageBufferSet> m_StorageBufferSet;
 
 		Ref<Shader> ShadowMapShader, ShadowMapAnimShader;
 		Ref<RenderPass> ShadowMapRenderPass[4];

@@ -54,17 +54,17 @@ namespace Vanta {
 		constexpr float latitudeBands = 30;
 		constexpr float longitudeBands = 30;
 
-		for (float latitude = 0.0F; latitude <= latitudeBands; latitude++)
+		for (float latitude = 0.0f; latitude <= latitudeBands; latitude++)
 		{
-			float theta = latitude * M_PI / latitudeBands;
-			float sinTheta = glm::sin(theta);
-			float cosTheta = glm::cos(theta);
+			const float theta = latitude * (float)M_PI / latitudeBands;
+			const float sinTheta = glm::sin(theta);
+			const float cosTheta = glm::cos(theta);
 
-			for (float longitude = 0.0F; longitude <= longitudeBands; longitude++)
+			for (float longitude = 0.0f; longitude <= longitudeBands; longitude++)
 			{
-				float phi = longitude * 2 * M_PI / longitudeBands;
-				float sinPhi = glm::sin(phi);
-				float cosPhi = glm::cos(phi);
+				const float phi = longitude * 2.f * (float)M_PI / longitudeBands;
+				const float sinPhi = glm::sin(phi);
+				const float cosPhi = glm::cos(phi);
 
 				Vertex vertex;
 				vertex.Normal = { cosPhi * sinTheta, cosTheta, sinPhi * sinTheta };
@@ -73,12 +73,12 @@ namespace Vanta {
 			}
 		}
 
-		for (uint32_t latitude = 0; latitude < latitudeBands; latitude++)
+		for (uint32_t latitude = 0; latitude < (uint32_t)latitudeBands; latitude++)
 		{
-			for (uint32_t longitude = 0; longitude < longitudeBands; longitude++)
+			for (uint32_t longitude = 0; longitude < (uint32_t)longitudeBands; longitude++)
 			{
-				uint32_t first = (latitude * (longitudeBands + 1)) + longitude;
-				uint32_t second = first + longitudeBands + 1;
+				const uint32_t first = (latitude * ((uint32_t)longitudeBands + 1)) + longitude;
+				const uint32_t second = first + (uint32_t)longitudeBands + 1;
 
 				indices.push_back({ first, second, first + 1 });
 				indices.push_back({ second, second + 1, first + 1 });
@@ -101,8 +101,8 @@ namespace Vanta {
 		float pointsZ[pointCount];
 		float pointsR[pointCount];
 
-		float calcH = 0.0F;
-		float calcV = 0.0F;
+		float calcH = 0.0f;
+		float calcV = 0.0f;
 
 		for (int i = 0; i < pointCount; i++)
 		{
@@ -114,15 +114,15 @@ namespace Vanta {
 			pointsY[i] = glm::cos(calcVRadians);
 			pointsR[i] = glm::sin(calcVRadians);
 
-			calcH += 360.0F / (float)segments;
-			calcV += 180.0F / (float)segments;
+			calcH += 360.f / (float)segments;
+			calcV += 180.f / (float)segments;
 		}
 
-		float yOffset = (height - (radius * 2.0F)) * 0.5F;
-		if (yOffset < 0.0F)
-			yOffset = 0.0F;
+		float yOffset = (height - (radius * 2.0f)) * 0.5f;
+		if (yOffset < 0.f)
+			yOffset = 0.f;
 
-		int top = glm::ceil(pointCount * 0.5F);
+		int top = (int)glm::ceil(pointCount * 0.5f);
 
 		for (int y = 0; y < top; y++)
 		{
@@ -134,7 +134,7 @@ namespace Vanta {
 			}
 		}
 
-		int bottom = glm::floor(pointCount * 0.5F);
+		int bottom = (int)glm::floor(pointCount * 0.5f);
 
 		for (int y = bottom; y < pointCount; y++)
 		{

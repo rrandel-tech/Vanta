@@ -50,6 +50,7 @@ namespace Vanta {
 		aiProcess_GenNormals |              // Make sure we have legit normals
 		aiProcess_GenUVCoords |             // Convert UVs if required 
 		aiProcess_OptimizeMeshes |          // Batch draws where possible
+		aiProcess_JoinIdenticalVertices |          
 		aiProcess_ValidateDataStructure;    // Validation
 
 	struct LogStream : public Assimp::LogStream
@@ -61,7 +62,7 @@ namespace Vanta {
 				Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
 				Assimp::DefaultLogger::get()->attachStream(new LogStream, Assimp::Logger::Err | Assimp::Logger::Warn);
 			}
-		}
+		} 
 
 		virtual void write(const char* message) override
 		{
@@ -95,7 +96,7 @@ namespace Vanta {
 		m_BoundingBox.Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
 		m_Submeshes.reserve(scene->mNumMeshes);
-		for (size_t m = 0; m < scene->mNumMeshes; m++)
+		for (unsigned m = 0; m < scene->mNumMeshes; m++)
 		{
 			aiMesh* mesh = scene->mMeshes[m];
 
@@ -241,6 +242,7 @@ namespace Vanta {
 			m_Materials.resize(scene->mNumMaterials);
 
 			Ref<Texture2D> whiteTexture = Renderer::GetWhiteTexture();
+			Ref<Texture2D> blackTexture = Renderer::GetBlackTexture();
 
 			for (uint32_t i = 0; i < scene->mNumMaterials; i++)
 			{
@@ -490,7 +492,7 @@ namespace Vanta {
 				if (fallback)
 				{
 					VA_MESH_LOG("    No metalness map");
-					mi->Set("u_MetalnessTexture", whiteTexture);
+					mi->Set("u_MetalnessTexture", blackTexture);
 					mi->Set("u_MaterialUniforms.Metalness", metalness);
 
 				}
@@ -513,7 +515,7 @@ namespace Vanta {
 		
 		if (m_IsAnimated)
 		{
-			m_VertexBuffer = VertexBuffer::Create(m_AnimatedVertices.data(), m_AnimatedVertices.size() * sizeof(AnimatedVertex));
+			m_VertexBuffer = VertexBuffer::Create(m_AnimatedVertices.data(), (uint32_t)(m_AnimatedVertices.size() * sizeof(AnimatedVertex)));
 			m_VertexBufferLayout = {
 				{ ShaderDataType::Float3, "a_Position" },
 				{ ShaderDataType::Float3, "a_Normal" },
@@ -526,7 +528,7 @@ namespace Vanta {
 		}
 		else
 		{
-			m_VertexBuffer = VertexBuffer::Create(m_StaticVertices.data(), m_StaticVertices.size() * sizeof(Vertex));
+			m_VertexBuffer = VertexBuffer::Create(m_StaticVertices.data(), (uint32_t)(m_StaticVertices.size() * sizeof(Vertex)));
 			m_VertexBufferLayout = {
 				{ ShaderDataType::Float3, "a_Position" },
 				{ ShaderDataType::Float3, "a_Normal" },
@@ -536,7 +538,7 @@ namespace Vanta {
 			};
 		}
 
-		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), m_Indices.size() * sizeof(Index));
+		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)(m_Indices.size() * sizeof(Index)));
 	}
 
 	MeshAsset::MeshAsset(const std::vector<Vertex>& vertices, const std::vector<Index>& indices, const glm::mat4& transform)
@@ -545,12 +547,12 @@ namespace Vanta {
 		Submesh submesh;
 		submesh.BaseVertex = 0;
 		submesh.BaseIndex = 0;
-		submesh.IndexCount = indices.size() * 3;
+		submesh.IndexCount = (uint32_t)indices.size() * 3u;
 		submesh.Transform = transform;
 		m_Submeshes.push_back(submesh);
 
-		m_VertexBuffer = VertexBuffer::Create(m_StaticVertices.data(), m_StaticVertices.size() * sizeof(Vertex));
-		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), m_Indices.size() * sizeof(Index));
+		m_VertexBuffer = VertexBuffer::Create(m_StaticVertices.data(), (uint32_t)(m_StaticVertices.size() * sizeof(Vertex)));
+		m_IndexBuffer = IndexBuffer::Create(m_Indices.data(), (uint32_t)(m_Indices.size() * sizeof(Index)));
 		m_VertexBufferLayout = {
 			{ ShaderDataType::Float3, "a_Position" },
 			{ ShaderDataType::Float3, "a_Normal" },

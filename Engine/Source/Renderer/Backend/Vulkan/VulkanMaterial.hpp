@@ -18,6 +18,9 @@ namespace Vanta {
 		virtual void Set(const std::string& name, int value) override;
 		virtual void Set(const std::string& name, uint32_t value) override;
 		virtual void Set(const std::string& name, bool value) override;
+		virtual void Set(const std::string& name, const glm::ivec2& value) override;
+		virtual void Set(const std::string& name, const glm::ivec3& value) override;
+		virtual void Set(const std::string& name, const glm::ivec4& value) override;
 		virtual void Set(const std::string& name, const glm::vec2& value) override;
 		virtual void Set(const std::string& name, const glm::vec3& value) override;
 		virtual void Set(const std::string& name, const glm::vec4& value) override;
@@ -25,6 +28,7 @@ namespace Vanta {
 		virtual void Set(const std::string& name, const glm::mat4& value) override;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
+		virtual void Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex) override;
 		virtual void Set(const std::string& name, const Ref<TextureCube>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
 
@@ -118,6 +122,7 @@ namespace Vanta {
 		void OnShaderReloaded();
 
 		void SetVulkanDescriptor(const std::string& name, const Ref<Texture2D>& texture);
+		void SetVulkanDescriptor(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex);
 		void SetVulkanDescriptor(const std::string& name, const Ref<TextureCube>& texture);
 		void SetVulkanDescriptor(const std::string& name, const Ref<Image2D>& image);
 
@@ -135,18 +140,30 @@ namespace Vanta {
 		{
 			PendingDescriptorType Type = PendingDescriptorType::None;
 			VkWriteDescriptorSet WDS;
-			VkDescriptorImageInfo ImageInfo{};
+			VkDescriptorImageInfo ImageInfo;
 			Ref<Texture> Texture;
 			Ref<Image> Image;
 			VkDescriptorImageInfo SubmittedImageInfo{};
 		};
-		std::unordered_map<uint32_t, std::shared_ptr<PendingDescriptor>> m_ResidentDescriptors; // TODO: should this be a map (binding point)?
+
+		struct PendingDescriptorArray
+		{
+			PendingDescriptorType Type = PendingDescriptorType::None;
+			VkWriteDescriptorSet WDS;
+			std::vector<VkDescriptorImageInfo> ImageInfos;
+			std::vector<Ref<Texture>> Textures;
+			std::vector<Ref<Image>> Images;
+			VkDescriptorImageInfo SubmittedImageInfo{};
+		};
+		std::unordered_map<uint32_t, std::shared_ptr<PendingDescriptor>> m_ResidentDescriptors;
+		std::unordered_map<uint32_t, std::shared_ptr<PendingDescriptorArray>> m_ResidentDescriptorArrays;
 		std::vector<std::shared_ptr<PendingDescriptor>> m_PendingDescriptors;  // TODO: weak ref
 
 		uint32_t m_MaterialFlags = 0;
 
 		Buffer m_UniformStorageBuffer;
 		std::vector<Ref<Texture>> m_Textures; // TODO: Texture should only be stored as images
+		std::vector<std::vector<Ref<Texture>>> m_TextureArrays;
 		std::vector<Ref<Image>> m_Images;
 
 		VulkanShader::ShaderMaterialDescriptorSet m_DescriptorSets[3];

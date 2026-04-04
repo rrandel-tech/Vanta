@@ -32,7 +32,7 @@ namespace Vanta {
 			uint32_t size = 0;
 			for (auto [name, shaderBuffer] : shaderBuffers)
 				size += shaderBuffer.Size;
-		
+
 			m_UniformStorageBuffer.Allocate(size);
 			m_UniformStorageBuffer.ZeroInitialize();
 		}
@@ -40,7 +40,7 @@ namespace Vanta {
 
 	void OpenGLMaterial::Invalidate()
 	{
-		
+
 	}
 
 	void OpenGLMaterial::OnShaderReloaded()
@@ -96,6 +96,21 @@ namespace Vanta {
 	{
 		// Bools are uints
 		Set<uint32_t>(name, (int)value);
+	}
+
+	void OpenGLMaterial::Set(const std::string& name, const glm::ivec2& value)
+	{
+		Set<glm::ivec2>(name, value);
+	}
+
+	void OpenGLMaterial::Set(const std::string& name, const glm::ivec3& value)
+	{
+		Set<glm::ivec3>(name, value);
+	}
+
+	void OpenGLMaterial::Set(const std::string& name, const glm::ivec4& value)
+	{
+		Set<glm::ivec4>(name, value);
 	}
 
 	void OpenGLMaterial::Set(const std::string& name, const glm::vec2& value)
@@ -243,9 +258,9 @@ namespace Vanta {
 		Ref<OpenGLShader> shader = m_Shader.As<OpenGLShader>();
 
 		Renderer::Submit([shader]()
-		{
-			glUseProgram(shader->GetRendererID());
-		});
+			{
+				glUseProgram(shader->GetRendererID());
+			});
 
 		const auto& shaderBuffers = GetShader()->GetShaderBuffers();
 		VA_CORE_ASSERT(shaderBuffers.size() <= 1, "We currently only support ONE material buffer!");
@@ -258,60 +273,78 @@ namespace Vanta {
 			{
 				switch (uniform.GetType())
 				{
-					case ShaderUniformType::Bool:
-					case ShaderUniformType::UInt:
-					{
-						uint32_t value = m_UniformStorageBuffer.Read<uint32_t>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Int:
-					{
-						int value = m_UniformStorageBuffer.Read<int>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Float:
-					{
-						float value = m_UniformStorageBuffer.Read<float>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Vec2:
-					{
-						const glm::vec2& value = m_UniformStorageBuffer.Read<glm::vec2>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Vec3:
-					{
-						const glm::vec3& value = m_UniformStorageBuffer.Read<glm::vec3>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Vec4:
-					{
-						const glm::vec4& value = m_UniformStorageBuffer.Read<glm::vec4>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Mat3:
-					{
-						const glm::mat3& value = m_UniformStorageBuffer.Read<glm::mat3>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					case ShaderUniformType::Mat4:
-					{
-						const glm::mat4& value = m_UniformStorageBuffer.Read<glm::mat4>(uniform.GetOffset());
-						shader->SetUniform(name, value);
-						break;
-					}
-					default:
-					{
-						VA_CORE_ASSERT(false);
-						break;
-					}
+				case ShaderUniformType::Bool:
+				case ShaderUniformType::UInt:
+				{
+					const uint32_t value = m_UniformStorageBuffer.Read<uint32_t>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Int:
+				{
+					const int value = m_UniformStorageBuffer.Read<int>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::IVec2:
+				{
+					const glm::ivec2& value = m_UniformStorageBuffer.Read<glm::ivec2>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::IVec3:
+				{
+					const glm::ivec3& value = m_UniformStorageBuffer.Read<glm::ivec3>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::IVec4:
+				{
+					const glm::ivec4& value = m_UniformStorageBuffer.Read<glm::ivec4>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Float:
+				{
+					const float value = m_UniformStorageBuffer.Read<float>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Vec2:
+				{
+					const glm::vec2& value = m_UniformStorageBuffer.Read<glm::vec2>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Vec3:
+				{
+					const glm::vec3& value = m_UniformStorageBuffer.Read<glm::vec3>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Vec4:
+				{
+					const glm::vec4& value = m_UniformStorageBuffer.Read<glm::vec4>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Mat3:
+				{
+					const glm::mat3& value = m_UniformStorageBuffer.Read<glm::mat3>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				case ShaderUniformType::Mat4:
+				{
+					const glm::mat4& value = m_UniformStorageBuffer.Read<glm::mat4>(uniform.GetOffset());
+					shader->SetUniform(name, value);
+					break;
+				}
+				default:
+				{
+					VA_CORE_ASSERT(false);
+					break;
+				}
 				}
 			}
 		}
@@ -322,14 +355,14 @@ namespace Vanta {
 			if (texture)
 			{
 				Renderer::Submit([i, texture]()
-				{
-					VA_CORE_ASSERT(texture->GetType() == TextureType::TextureCube);
-					Ref<OpenGLTextureCube> glTexture = texture.As<OpenGLTextureCube>();
-					glBindTextureUnit(i, glTexture->GetRendererID());
-				});
+					{
+						VA_CORE_ASSERT(texture->GetType() == TextureType::TextureCube);
+						Ref<OpenGLTextureCube> glTexture = texture.As<OpenGLTextureCube>();
+						glBindTextureUnit(int(i), glTexture->GetRendererID());
+					});
 			}
 		}
-		
+
 		for (auto [slot, texture] : m_Texture2Ds)
 		{
 			if (texture)
@@ -338,24 +371,24 @@ namespace Vanta {
 				Ref<Image2D> image = texture->GetImage();
 				Ref<OpenGLImage2D> glImage = image.As<OpenGLImage2D>();
 				Renderer::Submit([textureSlot, glImage]()
-				{
-					glBindSampler(textureSlot, glImage->GetSamplerRendererID());
-					glBindTextureUnit(textureSlot, glImage->GetRendererID());
-				});
+					{
+						glBindSampler(textureSlot, glImage->GetSamplerRendererID());
+						glBindTextureUnit(textureSlot, glImage->GetRendererID());
+					});
 			}
 		}
 
-		for (auto[slot, image] : m_Images)
+		for (auto [slot, image] : m_Images)
 		{
 			if (image)
 			{
 				uint32_t textureSlot = slot;
 				Ref<OpenGLImage2D> glImage = image.As<OpenGLImage2D>();
 				Renderer::Submit([textureSlot, glImage]()
-				{
-					glBindSampler(textureSlot, glImage->GetSamplerRendererID());
-					glBindTextureUnit(textureSlot, glImage->GetRendererID());
-				});
+					{
+						glBindSampler(textureSlot, glImage->GetSamplerRendererID());
+						glBindTextureUnit(textureSlot, glImage->GetRendererID());
+					});
 			}
 		}
 	}

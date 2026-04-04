@@ -10,17 +10,17 @@
 
 namespace Vanta {
 
-    Ref<UniformBufferSet> UniformBufferSet::Create(uint32_t frames)
-    {
-        switch (RendererAPI::Current())
-        {
-            case RendererAPIType::None:     return nullptr;
-            case RendererAPIType::Vulkan:  return Ref<VulkanUniformBufferSet>::Create(frames);
-            case RendererAPIType::OpenGL:  return Ref<OpenGLUniformBufferSet>::Create(frames);
-        }
+	Ref<UniformBufferSet> UniformBufferSet::Create(uint32_t frames)
+	{
+		switch (RendererAPI::Current())
+		{
+			case RendererAPIType::None:     return nullptr;
+			case RendererAPIType::Vulkan:  return Ref<VulkanUniformBufferSet>::Create(frames);
+			case RendererAPIType::OpenGL:  return Ref<OpenGLUniformBufferSet>::Create(frames);
+		}
 
-        VA_CORE_ASSERT(false, "Unknown RendererAPI!");
-        return nullptr;
-    }
+		VA_CORE_ASSERT(false, "Unknown RendererAPI!");
+		return nullptr;
+	}
 
 }

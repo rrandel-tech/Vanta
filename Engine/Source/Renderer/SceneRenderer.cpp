@@ -66,6 +66,7 @@ namespace Vanta {
 			shadowMapFramebufferSpec.ClearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 			shadowMapFramebufferSpec.NoResize = true;
 			shadowMapFramebufferSpec.ExistingImage = cascadedDepthImage;
+			shadowMapFramebufferSpec.DebugName = "Shadow Map";
 
 			// 4 cascades
 			for (int i = 0; i < 4; i++)
@@ -94,13 +95,14 @@ namespace Vanta {
 			m_ShadowPassPipeline = Pipeline::Create(pipelineSpec);
 			m_ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
 		}
-		
+
 		// Geometry
 		{
 			FramebufferSpecification geoFramebufferSpec;
 			geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::RGBA32F, ImageFormat::Depth };
 			geoFramebufferSpec.Samples = 1;
 			geoFramebufferSpec.ClearColor = { 0.1f, 0.5f, 0.1f, 1.0f };
+			geoFramebufferSpec.DebugName = "Geometry";
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(geoFramebufferSpec);
 
@@ -196,6 +198,7 @@ namespace Vanta {
 			extCompFramebufferSpec.Attachments = { ImageFormat::RGBA, ImageFormat::Depth };
 			extCompFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 			extCompFramebufferSpec.ClearOnLoad = false;
+			extCompFramebufferSpec.DebugName = "External Composite";
 			
 			// Use the color buffer from the final compositing pass, but the depth buffer from
 			// the actual 3D geometry pass, incase we want to composite elements behind meshes
@@ -290,7 +293,7 @@ namespace Vanta {
 		}
 
 		m_WireframeMaterial = Material::Create(Renderer::GetShaderLibrary()->Get("Wireframe"));
-		m_WireframeMaterial->Set("u_MaterialUniforms.Color", { 1.0f, 0.5f, 0.0f, 1.0f });
+		m_WireframeMaterial->Set("u_MaterialUniforms.Color", glm::vec4{ 1.0f, 0.5f, 0.0f, 1.0f });
 
 		// Skybox
 		{
@@ -312,9 +315,9 @@ namespace Vanta {
 
 		Ref<SceneRenderer> instance = this;
 		Renderer::Submit([instance]() mutable
-		{
-			instance->m_ResourcesCreated = true;
-		});
+			{
+				instance->m_ResourcesCreated = true;
+			});
 	}
 
 	void SceneRenderer::SetScene(Ref<Scene> scene)
@@ -332,15 +335,15 @@ namespace Vanta {
 			m_NeedsResize = true;
 		}
 	}
-	
-	void SceneRenderer::CalculateCascades(SceneRenderer::CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection)
+
+	void SceneRenderer::CalculateCascades(CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection) const
 	{
 		struct FrustumBounds
 		{
 			float r, l, b, t, f, n;
 		};
 
-		FrustumBounds frustumBounds[3];
+		//FrustumBounds frustumBounds[3];
 
 		auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * sceneCamera.ViewMatrix;
 
@@ -476,6 +479,8 @@ namespace Vanta {
 
 		if (m_NeedsResize)
 		{
+			m_NeedsResize = false;
+
 			m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 
@@ -487,8 +492,6 @@ namespace Vanta {
 
 			if (m_Specification.SwapChainTarget)
 				m_CommandBuffer = RenderCommandBuffer::CreateFromSwapChain("SceneRenderer");
-
-			m_NeedsResize = false;
 		}
 
 		// Update uniform buffers
@@ -504,13 +507,14 @@ namespace Vanta {
 		auto inverseVP = glm::inverse(viewProjection);
 		cameraData.ViewProjection = viewProjection;
 		cameraData.InverseViewProjection = inverseVP;
+		cameraData.Projection = sceneCamera.Camera.GetProjectionMatrix();
 		cameraData.View = sceneCamera.ViewMatrix;
 		Ref<SceneRenderer> instance = this;
 		Renderer::Submit([instance, cameraData]() mutable
-		{
-			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-			instance->m_UniformBufferSet->Get(0, 0, bufferIndex)->RT_SetData(&cameraData, sizeof(cameraData));
-		});
+			{
+				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+				instance->m_UniformBufferSet->Get(0, 0, bufferIndex)->RT_SetData(&cameraData, sizeof(cameraData));
+			});
 
 		const auto& directionalLight = m_SceneData.SceneLightEnvironment.DirectionalLights[0];
 		sceneData.lights.Direction = directionalLight.Direction;
@@ -519,11 +523,11 @@ namespace Vanta {
 		sceneData.u_CameraPosition = cameraPosition;
 		sceneData.EnvironmentMapIntensity = m_SceneData.SceneEnvironmentIntensity;
 		Renderer::Submit([instance, sceneData]() mutable
-		{
-			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-			instance->m_UniformBufferSet->Get(2, 0, bufferIndex)->RT_SetData(&sceneData, sizeof(sceneData));
-		});
-		
+			{
+				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+				instance->m_UniformBufferSet->Get(2, 0, bufferIndex)->RT_SetData(&sceneData, sizeof(sceneData));
+			});
+
 		CascadeData cascades[4];
 		CalculateCascades(cascades, sceneCamera, directionalLight.Direction);
 
@@ -534,17 +538,17 @@ namespace Vanta {
 			shadowData.ViewProjection[i] = cascades[i].ViewProj;
 		}
 		Renderer::Submit([instance, shadowData]() mutable
-		{
-			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-			instance->m_UniformBufferSet->Get(1, 0, bufferIndex)->RT_SetData(&shadowData, sizeof(shadowData));
-		});
+			{
+				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+				instance->m_UniformBufferSet->Get(1, 0, bufferIndex)->RT_SetData(&shadowData, sizeof(shadowData));
+			});
 
-		rendererData.u_CascadeSplits = CascadeSplits;
+		rendererData.CascadeSplits = CascadeSplits;
 		Renderer::Submit([instance, rendererData]() mutable
-		{
-			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-			instance->m_UniformBufferSet->Get(3, 0, bufferIndex)->RT_SetData(&rendererData, sizeof(rendererData));
-		});
+			{
+				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+				instance->m_UniformBufferSet->Get(3, 0, bufferIndex)->RT_SetData(&rendererData, sizeof(rendererData));
+			});
 
 		Renderer::SetSceneEnvironment(this, m_SceneData.SceneEnvironment, m_ShadowPassPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage());
 	}
@@ -557,15 +561,15 @@ namespace Vanta {
 #if MULTI_THREAD
 		Ref<SceneRenderer> instance = this;
 		s_ThreadPool.emplace_back(([instance]() mutable
-		{
-			instance->FlushDrawList();
-		}));
+			{
+				instance->FlushDrawList();
+	}));
 #else 
 		FlushDrawList();
 #endif
 
 		m_Active = false;
-	}
+}
 
 	void SceneRenderer::WaitForThreads()
 	{
@@ -610,18 +614,18 @@ namespace Vanta {
 			Renderer::BeginRenderPass(m_CommandBuffer, ShadowMapRenderPass[i]);
 
 			// static glm::mat4 scaleBiasMatrix = glm::scale(glm::mat4(1.0f), { 0.5f, 0.5f, 0.5f }) * glm::translate(glm::mat4(1.0f), { 1, 1, 1 });
-			
+
 			// Render entities
 			Buffer cascade(&i, sizeof(uint32_t));
 			for (auto& dc : m_ShadowPassDrawList)
 			{
-				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_ShadowPassPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform, m_ShadowPassMaterial, cascade);
+				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_ShadowPassPipeline, m_UniformBufferSet, nullptr, dc.Mesh, dc.Transform, m_ShadowPassMaterial, cascade);
 			}
 
 			Renderer::EndRenderPass(m_CommandBuffer);
 		}
 	}
-	
+
 	void SceneRenderer::GeometryPass()
 	{
 		VA_PROFILE_FUNC();
@@ -629,7 +633,7 @@ namespace Vanta {
 		Renderer::BeginRenderPass(m_CommandBuffer, m_SelectedGeometryPipeline->GetSpecification().RenderPass);
 		for (auto& dc : m_SelectedMeshDrawList)
 		{
-			Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_SelectedGeometryPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform, m_SelectedGeometryMaterial);
+			Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_SelectedGeometryPipeline, m_UniformBufferSet, nullptr, dc.Mesh, dc.Transform, m_SelectedGeometryMaterial);
 		}
 		Renderer::EndRenderPass(m_CommandBuffer);
 
@@ -640,24 +644,24 @@ namespace Vanta {
 
 		Ref<TextureCube> radianceMap = m_SceneData.SceneEnvironment ? m_SceneData.SceneEnvironment->RadianceMap : Renderer::GetBlackCubeTexture();
 		m_SkyboxMaterial->Set("u_Texture", radianceMap);
-		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_SkyboxPipeline, m_UniformBufferSet, m_SkyboxMaterial);
+		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_SkyboxPipeline, m_UniformBufferSet, nullptr, m_SkyboxMaterial);
 
 		// Render entities
 		for (auto& dc : m_DrawList)
-			Renderer::RenderMesh(m_CommandBuffer, m_GeometryPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform);
+			Renderer::RenderMesh(m_CommandBuffer, m_GeometryPipeline, m_UniformBufferSet, m_StorageBufferSet, dc.Mesh, dc.Transform);
 
 		for (auto& dc : m_SelectedMeshDrawList)
 		{
-			Renderer::RenderMesh(m_CommandBuffer, m_GeometryPipeline, m_UniformBufferSet, dc.Mesh, dc.Transform);
+			Renderer::RenderMesh(m_CommandBuffer, m_GeometryPipeline, m_UniformBufferSet, m_StorageBufferSet, dc.Mesh, dc.Transform);
 			if (m_Options.ShowSelectedInWireframe)
-				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_GeometryWireframePipeline, m_UniformBufferSet, dc.Mesh, dc.Transform, m_WireframeMaterial);
+				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_GeometryWireframePipeline, m_UniformBufferSet, nullptr, dc.Mesh, dc.Transform, m_WireframeMaterial);
 		}
 
 		// Grid
 		if (GetOptions().ShowGrid)
 		{
 			const glm::mat4 transform = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(8.0f));
-			Renderer::RenderQuad(m_CommandBuffer, m_GridPipeline, m_UniformBufferSet, m_GridMaterial, transform);
+			Renderer::RenderQuad(m_CommandBuffer, m_GridPipeline, m_UniformBufferSet, nullptr, m_GridMaterial, transform);
 		}
 
 		if (GetOptions().ShowBoundingBoxes)
@@ -668,7 +672,7 @@ namespace Vanta {
 				Renderer::DrawAABB(dc.Mesh, dc.Transform);
 			Renderer2D::EndScene();
 #endif
-		}
+	}
 
 		Renderer::EndRenderPass(m_CommandBuffer);
 	}
@@ -859,19 +863,25 @@ namespace Vanta {
 			}
 			ImGui::TreePop();
 		}
+		if (UI::BeginTreeNode("Visualization"))
+		{
+			UI::BeginPropertyGrid();
+			UI::Property("Show Shadow Cascades", RendererDataUB.ShowCascades);
+			UI::EndPropertyGrid();
+			UI::EndTreeNode();
+		}
 
 		if (UI::BeginTreeNode("Shadows"))
 		{
 			UI::BeginPropertyGrid();
 			UI::Property("Soft Shadows", RendererDataUB.SoftShadows);
-			UI::Property("Light Size", RendererDataUB.LightSize, 0.01f);
+			UI::Property("DirLight Size", RendererDataUB.LightSize, 0.01f);
 			UI::Property("Max Shadow Distance", RendererDataUB.MaxShadowDistance, 1.0f);
 			UI::Property("Shadow Fade", RendererDataUB.ShadowFade, 5.0f);
 			UI::EndPropertyGrid();
 			if (UI::BeginTreeNode("Cascade Settings"))
 			{
 				UI::BeginPropertyGrid();
-				UI::Property("Show Cascades", RendererDataUB.ShowCascades);
 				UI::Property("Cascade Fading", RendererDataUB.CascadeFading);
 				UI::Property("Cascade Transition Fade", RendererDataUB.CascadeTransitionFade, 0.05f, 0.0f, FLT_MAX);
 				UI::Property("Cascade Split", CascadeSplitLambda, 0.01f);
@@ -913,7 +923,7 @@ namespace Vanta {
 			float h = w / ((float)fb->GetWidth() / (float)fb->GetHeight());
 			ImGui::Image((ImTextureID)id, { w, h }, { 0, 1 }, { 1, 0 });
 			UI::EndTreeNode();
-		}
+	}
 #endif
 
 		ImGui::End();

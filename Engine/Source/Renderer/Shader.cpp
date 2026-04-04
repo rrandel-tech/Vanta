@@ -1,6 +1,8 @@
 #include "vapch.hpp"
 #include "Shader.hpp"
 
+#include <utility>
+
 #include "Renderer/Renderer.hpp"
 #include "Renderer/Backend/OpenGL/OpenGLShader.hpp"
 #include "Renderer/Backend/Vulkan/VulkanShader.hpp"
@@ -10,6 +12,8 @@
 namespace Vanta {
 
 	std::vector<Ref<Shader>> Shader::s_AllShaders;
+
+	
 
 	Ref<Shader> Shader::Create(const std::string& filepath, bool forceCompile)
 	{
@@ -77,27 +81,27 @@ namespace Vanta {
 		return m_Shaders.at(name);
 	}
 
-	ShaderUniform::ShaderUniform(const std::string& name, ShaderUniformType type, uint32_t size, uint32_t offset)
-		: m_Name(name), m_Type(type), m_Size(size), m_Offset(offset)
+	ShaderUniform::ShaderUniform(std::string name, const ShaderUniformType type, const uint32_t size, const uint32_t offset)
+		: m_Name(std::move(name)), m_Type(type), m_Size(size), m_Offset(offset)
 	{
 	}
 
-	const std::string& ShaderUniform::UniformTypeToString(ShaderUniformType type)
+	const std::string& ShaderUniform::UniformTypeToString(const ShaderUniformType type)
 	{
 		if (type == ShaderUniformType::Bool)
 		{
-			return "Boolean";
+			return std::string("Boolean");
 		}
 		else if (type == ShaderUniformType::Int)
 		{
-			return "Int";
+			return std::string("Int");
 		}
 		else if (type == ShaderUniformType::Float)
 		{
-			return "Float";
+			return std::string("Float");
 		}
 
-		return "None";
+		return std::string("None");
 	}
 
 }

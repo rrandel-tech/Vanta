@@ -56,12 +56,9 @@ namespace Vanta {
 		}
 
 		VA_CORE_ASSERT(spec.Attachments.Attachments.size());
-		Resize(m_Width * spec.Scale, m_Height * spec.Scale, true);
+		Resize((uint32_t)((float)(m_Width) * spec.Scale), (uint32_t)((float)m_Height * spec.Scale), true);
 	}
 
-	VulkanFramebuffer::~VulkanFramebuffer()
-	{
-	}
 
 	void VulkanFramebuffer::Resize(uint32_t width, uint32_t height, bool forceRecreate)
 	{
@@ -103,7 +100,7 @@ namespace Vanta {
 
 	void VulkanFramebuffer::RT_Invalidate()
 	{
-		VA_CORE_TRACE("VulkanFramebuffer::RT_Invalidate");
+		VA_CORE_TRACE("VulkanFramebuffer::RT_Invalidate ({})", m_Specification.DebugName);
 
 		auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -132,7 +129,7 @@ namespace Vanta {
 				if (m_DepthAttachmentImage)
 				{
 					// Do we own the depth image?
-					if (m_Specification.ExistingImages.find(m_Specification.Attachments.Attachments.size() - 1) == m_Specification.ExistingImages.end())
+					if (m_Specification.ExistingImages.find((uint32_t)m_Specification.Attachments.Attachments.size() - 1) == m_Specification.ExistingImages.end())
 						m_DepthAttachmentImage->Release();
 				}
 
@@ -149,6 +146,7 @@ namespace Vanta {
 		m_ClearValues.resize(m_Specification.Attachments.Attachments.size());
 
 		bool createImages = m_AttachmentImages.empty();
+		bool createDepthImage = !(bool)m_DepthAttachmentImage;
 
 		if (m_Specification.ExistingFramebuffer)
 			m_AttachmentImages.clear();
@@ -175,17 +173,6 @@ namespace Vanta {
 				}
 				else
 				{
-					if (createImages)
-					{
-						ImageSpecification spec;
-						spec.Format = attachmentSpec.Format;
-						spec.Usage = ImageUsage::Attachment;
-						spec.Width = m_Width;
-						spec.Height = m_Height;
-						m_DepthAttachmentImage = Image2D::Create(spec);
-						VA_CORE_VERIFY(false);
-					}
-
 					Ref<VulkanImage2D> depthAttachmentImage = m_DepthAttachmentImage.As<VulkanImage2D>();
 					auto& spec = depthAttachmentImage->GetSpecification();
 					spec.Width = m_Width;
@@ -280,7 +267,7 @@ namespace Vanta {
 
 		VkSubpassDescription subpassDescription = {};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDescription.colorAttachmentCount = colorAttachmentReferences.size();
+		subpassDescription.colorAttachmentCount = uint32_t(colorAttachmentReferences.size());
 		subpassDescription.pColorAttachments = colorAttachmentReferences.data();
 		if (m_DepthAttachmentImage)
 			subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
@@ -376,7 +363,7 @@ namespace Vanta {
 		VkFramebufferCreateInfo framebufferCreateInfo = {};
 		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebufferCreateInfo.renderPass = m_RenderPass;
-		framebufferCreateInfo.attachmentCount = attachments.size();
+		framebufferCreateInfo.attachmentCount = uint32_t(attachments.size());
 		framebufferCreateInfo.pAttachments = attachments.data();
 		framebufferCreateInfo.width = m_Width;
 		framebufferCreateInfo.height = m_Height;

@@ -2,9 +2,7 @@
 
 #include "Renderer/Renderer.hpp"
 
-#include "Vulkan.hpp"
 #include "VulkanDevice.hpp"
-#include "VulkanAllocator.hpp"
 #include "VulkanSwapChain.hpp"
 
 struct SDL_Window;

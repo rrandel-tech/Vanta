@@ -83,7 +83,7 @@ namespace Vanta {
 			void* dstBuffer = allocator.MapMemory<void>(bufferAlloc);
 			memcpy(dstBuffer, instance->m_LocalData.Data, instance->m_Size);
 			allocator.UnmapMemory(bufferAlloc);
-
+			
 #endif
 		});
 	}
@@ -98,6 +98,7 @@ namespace Vanta {
 			allocator.DestroyBuffer(buffer, allocation);
 		});
 	}
+
 
 	void VulkanVertexBuffer::SetData(void* buffer, uint32_t size, uint32_t offset)
 	{
@@ -119,3 +120,4 @@ namespace Vanta {
 	}
 
 }
+

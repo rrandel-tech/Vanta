@@ -173,7 +173,7 @@ namespace Vanta {
 
 				if (m_ShowBoundingBoxes)
 				{
-					Renderer2D::BeginScene(m_EditorCamera.GetViewProjection());
+					// Renderer2D::BeginScene(m_EditorCamera.GetViewProjection());
 					if (m_ShowBoundingBoxSelectedMeshOnly)
 					{
 						if (m_SelectionContext.size())

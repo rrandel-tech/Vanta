@@ -61,9 +61,9 @@ namespace Vanta {
 		// This function currently returns the expected number of mips based on image size,
 		// not present mips in data
 		virtual uint32_t GetMipLevelCount() const override;
-
+#if NEEDED
 		virtual const std::string& GetPath() const override { return m_FilePath; }
-
+#endif
 		RendererID GetRendererID() const { return m_RendererID; }
 
 		virtual uint64_t GetHash() const { return (uint64_t)m_RendererID; }

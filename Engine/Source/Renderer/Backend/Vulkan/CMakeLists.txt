@@ -15,6 +15,7 @@ set(VULKAN_SOURCES
 		VulkanRenderer.cpp
 		VulkanRenderPass.cpp
 		VulkanShader.cpp
+		VulkanStorageBuffer.cpp
 		VulkanSwapChain.cpp
 		VulkanTexture.cpp
 		VulkanUniformBuffer.cpp
@@ -38,6 +39,8 @@ set(VULKAN_HEADERS
 		VulkanRenderer.hpp
 		VulkanRenderPass.hpp
 		VulkanShader.hpp
+		VulkanStorageBuffer.hpp
+		VulkanStorageBufferSet.hpp
 		VulkanSwapChain.hpp
 		VulkanTexture.hpp
 		VulkanUniformBuffer.hpp

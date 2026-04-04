@@ -179,7 +179,7 @@ namespace Vanta {
 
 				// Create color attachments
 				for (size_t i = 0; i < instance->m_ColorAttachments.size(); i++)
-					instance->m_ColorAttachments[i] = Utils::CreateAndAttachColorAttachment(instance->m_Specification.Samples, instance->m_ColorAttachmentFormats[i], instance->m_Width, instance->m_Height, i);
+					instance->m_ColorAttachments[i] = Utils::CreateAndAttachColorAttachment(instance->m_Specification.Samples, instance->m_ColorAttachmentFormats[i], instance->m_Width, instance->m_Height, int(i));
 			}
 
 			if (instance->m_DepthAttachmentFormat != ImageFormat::None)
@@ -191,7 +191,7 @@ namespace Vanta {
 			{
 				VA_CORE_ASSERT(instance->m_ColorAttachments.size() <= 4);
 				GLenum buffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-				glDrawBuffers(instance->m_ColorAttachments.size(), buffers);
+				glDrawBuffers(int(instance->m_ColorAttachments.size()), buffers);
 			}
 			else if (instance->m_ColorAttachments.empty())
 			{

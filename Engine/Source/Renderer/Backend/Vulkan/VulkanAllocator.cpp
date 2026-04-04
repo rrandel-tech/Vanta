@@ -61,7 +61,7 @@ namespace Vanta {
 		vmaCreateBuffer(s_Data->Allocator, &bufferCreateInfo, &allocCreateInfo, &outBuffer, &allocation, nullptr);
 
 		// TODO: Tracking
-		VmaAllocationInfo allocInfo;
+		VmaAllocationInfo allocInfo{};
 		vmaGetAllocationInfo(s_Data->Allocator, allocation, &allocInfo);
 		VA_ALLOCATOR_LOG("VulkanAllocator ({0}): allocating buffer; size = {1}", m_Tag, Utils::BytesToString(allocInfo.size));
 

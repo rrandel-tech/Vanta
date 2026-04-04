@@ -1,27 +1,27 @@
 #pragma once
 
-#include "Renderer/UniformBuffer.hpp"
 
+#include "Renderer/StorageBuffer.hpp"
 #include "VulkanAllocator.hpp"
 
 namespace Vanta {
 
-	class VulkanUniformBuffer : public UniformBuffer
+	class VulkanStorageBuffer : public StorageBuffer
 	{
 	public:
-		VulkanUniformBuffer(uint32_t size, uint32_t binding);
-		virtual ~VulkanUniformBuffer();
+		VulkanStorageBuffer(uint32_t size, uint32_t binding);
 
 		virtual void SetData(const void* data, uint32_t size, uint32_t offset = 0) override;
 		virtual void RT_SetData(const void* data, uint32_t size, uint32_t offset = 0) override;
 		virtual uint32_t GetBinding() const override { return m_Binding; }
+		virtual void Resize(uint32_t newSize) override;
 
 		const VkDescriptorBufferInfo& GetDescriptorBufferInfo() const { return m_DescriptorInfo; }
 	private:
 		void RT_Invalidate();
 	private:
 		VmaAllocation m_MemoryAlloc = nullptr;
-		VkBuffer m_Buffer;
+		VkBuffer m_Buffer {};
 		VkDescriptorBufferInfo m_DescriptorInfo{};
 		uint32_t m_Size = 0;
 		uint32_t m_Binding = 0;

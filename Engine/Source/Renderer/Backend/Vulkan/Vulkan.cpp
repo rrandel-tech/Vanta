@@ -23,6 +23,7 @@ namespace Vanta::Utils {
 		if (!supported)
 			return;
 
+
 		{
 			const uint32_t checkpointCount = 4;
 			VkCheckpointDataNV data[checkpointCount];
@@ -53,7 +54,7 @@ namespace Vanta::Utils {
 				VA_CORE_ERROR("Checkpoint: {0} (stage: {1})", checkpoint->Data, StageToString(data[i].stage));
 			}
 		}
-		// __debugbreak();
+		//__debugbreak();
 	}
 
 }

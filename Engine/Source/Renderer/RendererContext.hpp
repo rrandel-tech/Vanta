@@ -2,7 +2,7 @@
 
 #include "Core/Ref.hpp"
 
-struct SDL_Window;
+struct GLFWwindow;
 
 namespace Vanta {
 

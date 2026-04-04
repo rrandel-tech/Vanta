@@ -18,6 +18,10 @@ namespace Vanta {
 		virtual void Set(const std::string& name, int value) override;
 		virtual void Set(const std::string& name, uint32_t value) override;
 		virtual void Set(const std::string& name, bool value) override;
+		virtual void Set(const std::string& name, const glm::ivec2& value) override;
+		virtual void Set(const std::string& name, const glm::ivec3& value) override;
+		virtual void Set(const std::string& name, const glm::ivec4& value) override;
+
 		virtual void Set(const std::string& name, const glm::vec2& value) override;
 		virtual void Set(const std::string& name, const glm::vec3& value) override;
 		virtual void Set(const std::string& name, const glm::vec4& value) override;
@@ -25,6 +29,7 @@ namespace Vanta {
 		virtual void Set(const std::string& name, const glm::mat4& value) override;
 
 		virtual void Set(const std::string& name, const Ref<Texture2D>& texture) override;
+		virtual void Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex) override {}
 		virtual void Set(const std::string& name, const Ref<TextureCube>& texture) override;
 		virtual void Set(const std::string& name, const Ref<Image2D>& image) override;
 

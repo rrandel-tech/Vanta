@@ -131,6 +131,43 @@ namespace Vanta {
 		InvalidateDescriptorSets();
 	}
 
+	void VulkanMaterial::SetVulkanDescriptor(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex)
+	{
+		const ShaderResourceDeclaration* resource = FindResourceDeclaration(name);
+		VA_CORE_ASSERT(resource);
+
+		uint32_t binding = resource->GetRegister();
+		// Texture is already set
+		if (binding < m_TextureArrays.size() && m_TextureArrays[binding].size() < arrayIndex && texture->GetHash() == m_TextureArrays[binding][arrayIndex]->GetHash())
+			return;
+
+		if (binding >= m_TextureArrays.size())
+			m_TextureArrays.resize(binding + 1);
+
+		if (arrayIndex >= m_TextureArrays[binding].size())
+			m_TextureArrays[binding].resize(arrayIndex + 1);
+
+		m_TextureArrays[binding][arrayIndex] = texture;
+
+		const VkWriteDescriptorSet* wds = m_Shader.As<VulkanShader>()->GetDescriptorSet(name);
+		VA_CORE_ASSERT(wds);
+		if (m_ResidentDescriptorArrays.find(binding) == m_ResidentDescriptorArrays.end())
+		{
+			m_ResidentDescriptorArrays[binding] = std::make_shared<PendingDescriptorArray>(PendingDescriptorArray{ PendingDescriptorType::Texture2D, *wds, {}, {}, {} });
+		}
+
+		auto& residentDesriptorArray = m_ResidentDescriptorArrays.at(binding);
+		if (arrayIndex >= residentDesriptorArray->Textures.size())
+			residentDesriptorArray->Textures.resize(arrayIndex + 1);
+
+		residentDesriptorArray->Textures[arrayIndex] = texture;
+
+		//m_PendingDescriptors.push_back(m_ResidentDescriptors.at(binding));
+
+		InvalidateDescriptorSets();
+	}
+
+
 	void VulkanMaterial::SetVulkanDescriptor(const std::string& name, const Ref<TextureCube>& texture)
 	{
 		const ShaderResourceDeclaration* resource = FindResourceDeclaration(name);
@@ -199,6 +236,21 @@ namespace Vanta {
 		Set<int>(name, (int)value);
 	}
 
+	void VulkanMaterial::Set(const std::string& name, const glm::ivec2& value)
+	{
+		Set<glm::ivec2>(name, value);
+	}
+
+	void VulkanMaterial::Set(const std::string& name, const glm::ivec3& value)
+	{
+		Set<glm::ivec3>(name, value);
+	}
+
+	void VulkanMaterial::Set(const std::string& name, const glm::ivec4& value)
+	{
+		Set<glm::ivec4>(name, value);
+	}
+	
 	void VulkanMaterial::Set(const std::string& name, const glm::vec2& value)
 	{
 		Set<glm::vec2>(name, value);
@@ -227,6 +279,11 @@ namespace Vanta {
 	void VulkanMaterial::Set(const std::string& name, const Ref<Texture2D>& texture)
 	{
 		SetVulkanDescriptor(name, texture);
+	}
+
+	void VulkanMaterial::Set(const std::string& name, const Ref<Texture2D>& texture, uint32_t arrayIndex)
+	{
+		SetVulkanDescriptor(name, texture, arrayIndex);
 	}
 
 	void VulkanMaterial::Set(const std::string& name, const Ref<TextureCube>& texture)
@@ -323,6 +380,8 @@ namespace Vanta {
 			}
 		}
 
+		std::vector<VkDescriptorImageInfo> arrayImageInfos;
+
 		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		// NOTE: we can't cache the results atm because we might render the same material in different viewports,
 		//            and so we can't bind to the same uniform buffers
@@ -361,6 +420,21 @@ namespace Vanta {
 				m_WriteDescriptors[frameIndex].push_back(pd->WDS);
 			}
 
+			for (auto&& [binding, pd] : m_ResidentDescriptorArrays)
+			{
+				if (pd->Type == PendingDescriptorType::Texture2D)
+				{
+					for (auto tex : pd->Textures)
+					{
+						Ref<VulkanTexture2D> texture = tex.As<VulkanTexture2D>();
+						arrayImageInfos.emplace_back(texture->GetVulkanDescriptorInfo());
+					}
+				}
+				pd->WDS.pImageInfo = arrayImageInfos.data();
+				pd->WDS.descriptorCount = arrayImageInfos.size();
+				m_WriteDescriptors[frameIndex].push_back(pd->WDS);
+			}
+
 		}
 
 		auto vulkanShader = m_Shader.As<VulkanShader>();
@@ -369,14 +443,14 @@ namespace Vanta {
 		for (auto& writeDescriptor : m_WriteDescriptors[frameIndex])
 			writeDescriptor.dstSet = descriptorSet.DescriptorSets[0];
 
-		vkUpdateDescriptorSets(vulkanDevice, m_WriteDescriptors[frameIndex].size(), m_WriteDescriptors[frameIndex].data(), 0, nullptr);
+		vkUpdateDescriptorSets(vulkanDevice, (uint32_t)m_WriteDescriptors[frameIndex].size(), m_WriteDescriptors[frameIndex].data(), 0, nullptr);
 		m_PendingDescriptors.clear();
 	}
 
 	void VulkanMaterial::InvalidateDescriptorSets()
 	{
-		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
-		for (int i = 0; i < framesInFlight; i++)
+		const uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+		for (uint32_t i = 0; i < framesInFlight; i++)
 			m_DirtyDescriptorSets[i] = true;
 	}
 

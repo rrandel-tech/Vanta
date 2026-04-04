@@ -16,12 +16,12 @@ namespace Vanta {
 		{
 			switch (topology)
 			{
-				case PrimitiveTopology::Points:			return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-				case PrimitiveTopology::Lines:			return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-				case PrimitiveTopology::Triangles:		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-				case PrimitiveTopology::LineStrip:		return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-				case PrimitiveTopology::TriangleStrip:	return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-				case PrimitiveTopology::TriangleFan:	return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+			case PrimitiveTopology::Points:			return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+			case PrimitiveTopology::Lines:			return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+			case PrimitiveTopology::Triangles:		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			case PrimitiveTopology::LineStrip:		return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+			case PrimitiveTopology::TriangleStrip:	return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+			case PrimitiveTopology::TriangleFan:	return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 			}
 
 			VA_CORE_ASSERT(false, "Unknown toplogy");
@@ -33,10 +33,10 @@ namespace Vanta {
 	{
 		switch (type)
 		{
-			case ShaderDataType::Float:     return VK_FORMAT_R32_SFLOAT;
-			case ShaderDataType::Float2:    return VK_FORMAT_R32G32_SFLOAT;
-			case ShaderDataType::Float3:    return VK_FORMAT_R32G32B32_SFLOAT;
-			case ShaderDataType::Float4:    return VK_FORMAT_R32G32B32A32_SFLOAT;
+		case ShaderDataType::Float:     return VK_FORMAT_R32_SFLOAT;
+		case ShaderDataType::Float2:    return VK_FORMAT_R32G32_SFLOAT;
+		case ShaderDataType::Float3:    return VK_FORMAT_R32G32B32_SFLOAT;
+		case ShaderDataType::Float4:    return VK_FORMAT_R32G32B32A32_SFLOAT;
 		}
 		VA_CORE_ASSERT(false);
 		return VK_FORMAT_UNDEFINED;
@@ -246,76 +246,145 @@ namespace Vanta {
 				vertexInputAttributs[location].format = ShaderDataTypeToVulkanFormat(element.Type);
 				vertexInputAttributs[location].offset = element.Offset;
 
-				location++;
-			}
+				VkPipelineColorBlendStateCreateInfo colorBlendState = {};
+				colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+				colorBlendState.attachmentCount = (uint32_t)blendAttachmentStates.size();
+				colorBlendState.pAttachments = blendAttachmentStates.data();
 
-			// Vertex input state used for pipeline creation
-			VkPipelineVertexInputStateCreateInfo vertexInputState = {};
-			vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-			vertexInputState.vertexBindingDescriptionCount = 1;
-			vertexInputState.pVertexBindingDescriptions = &vertexInputBinding;
-			vertexInputState.vertexAttributeDescriptionCount = vertexInputAttributs.size();
-			vertexInputState.pVertexAttributeDescriptions = vertexInputAttributs.data();
+				// Viewport state sets the number of viewports and scissor used in this pipeline
+				// Note: This is actually overriden by the dynamic states (see below)
+				VkPipelineViewportStateCreateInfo viewportState = {};
+				viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+				viewportState.viewportCount = 1;
+				viewportState.scissorCount = 1;
 
-			const auto& shaderStages = vulkanShader->GetPipelineShaderStageCreateInfos();
+				// Enable dynamic states
+				// Most states are baked into the pipeline, but there are still a few dynamic states that can be changed within a command buffer
+				// To be able to change these we need do specify which dynamic states will be changed using this pipeline. Their actual states are set later on in the command buffer.
+				// For this example we will set the viewport and scissor using dynamic states
+				std::vector<VkDynamicState> dynamicStateEnables;
+				dynamicStateEnables.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+				dynamicStateEnables.push_back(VK_DYNAMIC_STATE_SCISSOR);
+				if (instance->m_Specification.Topology == PrimitiveTopology::Lines || instance->m_Specification.Topology == PrimitiveTopology::LineStrip || instance->m_Specification.Wireframe)
+					dynamicStateEnables.push_back(VK_DYNAMIC_STATE_LINE_WIDTH);
 
-			// Set pipeline shader stage info
-			pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
-			pipelineCreateInfo.pStages = shaderStages.data();
+				VkPipelineDynamicStateCreateInfo dynamicState = {};
+				dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+				dynamicState.pDynamicStates = dynamicStateEnables.data();
+				dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStateEnables.size());
 
-			// Assign the pipeline states to the pipeline creation info structure
-			pipelineCreateInfo.pVertexInputState = &vertexInputState;
-			pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
-			pipelineCreateInfo.pRasterizationState = &rasterizationState;
-			pipelineCreateInfo.pColorBlendState = &colorBlendState;
-			pipelineCreateInfo.pMultisampleState = &multisampleState;
-			pipelineCreateInfo.pViewportState = &viewportState;
-			pipelineCreateInfo.pDepthStencilState = &depthStencilState;
-			pipelineCreateInfo.renderPass = framebuffer->GetRenderPass();
-			pipelineCreateInfo.pDynamicState = &dynamicState;
+				// Depth and stencil state containing depth and stencil compare and test operations
+				// We only use depth tests and want depth tests and writes to be enabled and compare with less or equal
+				VkPipelineDepthStencilStateCreateInfo depthStencilState = {};
+				depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+				depthStencilState.depthTestEnable = instance->m_Specification.DepthTest ? VK_TRUE : VK_FALSE;
+				depthStencilState.depthWriteEnable = instance->m_Specification.DepthWrite ? VK_TRUE : VK_FALSE;
+				depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+				depthStencilState.depthBoundsTestEnable = VK_FALSE;
+				depthStencilState.back.failOp = VK_STENCIL_OP_KEEP;
+				depthStencilState.back.passOp = VK_STENCIL_OP_KEEP;
+				depthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
+				depthStencilState.stencilTestEnable = VK_FALSE;
+				depthStencilState.front = depthStencilState.back;
 
-			// What is this pipeline cache?
-			VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
-			pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-			VkPipelineCache pipelineCache;
-			VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
+				// Multi sampling state
+				// This example does not make use fo multi sampling (for anti-aliasing), the state must still be set and passed to the pipeline
+				VkPipelineMultisampleStateCreateInfo multisampleState = {};
+				multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+				multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+				multisampleState.pSampleMask = nullptr;
 
-			// Create rendering pipeline using the specified states
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &instance->m_VulkanPipeline));
+				// Vertex input descriptor
 
-			// Shader modules are no longer needed once the graphics pipeline has been created
-			// vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
-			// vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+				VertexBufferLayout& layout = instance->m_Specification.Layout;
 
-			// instance->m_DescriptorSets = vulkanShader->AllocateDescriptorSets();
+				VkVertexInputBindingDescription vertexInputBinding = {};
+				vertexInputBinding.binding = 0;
+				vertexInputBinding.stride = layout.GetStride();
+				vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-#if OLD
-			const auto& shaderDescriptorSets = vulkanShader->GetShaderDescriptorSets();
-			if (!shaderDescriptorSets.empty())
-			{
-				// Write default descriptor set... this overlaps materials somewhat, definitely requires more thought
-				instance->m_DescriptorSet = vulkanShader->CreateDescriptorSets();
-				std::vector<VkWriteDescriptorSet> writeDescriptors;
+				// Inpute attribute bindings describe shader attribute locations and memory layouts
+				std::vector<VkVertexInputAttributeDescription> vertexInputAttributs(layout.GetElementCount());
 
-				for (auto&& [set, shaderDescriptorSet] : shaderDescriptorSets)
+				uint32_t location = 0;
+				for (auto element : layout)
 				{
-					for (auto&& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
-					{
-						VkWriteDescriptorSet writeDescriptorSet = {};
-						writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-						writeDescriptorSet.descriptorCount = 1;
-						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-						writeDescriptorSet.pBufferInfo = &uniformBuffer->Descriptor;
-						writeDescriptorSet.dstBinding = binding;
-						writeDescriptorSet.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
-						writeDescriptors.push_back(writeDescriptorSet);
-					}
+					vertexInputAttributs[location].binding = 0;
+					vertexInputAttributs[location].location = location;
+					vertexInputAttributs[location].format = ShaderDataTypeToVulkanFormat(element.Type);
+					vertexInputAttributs[location].offset = element.Offset;
+
+					location++;
 				}
 
-				VA_CORE_WARN("VulkanPipeline - Updating {0} descriptor sets", writeDescriptors.size());
-				vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
-			}
+				// Vertex input state used for pipeline creation
+				VkPipelineVertexInputStateCreateInfo vertexInputState = {};
+				vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+				vertexInputState.vertexBindingDescriptionCount = 1;
+				vertexInputState.pVertexBindingDescriptions = &vertexInputBinding;
+				vertexInputState.vertexAttributeDescriptionCount = (uint32_t)vertexInputAttributs.size();
+				vertexInputState.pVertexAttributeDescriptions = vertexInputAttributs.data();
+
+				const auto& shaderStages = vulkanShader->GetPipelineShaderStageCreateInfos();
+
+				// Set pipeline shader stage info
+				pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+				pipelineCreateInfo.pStages = shaderStages.data();
+
+				// Assign the pipeline states to the pipeline creation info structure
+				pipelineCreateInfo.pVertexInputState = &vertexInputState;
+				pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+				pipelineCreateInfo.pRasterizationState = &rasterizationState;
+				pipelineCreateInfo.pColorBlendState = &colorBlendState;
+				pipelineCreateInfo.pMultisampleState = &multisampleState;
+				pipelineCreateInfo.pViewportState = &viewportState;
+				pipelineCreateInfo.pDepthStencilState = &depthStencilState;
+				pipelineCreateInfo.renderPass = framebuffer->GetRenderPass();
+				pipelineCreateInfo.pDynamicState = &dynamicState;
+
+				// What is this pipeline cache?
+				VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+				pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+				VkPipelineCache pipelineCache;
+				VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
+
+				// Create rendering pipeline using the specified states
+				VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &instance->m_VulkanPipeline));
+
+				// Shader modules are no longer needed once the graphics pipeline has been created
+				// vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+				// vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+
+				// instance->m_DescriptorSets = vulkanShader->AllocateDescriptorSets();
+
+#if OLD
+				const auto& shaderDescriptorSets = vulkanShader->GetShaderDescriptorSets();
+				if (!shaderDescriptorSets.empty())
+				{
+					// Write default descriptor set... this overlaps materials somewhat, definitely requires more thought
+					instance->m_DescriptorSet = vulkanShader->CreateDescriptorSets();
+					std::vector<VkWriteDescriptorSet> writeDescriptors;
+
+					for (auto&& [set, shaderDescriptorSet] : shaderDescriptorSets)
+					{
+						for (auto&& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
+						{
+							VkWriteDescriptorSet writeDescriptorSet = {};
+							writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+							writeDescriptorSet.descriptorCount = 1;
+							writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+							writeDescriptorSet.pBufferInfo = &uniformBuffer->Descriptor;
+							writeDescriptorSet.dstBinding = binding;
+							writeDescriptorSet.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
+							writeDescriptors.push_back(writeDescriptorSet);
+						}
+					}
+
+					VA_CORE_WARN("VulkanPipeline - Updating {0} descriptor sets", writeDescriptors.size());
+					vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+				}
 #endif
+			}
 		});
 	}
 
@@ -323,9 +392,9 @@ namespace Vanta {
 	{
 		Ref<VulkanPipeline> instance = this;
 		Renderer::Submit([instance, uniformBuffer, binding, set]() mutable
-		{
-			instance->RT_SetUniformBuffer(uniformBuffer, binding, set);
-		});
+			{
+				instance->RT_SetUniformBuffer(uniformBuffer, binding, set);
+			});
 	}
 
 	void VulkanPipeline::Bind()

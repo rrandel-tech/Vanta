@@ -30,7 +30,7 @@ namespace Vanta {
 
 		VkBuffer m_VulkanBuffer = nullptr;
 		VmaAllocation m_MemoryAllocation;
-
+		
 	};
 
 }

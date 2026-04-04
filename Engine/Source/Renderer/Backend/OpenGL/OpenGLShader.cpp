@@ -32,14 +32,14 @@ namespace Vanta {
 			// TODO: make sure the assets directory is valid
 			return "assets/cache/shader/opengl";
 		}
-		
+
 		static void CreateCacheDirectoryIfNeeded()
 		{
 			std::string cacheDirectory = GetCacheDirectory();
 			if (!std::filesystem::exists(cacheDirectory))
 				std::filesystem::create_directories(cacheDirectory);
 		}
-		
+
 	}
 
 	OpenGLShader::OpenGLShader(const std::string& filepath, bool forceRecompile)
@@ -72,12 +72,12 @@ namespace Vanta {
 		Utils::CreateCacheDirectoryIfNeeded();
 		Ref<OpenGLShader> instance = this;
 		Renderer::Submit([instance, forceCompile]() mutable
-		{
-			std::array<std::vector<uint32_t>, 2> vulkanBinaries;
-			std::unordered_map<uint32_t, std::vector<uint32_t>> shaderData;
-			instance->CompileOrGetVulkanBinary(shaderData, forceCompile);
-			instance->CompileOrGetOpenGLBinary(shaderData, forceCompile);
-		});
+			{
+				//std::array<std::vector<uint32_t>, 2> vulkanBinaries;
+				std::unordered_map<uint32_t, std::vector<uint32_t>> shaderData;
+				instance->CompileOrGetVulkanBinary(shaderData, forceCompile);
+				instance->CompileOrGetOpenGLBinary(shaderData, forceCompile);
+			});
 	}
 
 	void OpenGLShader::ClearUniformBuffers()
@@ -89,9 +89,9 @@ namespace Vanta {
 	{
 		switch (stage)
 		{
-			case GL_VERTEX_SHADER:    return ".cached_vulkan.vert";
-			case GL_FRAGMENT_SHADER:  return ".cached_vulkan.frag";
-			case GL_COMPUTE_SHADER:   return ".cached_vulkan.comp";
+		case GL_VERTEX_SHADER:    return ".cached_vulkan.vert";
+		case GL_FRAGMENT_SHADER:  return ".cached_vulkan.frag";
+		case GL_COMPUTE_SHADER:   return ".cached_vulkan.comp";
 		}
 		VA_CORE_ASSERT(false);
 		return "";
@@ -113,9 +113,9 @@ namespace Vanta {
 	{
 		switch (stage)
 		{
-			case GL_VERTEX_SHADER:    return shaderc_vertex_shader;
-			case GL_FRAGMENT_SHADER:  return shaderc_fragment_shader;
-			case GL_COMPUTE_SHADER:   return shaderc_compute_shader;
+		case GL_VERTEX_SHADER:    return shaderc_vertex_shader;
+		case GL_FRAGMENT_SHADER:  return shaderc_fragment_shader;
+		case GL_COMPUTE_SHADER:   return shaderc_compute_shader;
 		}
 		VA_CORE_ASSERT(false);
 		return (shaderc_shader_kind)0;
@@ -125,9 +125,9 @@ namespace Vanta {
 	{
 		switch (stage)
 		{
-			case GL_VERTEX_SHADER:    return "Vertex";
-			case GL_FRAGMENT_SHADER:  return "Fragment";
-			case GL_COMPUTE_SHADER:   return "Compute";
+		case GL_VERTEX_SHADER:    return "Vertex";
+		case GL_FRAGMENT_SHADER:  return "Fragment";
+		case GL_COMPUTE_SHADER:   return "Compute";
 		}
 		VA_CORE_ASSERT(false);
 		return "";
@@ -146,7 +146,8 @@ namespace Vanta {
 				auto path = cacheDirectory / (p.filename().string() + extension);
 				std::string cachedFilePath = path.string();
 
-				FILE* f = fopen(cachedFilePath.c_str(), "rb");
+				FILE* f;
+				fopen_s(&f, cachedFilePath.c_str(), "rb");
 				if (f)
 				{
 					fseek(f, 0, SEEK_END);
@@ -193,7 +194,8 @@ namespace Vanta {
 					auto path = cacheDirectory / (p.filename().string() + extension);
 					std::string cachedFilePath = path.string();
 
-					FILE* f = fopen(cachedFilePath.c_str(), "wb");
+					FILE* f;
+					fopen_s(&f, cachedFilePath.c_str(), "wb");
 					fwrite(outputBinary[stage].data(), sizeof(uint32_t), outputBinary[stage].size(), f);
 					fclose(f);
 				}
@@ -213,7 +215,7 @@ namespace Vanta {
 		shaderRendererIDs.reserve(vulkanBinaries.size());
 
 		std::filesystem::path cacheDirectory = Utils::GetCacheDirectory();
-		
+
 		m_ConstantBufferOffset = 0;
 		std::vector<std::vector<uint32_t>> shaderData;
 		for (auto [stage, binary] : vulkanBinaries)
@@ -221,7 +223,7 @@ namespace Vanta {
 			shaderc::Compiler compiler;
 			shaderc::CompileOptions options;
 			options.SetTargetEnvironment(shaderc_target_env_opengl_compat, shaderc_env_version_opengl_4_5);
-			
+
 			{
 				spirv_cross::CompilerGLSL glsl(binary);
 				ParseConstantBuffers(glsl);
@@ -234,7 +236,8 @@ namespace Vanta {
 
 				if (!forceCompile)
 				{
-					FILE* f = fopen(cachedFilePath.c_str(), "rb");
+					FILE* f;
+					fopen_s(&f, cachedFilePath.c_str(), "rb");
 					if (f)
 					{
 						fseek(f, 0, SEEK_END);
@@ -245,7 +248,7 @@ namespace Vanta {
 						fclose(f);
 					}
 				}
-				
+
 				if (!shaderStageData.size())
 				{
 					std::string source = glsl.compile();
@@ -268,14 +271,15 @@ namespace Vanta {
 						std::filesystem::path p = m_AssetPath;
 						auto path = cacheDirectory / (p.filename().string() + GLShaderStageCachedOpenGLFileExtension(stage));
 						std::string cachedFilePath = path.string();
-						FILE* f = fopen(cachedFilePath.c_str(), "wb");
+						FILE* f;
+						fopen_s(&f, cachedFilePath.c_str(), "wb");
 						fwrite(shaderStageData.data(), sizeof(uint32_t), shaderStageData.size(), f);
 						fclose(f);
 					}
 				}
 
 				GLuint shaderID = glCreateShader(stage);
-				glShaderBinary(1, &shaderID, GL_SHADER_BINARY_FORMAT_SPIR_V, shaderStageData.data(), shaderStageData.size() * sizeof(uint32_t));
+				glShaderBinary(1, &shaderID, GL_SHADER_BINARY_FORMAT_SPIR_V, shaderStageData.data(), uint32_t(shaderStageData.size() * sizeof(uint32_t)));
 				glSpecializeShader(shaderID, "main", 0, nullptr, nullptr);
 				glAttachShader(program, shaderID);
 
@@ -332,16 +336,21 @@ namespace Vanta {
 		switch (type.basetype)
 		{
 		case spirv_cross::SPIRType::Boolean:  return ShaderUniformType::Bool;
-		case spirv_cross::SPIRType::Int:      return ShaderUniformType::Int;
+		case spirv_cross::SPIRType::Int:
+			if (type.vecsize == 1)            return ShaderUniformType::Int;
+			if (type.vecsize == 2)            return ShaderUniformType::IVec2;
+			if (type.vecsize == 3)            return ShaderUniformType::IVec3;
+			if (type.vecsize == 4)            return ShaderUniformType::IVec4;
 		case spirv_cross::SPIRType::UInt:     return ShaderUniformType::UInt;
 		case spirv_cross::SPIRType::Float:
+
+			if (type.columns == 3)            return ShaderUniformType::Mat3;
+			if (type.columns == 4)            return ShaderUniformType::Mat4;
+
 			if (type.vecsize == 1)            return ShaderUniformType::Float;
 			if (type.vecsize == 2)            return ShaderUniformType::Vec2;
 			if (type.vecsize == 3)            return ShaderUniformType::Vec3;
 			if (type.vecsize == 4)            return ShaderUniformType::Vec4;
-
-			if (type.columns == 3)            return ShaderUniformType::Mat3;
-			if (type.columns == 4)            return ShaderUniformType::Mat4;
 			break;
 		}
 		VA_CORE_ASSERT(false, "Unknown type!");
@@ -350,7 +359,7 @@ namespace Vanta {
 
 	void OpenGLShader::Compile(const std::vector<uint32_t>& vertexBinary, const std::vector<uint32_t>& fragmentBinary)
 	{
-		
+
 	}
 
 	void OpenGLShader::ParseConstantBuffers(const spirv_cross::CompilerGLSL& compiler)
@@ -360,7 +369,7 @@ namespace Vanta {
 		{
 			const auto& bufferName = resource.name;
 			auto& bufferType = compiler.get_type(resource.base_type_id);
-			auto bufferSize = compiler.get_declared_struct_size(bufferType);
+			const auto bufferSize = uint32_t(compiler.get_declared_struct_size(bufferType));
 
 			// Skip empty push constant buffers - these are for the renderer only
 			if (bufferName.empty() || bufferName == "u_Renderer")
@@ -370,19 +379,19 @@ namespace Vanta {
 			}
 
 			auto location = compiler.get_decoration(resource.id, spv::DecorationLocation);
-			int memberCount = bufferType.member_types.size();
-			ShaderBuffer& buffer = m_Buffers[bufferName];
-			buffer.Name = bufferName;
-			buffer.Size = bufferSize - m_ConstantBufferOffset;
+			const int memberCount = int(bufferType.member_types.size());
+			auto& [Name, Size, Uniforms] = m_Buffers[bufferName];
+			Name = bufferName;
+			Size = bufferSize - m_ConstantBufferOffset;
 			for (int i = 0; i < memberCount; i++)
 			{
-				auto type = compiler.get_type(bufferType.member_types[i]);
+				const auto& type = compiler.get_type(bufferType.member_types[i]);
 				const auto& memberName = compiler.get_member_name(bufferType.self, i);
-				auto size = compiler.get_declared_struct_member_size(bufferType, i);
-				auto offset = compiler.type_struct_member_offset(bufferType, i) - m_ConstantBufferOffset;
+				const auto size = (uint32_t)compiler.get_declared_struct_member_size(bufferType, i);
+				const auto offset = compiler.type_struct_member_offset(bufferType, i) - m_ConstantBufferOffset;
 
-				std::string uniformName = bufferName + "." + memberName;
-				buffer.Uniforms[uniformName] = ShaderUniform(uniformName, SPIRTypeToShaderUniformType(type), size, offset);
+				std::string uniformName = std::format("{}.{}", bufferName, memberName);
+				Uniforms[uniformName] = ShaderUniform(uniformName, SPIRTypeToShaderUniformType(type), size, offset);
 			}
 
 			m_ConstantBufferOffset += bufferSize;
@@ -396,67 +405,115 @@ namespace Vanta {
 
 		VA_CORE_TRACE("OpenGLShader::Reflect - {0}", m_AssetPath);
 		VA_CORE_TRACE("   {0} Uniform Buffers", res.uniform_buffers.size());
+		VA_CORE_TRACE("   {0} Storage Buffers", res.storage_buffers.size());
 		VA_CORE_TRACE("   {0} Resources", res.sampled_images.size());
 
 		glUseProgram(m_RendererID);
-
-		uint32_t bufferIndex = 0;
-		for (const spirv_cross::Resource& resource : res.uniform_buffers)
+		//Uniform buffers
 		{
-			auto& bufferType = comp.get_type(resource.base_type_id);
-			int memberCount = bufferType.member_types.size();
-			uint32_t bindingPoint = comp.get_decoration(resource.id, spv::DecorationBinding);
-			uint32_t bufferSize = comp.get_declared_struct_size(bufferType);
-
-			if (s_UniformBuffers.find(bindingPoint) == s_UniformBuffers.end())
+			uint32_t bufferIndex = 0;
+			for (const spirv_cross::Resource& resource : res.uniform_buffers)
 			{
-				ShaderUniformBuffer& buffer = s_UniformBuffers[bindingPoint];
-				buffer.Name = resource.name;
-				buffer.BindingPoint = bindingPoint;
-				buffer.Size = bufferSize;
-			 
-#if 0
-				buffer.Uniforms.reserve(memberCount);
-				for (int i = 0; i < memberCount; i++)
+				auto& bufferType = comp.get_type(resource.base_type_id);
+				//int memberCount = bufferType.member_types.size();
+				uint32_t bindingPoint = comp.get_decoration(resource.id, spv::DecorationBinding);
+				uint32_t bufferSize = (uint32_t)comp.get_declared_struct_size(bufferType);
+
+				if (s_UniformBuffers.find(bindingPoint) == s_UniformBuffers.end())
 				{
-					auto type = comp.get_type(bufferType.member_types[i]);
-					const auto& name = comp.get_member_name(bufferType.self, i);
-					auto size = comp.get_declared_struct_member_size(bufferType, i);
-					auto offset = comp.type_struct_member_offset(bufferType, i);
-
-					//ShaderUniformType uniformType = SPIRTypeToShaderUniformType(type);
-					//buffer.Uniforms.emplace_back(name, uniformType, size, offset);
-				}
-#endif
-				glCreateBuffers(1, &buffer.RendererID);
-				glBindBuffer(GL_UNIFORM_BUFFER, buffer.RendererID);
-				glBufferData(GL_UNIFORM_BUFFER, buffer.Size, nullptr, GL_DYNAMIC_DRAW);
-				glBindBufferBase(GL_UNIFORM_BUFFER, buffer.BindingPoint, buffer.RendererID);
-
-				VA_CORE_TRACE("Created Uniform Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
-
-				glBindBuffer(GL_UNIFORM_BUFFER, 0);
-			}
-			else
-			{
-				// Validation
-				ShaderUniformBuffer& buffer = s_UniformBuffers.at(bindingPoint);
-				VA_CORE_ASSERT(buffer.Name == resource.name); // Must be the same buffer
-				if (bufferSize > buffer.Size) // Resize buffer if needed
-				{
+					ShaderUniformBuffer& buffer = s_UniformBuffers[bindingPoint];
+					buffer.Name = resource.name;
+					buffer.BindingPoint = bindingPoint;
 					buffer.Size = bufferSize;
-					
-					glDeleteBuffers(1, &buffer.RendererID);
+
+#if 0
+					buffer.Uniforms.reserve(memberCount);
+					for (int i = 0; i < memberCount; i++)
+					{
+						auto type = comp.get_type(bufferType.member_types[i]);
+						const auto& name = comp.get_member_name(bufferType.self, i);
+						auto size = comp.get_declared_struct_member_size(bufferType, i);
+						auto offset = comp.type_struct_member_offset(bufferType, i);
+
+						//ShaderUniformType uniformType = SPIRTypeToShaderUniformType(type);
+						//buffer.Uniforms.emplace_back(name, uniformType, size, offset);
+					}
+#endif
 					glCreateBuffers(1, &buffer.RendererID);
 					glBindBuffer(GL_UNIFORM_BUFFER, buffer.RendererID);
 					glBufferData(GL_UNIFORM_BUFFER, buffer.Size, nullptr, GL_DYNAMIC_DRAW);
 					glBindBufferBase(GL_UNIFORM_BUFFER, buffer.BindingPoint, buffer.RendererID);
 
-					VA_CORE_TRACE("Resized Uniform Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
+					VA_CORE_TRACE("Created Uniform Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
+
+					glBindBuffer(GL_UNIFORM_BUFFER, 0);
+				}
+				else
+				{
+					// Validation
+					ShaderUniformBuffer& buffer = s_UniformBuffers.at(bindingPoint);
+					VA_CORE_ASSERT(buffer.Name == resource.name); // Must be the same buffer
+					if (bufferSize > buffer.Size) // Resize buffer if needed
+					{
+						buffer.Size = bufferSize;
+
+						glDeleteBuffers(1, &buffer.RendererID);
+						glCreateBuffers(1, &buffer.RendererID);
+						glBindBuffer(GL_UNIFORM_BUFFER, buffer.RendererID);
+						glBufferData(GL_UNIFORM_BUFFER, buffer.Size, nullptr, GL_DYNAMIC_DRAW);
+						glBindBufferBase(GL_UNIFORM_BUFFER, buffer.BindingPoint, buffer.RendererID);
+
+						VA_CORE_TRACE("Resized Uniform Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
+					}
 				}
 			}
 		}
+		//Storage Buffers
+		{
+			uint32_t bufferIndex = 0;
+			for (const spirv_cross::Resource& resource : res.storage_buffers)
+			{
+				const auto& bufferType = comp.get_type(resource.base_type_id);
+				//int memberCount = bufferType.member_types.size();
+				const uint32_t bindingPoint = comp.get_decoration(resource.id, spv::DecorationBinding);
+				const uint32_t bufferSize = (uint32_t)comp.get_declared_struct_size(bufferType);
 
+				if (s_UniformBuffers.find(bindingPoint) == s_UniformBuffers.end())
+				{
+					ShaderStorageBuffer& buffer = s_StorageBuffers[bindingPoint];
+					buffer.Name = resource.name;
+					buffer.BindingPoint = bindingPoint;
+					buffer.Size = bufferSize;
+
+					glCreateBuffers(1, &buffer.RendererID);
+					glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.RendererID);
+					glBufferData(GL_SHADER_STORAGE_BUFFER, buffer.Size, nullptr, GL_DYNAMIC_DRAW);
+					glBindBufferBase(GL_SHADER_STORAGE_BUFFER, buffer.BindingPoint, buffer.RendererID);
+
+					VA_CORE_TRACE("Created Storage Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
+
+					glBindBuffer(GL_UNIFORM_BUFFER, 0);
+				}
+				else
+				{
+					// Validation
+					ShaderStorageBuffer& buffer = s_StorageBuffers.at(bindingPoint);
+					VA_CORE_ASSERT(buffer.Name == resource.name); // Must be the same buffer
+					if (bufferSize > buffer.Size) // Resize buffer if needed
+					{
+						buffer.Size = bufferSize;
+
+						glDeleteBuffers(1, &buffer.RendererID);
+						glCreateBuffers(1, &buffer.RendererID);
+						glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.RendererID);
+						glBufferData(GL_SHADER_STORAGE_BUFFER, buffer.Size, nullptr, GL_DYNAMIC_DRAW);
+						glBindBufferBase(GL_SHADER_STORAGE_BUFFER, buffer.BindingPoint, buffer.RendererID);
+
+						VA_CORE_TRACE("Resized Storage Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
+					}
+				}
+			}
+		}
 		int32_t sampler = 0;
 		for (const spirv_cross::Resource& resource : res.sampled_images)
 		{
@@ -481,7 +538,7 @@ namespace Vanta {
 	{
 		Renderer::Submit([=]() {
 			glUseProgram(m_RendererID);
-		});
+			});
 	}
 
 	std::string OpenGLShader::ReadShaderFromFile(const std::string& filepath) const
@@ -563,7 +620,7 @@ namespace Vanta {
 
 		if (outPosition)
 			*outPosition = end;
-		uint32_t length = end - str + 1;
+		const uint32_t length = (uint32_t)(end - str) + 1u;
 		return std::string(str, length);
 	}
 
@@ -575,7 +632,7 @@ namespace Vanta {
 
 		if (outPosition)
 			*outPosition = end;
-		uint32_t length = end - str + 1;
+		const uint32_t length = (uint32_t)(end - str) + 1u;
 		return std::string(str, length);
 	}
 
@@ -620,6 +677,32 @@ namespace Vanta {
 		return std::hash<std::string>{}(m_AssetPath);
 	}
 
+	const ShaderUniformBuffer& OpenGLShader::FindUniformBuffer(const std::string& name)
+	{
+		ShaderUniformBuffer* uniformBuffer = nullptr;
+		for (auto& [bindingPoint, ub] : s_UniformBuffers)
+		{
+			if (ub.Name == name)
+			{
+				uniformBuffer = &ub;
+				break;
+			}
+		}
+
+		VA_CORE_ASSERT(uniformBuffer);
+		return *uniformBuffer;
+	}
+
+	void OpenGLShader::SetUniformBuffer(const ShaderUniformBuffer& buffer, const void* data, uint32_t size, const uint32_t offset)
+	{
+		glNamedBufferSubData(buffer.RendererID, offset, size, data);
+	}
+
+	void OpenGLShader::SetStorageBuffer(const ShaderStorageBuffer& buffer, const void* data, uint32_t size, const uint32_t offset)
+	{
+		glNamedBufferSubData(buffer.RendererID, offset, size, data);
+	}
+
 	void OpenGLShader::SetUniformBuffer(const std::string& name, const void* data, uint32_t size)
 	{
 		ShaderUniformBuffer* uniformBuffer = nullptr;
@@ -637,98 +720,153 @@ namespace Vanta {
 		glNamedBufferSubData(uniformBuffer->RendererID, 0, size, data);
 	}
 
+	void OpenGLShader::SetStorageBuffer(const std::string& name, const void* data, uint32_t size)
+	{
+		ShaderStorageBuffer* storageBuffer = nullptr;
+		for (auto& [bindingPoint, ub] : s_StorageBuffers)
+		{
+			if (ub.Name == name)
+			{
+				storageBuffer = &ub;
+				break;
+			}
+		}
+
+		VA_CORE_ASSERT(storageBuffer);
+		VA_CORE_ASSERT(storageBuffer->Size >= size);
+		glNamedBufferSubData(storageBuffer->RendererID, 0, size, data);
+	}
+
+	void OpenGLShader::ResizeStorageBuffer(const uint32_t bindingPoint, const uint32_t newSize)
+	{
+		// Validation
+		ShaderStorageBuffer& buffer = s_StorageBuffers.at(bindingPoint);
+		if (newSize == buffer.Size)
+			return;
+		buffer.Size = newSize;
+
+		glNamedBufferData(buffer.RendererID, buffer.Size, nullptr, GL_DYNAMIC_DRAW);
+
+		VA_CORE_TRACE("Resized Storage Buffer at binding point {0} with name '{1}', size is {2} bytes", buffer.BindingPoint, buffer.Name, buffer.Size);
+	}
+
 	void OpenGLShader::SetUniform(const std::string& fullname, float value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniform1f(location, value);
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform1f(location, value);
+			});
 	}
 
 	void OpenGLShader::SetUniform(const std::string& fullname, uint32_t value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniform1ui(location, value);
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform1ui(location, value);
+			});
 	}
 
 	void OpenGLShader::SetUniform(const std::string& fullname, int value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniform1i(location, value);
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform1i(location, value);
+			});
 	}
+
 
 	void OpenGLShader::SetUniform(const std::string& fullname, const glm::vec2& value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniform2fv(location, 1, glm::value_ptr(value));
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform2fv(location, 1, glm::value_ptr(value));
+			});
+	}
+
+	void OpenGLShader::SetUniform(const std::string& fullname, const glm::ivec2& value)
+	{
+		Renderer::Submit([=]()
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform2i(location, value.x, value.y);
+			});
+	}
+
+	void OpenGLShader::SetUniform(const std::string& fullname, const glm::ivec3& value)
+	{
+		Renderer::Submit([=]()
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform3i(location, value.x, value.y, value.z);
+			});
+	}
+
+	void OpenGLShader::SetUniform(const std::string& fullname, const glm::ivec4& value)
+	{
+		Renderer::Submit([=]()
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform4i(location, value.x, value.y, value.z, value.w);
+			});
 	}
 
 	void OpenGLShader::SetUniform(const std::string& fullname, const glm::vec3& value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniform3fv(location, 1, glm::value_ptr(value));
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform3fv(location, 1, glm::value_ptr(value));
+			});
 	}
 
 	void OpenGLShader::SetUniform(const std::string& fullname, const glm::vec4& value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniform4fv(location, 1, glm::value_ptr(value));
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniform4fv(location, 1, glm::value_ptr(value));
+			});
 	}
 
 	void OpenGLShader::SetUniform(const std::string& fullname, const glm::mat3& value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
+			});
 	}
 
 	void OpenGLShader::SetUniform(const std::string& fullname, const glm::mat4& value)
 	{
 		Renderer::Submit([=]()
-		{
-			VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
-			GLint location = m_UniformLocations.at(fullname);
-			glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
-		});
+			{
+				VA_CORE_ASSERT(m_UniformLocations.find(fullname) != m_UniformLocations.end());
+				GLint location = m_UniformLocations.at(fullname);
+				glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
+			});
 	}
 
-	void OpenGLShader::SetIntArray(const std::string& name, int* values, uint32_t size)
-	{
-		Renderer::Submit([=]() {
-			UploadUniformIntArray(name, values, size);
-		});
-	}
 
 	const ShaderResourceDeclaration* OpenGLShader::GetShaderResource(const std::string& name)
 	{
 		if (m_Resources.find(name) == m_Resources.end())
 			return nullptr;
-		
+
 		return &m_Resources.at(name);
 	}
 

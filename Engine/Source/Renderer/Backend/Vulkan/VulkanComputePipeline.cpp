@@ -21,10 +21,6 @@ namespace Vanta {
 		});
 	}
 
-	VulkanComputePipeline::~VulkanComputePipeline()
-	{
-	}
-
 	void VulkanComputePipeline::CreatePipeline()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
@@ -32,11 +28,10 @@ namespace Vanta {
 		// TODO: Abstract into some sort of compute pipeline
 
 		auto descriptorSetLayouts = m_Shader->GetAllDescriptorSetLayouts();
-		auto descriptorSet = m_Shader->CreateDescriptorSets();
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
+		pipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayouts.size();
 		pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
 
 		const auto& pushConstantRanges = m_Shader->GetPushConstantRanges();
@@ -54,7 +49,7 @@ namespace Vanta {
 				vulkanPushConstantRange.size = pushConstantRange.Size;
 			}
 
-			pipelineLayoutCreateInfo.pushConstantRangeCount = vulkanPushConstantRanges.size();
+			pipelineLayoutCreateInfo.pushConstantRangeCount = (uint32_t)vulkanPushConstantRanges.size();
 			pipelineLayoutCreateInfo.pPushConstantRanges = vulkanPushConstantRanges.data();
 		}
 
@@ -121,11 +116,21 @@ namespace Vanta {
 		}
 	}
 
-	void VulkanComputePipeline::Begin()
+	void VulkanComputePipeline::Begin(Ref<RenderCommandBuffer> renderCommandBuffer)
 	{
 		VA_CORE_ASSERT(!m_ActiveComputeCommandBuffer);
 
-		m_ActiveComputeCommandBuffer = VulkanContext::GetCurrentDevice()->GetCommandBuffer(true, true);
+		if (renderCommandBuffer)
+		{
+			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+			m_ActiveComputeCommandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
+			m_UsingGraphicsQueue = true;
+		}
+		else
+		{
+			m_ActiveComputeCommandBuffer = VulkanContext::GetCurrentDevice()->GetCommandBuffer(true, true);
+			m_UsingGraphicsQueue = false;
+		}
 		vkCmdBindPipeline(m_ActiveComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipeline);
 	}
 
@@ -142,34 +147,36 @@ namespace Vanta {
 		VA_CORE_ASSERT(m_ActiveComputeCommandBuffer);
 
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-		VkQueue computeQueue = VulkanContext::GetCurrentDevice()->GetComputeQueue();
-
-		vkEndCommandBuffer(m_ActiveComputeCommandBuffer);
-
-		if (!s_ComputeFence)
+		if (!m_UsingGraphicsQueue)
 		{
-			VkFenceCreateInfo fenceCreateInfo{};
-			fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-			fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-			VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, nullptr, &s_ComputeFence));
-		}
-		vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(device, 1, &s_ComputeFence);
+			VkQueue computeQueue = VulkanContext::GetCurrentDevice()->GetComputeQueue();
 
-		VkSubmitInfo computeSubmitInfo{};
-		computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		computeSubmitInfo.commandBufferCount = 1;
-		computeSubmitInfo.pCommandBuffers = &m_ActiveComputeCommandBuffer;
-		VK_CHECK_RESULT(vkQueueSubmit(computeQueue, 1, &computeSubmitInfo, s_ComputeFence));
+			vkEndCommandBuffer(m_ActiveComputeCommandBuffer);
 
-		// Wait for execution of compute shader to complete
-		// Currently this is here for "safety"
-		{
-			Timer timer;
+			if (!s_ComputeFence)
+			{
+				VkFenceCreateInfo fenceCreateInfo{};
+				fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+				fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+				VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, nullptr, &s_ComputeFence));
+			}
 			vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
-			VA_CORE_TRACE("Compute shader execution took {0} ms", timer.ElapsedMillis());
-		}
+			vkResetFences(device, 1, &s_ComputeFence);
 
+			VkSubmitInfo computeSubmitInfo{};
+			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			computeSubmitInfo.commandBufferCount = 1;
+			computeSubmitInfo.pCommandBuffers = &m_ActiveComputeCommandBuffer;
+			VK_CHECK_RESULT(vkQueueSubmit(computeQueue, 1, &computeSubmitInfo, s_ComputeFence));
+
+			// Wait for execution of compute shader to complete
+			// Currently this is here for "safety"
+			{
+				Timer timer;
+				vkWaitForFences(device, 1, &s_ComputeFence, VK_TRUE, UINT64_MAX);
+				VA_CORE_TRACE("Compute shader execution took {0} ms", timer.ElapsedMillis());
+			}
+		}
 		m_ActiveComputeCommandBuffer = nullptr;
 	}
 

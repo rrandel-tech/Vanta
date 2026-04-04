@@ -15,6 +15,7 @@
 #include "VulkanFramebuffer.hpp"
 #include "VulkanMaterial.hpp"
 #include "VulkanUniformBuffer.hpp"
+#include "VulkanStorageBuffer.hpp"
 #include "VulkanRenderCommandBuffer.hpp"
 
 #include "VulkanShader.hpp"
@@ -23,11 +24,12 @@
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_vulkan.h"
 
-#include "VulkanComputePipeline.hpp"
 #include "Core/Timer.hpp"
 #include "Debug/Profiler.hpp"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 
 namespace Vanta {
 
@@ -46,8 +48,10 @@ namespace Vanta {
 		std::vector<VkDescriptorPool> DescriptorPools;
 		std::vector<uint32_t> DescriptorPoolAllocationCount;
 
+
 		// UniformBufferSet -> Shader Hash -> Frame -> WriteDescriptor
 		std::unordered_map<UniformBufferSet*, std::unordered_map<uint64_t, std::vector<std::vector<VkWriteDescriptorSet>>>> UniformBufferWriteDescriptorCache;
+		std::unordered_map<StorageBufferSet*, std::unordered_map<uint64_t, std::vector<std::vector<VkWriteDescriptorSet>>>> StorageBufferWriteDescriptorCache;
 	};
 
 	static VulkanRendererData* s_Data = nullptr;
@@ -159,7 +163,7 @@ namespace Vanta {
 		return s_Data->RenderCaps;
 	}
 
-	static const std::vector<std::vector<VkWriteDescriptorSet>>& RT_RetrieveOrCreateWriteDescriptors(Ref<UniformBufferSet> uniformBufferSet, Ref<VulkanMaterial> vulkanMaterial)
+	static const std::vector<std::vector<VkWriteDescriptorSet>>& RT_RetrieveOrCreateUniformBufferWriteDescriptors(Ref<UniformBufferSet> uniformBufferSet, Ref<VulkanMaterial> vulkanMaterial)
 	{
 		VA_PROFILE_FUNC();
 
@@ -205,9 +209,76 @@ namespace Vanta {
 		return s_Data->UniformBufferWriteDescriptorCache[uniformBufferSet.Raw()][shaderHash];
 	}
 
-	void VulkanRenderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
+	static const std::vector<std::vector<VkWriteDescriptorSet>>& RT_RetrieveOrCreateStorageBufferWriteDescriptors(Ref<StorageBufferSet> storageBufferSet, Ref<VulkanMaterial> vulkanMaterial)
 	{
-		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, mesh, transform]() mutable
+		size_t shaderHash = vulkanMaterial->GetShader()->GetHash();
+		if (s_Data->StorageBufferWriteDescriptorCache.find(storageBufferSet.Raw()) != s_Data->StorageBufferWriteDescriptorCache.end())
+		{
+			const auto& shaderMap = s_Data->StorageBufferWriteDescriptorCache.at(storageBufferSet.Raw());
+			if (shaderMap.find(shaderHash) != shaderMap.end())
+			{
+				const auto& writeDescriptors = shaderMap.at(shaderHash);
+				return writeDescriptors;
+			}
+		}
+
+		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+		Ref<VulkanShader> vulkanShader = vulkanMaterial->GetShader().As<VulkanShader>();
+		if (vulkanShader->HasDescriptorSet(0))
+		{
+			const auto& shaderDescriptorSets = vulkanShader->GetShaderDescriptorSets();
+			if (!shaderDescriptorSets.empty())
+			{
+				for (auto&& [binding, shaderSB] : shaderDescriptorSets[0].StorageBuffers)
+				{
+					auto& writeDescriptors = s_Data->StorageBufferWriteDescriptorCache[storageBufferSet.Raw()][shaderHash];
+					writeDescriptors.resize(framesInFlight);
+					for (uint32_t frame = 0; frame < framesInFlight; frame++)
+					{
+						Ref<VulkanStorageBuffer> storageBuffer = storageBufferSet->Get(binding, 0, frame); // set = 0 for now
+
+						VkWriteDescriptorSet writeDescriptorSet = {};
+						writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+						writeDescriptorSet.descriptorCount = 1;
+						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+						writeDescriptorSet.pBufferInfo = &storageBuffer->GetDescriptorBufferInfo();
+						writeDescriptorSet.dstBinding = storageBuffer->GetBinding();
+						writeDescriptors[frame].push_back(writeDescriptorSet);
+					}
+				}
+			}
+		}
+
+		return s_Data->StorageBufferWriteDescriptorCache[storageBufferSet.Raw()][shaderHash];
+	}
+
+	static void RT_UpdateMaterialForRendering(Ref<VulkanMaterial> material, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet)
+	{
+		if (uniformBufferSet)
+		{
+			auto writeDescriptors = RT_RetrieveOrCreateUniformBufferWriteDescriptors(uniformBufferSet, material);
+			if (storageBufferSet)
+			{
+				const auto& storageBufferWriteDescriptors = RT_RetrieveOrCreateStorageBufferWriteDescriptors(storageBufferSet, material);
+
+				uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+				for (uint32_t frame = 0; frame < framesInFlight; frame++)
+				{
+					writeDescriptors[frame].reserve(writeDescriptors[frame].size() + storageBufferWriteDescriptors[frame].size());
+					writeDescriptors[frame].insert(writeDescriptors[frame].end(), storageBufferWriteDescriptors[frame].begin(), storageBufferWriteDescriptors[frame].end());
+				}
+			}
+			material->RT_UpdateForRendering(writeDescriptors);
+		}
+		else
+		{
+			material->RT_UpdateForRendering();
+		}
+	}
+
+	void VulkanRenderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
+	{
+		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, mesh, transform]() mutable
 		{
 			VA_PROFILE_FUNC("VulkanRenderer::RenderMesh");
 			VA_SCOPE_PERF("VulkanRenderer::RenderMesh");
@@ -235,8 +306,7 @@ namespace Vanta {
 			for (auto& material : materials)
 			{
 				Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
-				writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
-				vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
+				RT_UpdateMaterialForRendering(vulkanMaterial, uniformBufferSet, storageBufferSet);
 			}
 
 			const auto& meshAssetSubmeshes = meshAsset->GetSubmeshes();
@@ -266,7 +336,7 @@ namespace Vanta {
 		});
 	}
 
-	void VulkanRenderer::RenderMeshWithMaterial(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
+	void VulkanRenderer::RenderMeshWithMaterial(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Mesh> mesh, Ref<Material> material, const glm::mat4& transform, Buffer additionalUniforms)
 	{
 		VA_CORE_ASSERT(mesh);
 		VA_CORE_ASSERT(mesh->GetMeshAsset());
@@ -277,7 +347,7 @@ namespace Vanta {
 			pushConstantBuffer.Write(additionalUniforms.Data, additionalUniforms.Size, sizeof(glm::mat4));
 
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
-		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, mesh, vulkanMaterial, transform, pushConstantBuffer]() mutable
+		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, mesh, vulkanMaterial, transform, pushConstantBuffer]() mutable
 		{
 			VA_PROFILE_FUNC("VulkanRenderer::RenderMeshWithMaterial");
 			VA_SCOPE_PERF("VulkanRenderer::RenderMeshWithMaterial");
@@ -295,8 +365,7 @@ namespace Vanta {
 			VkBuffer ibBuffer = vulkanMeshIB->GetVulkanBuffer();
 			vkCmdBindIndexBuffer(commandBuffer, ibBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-			const auto& writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
-			vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
+			RT_UpdateMaterialForRendering(vulkanMaterial, uniformBufferSet, storageBufferSet);
 
 			Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
@@ -330,10 +399,10 @@ namespace Vanta {
 		});
 	}
 
-	void VulkanRenderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, const glm::mat4& transform)
+	void VulkanRenderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::mat4& transform)
 	{
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
-		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, vulkanMaterial, transform]() mutable
+		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, vulkanMaterial, transform]() mutable
 		{
 			VA_PROFILE_FUNC("VulkanRenderer::RenderQuad");
 
@@ -356,8 +425,7 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 			
-			const auto& writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
-			vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
+			RT_UpdateMaterialForRendering(vulkanMaterial, uniformBufferSet, storageBufferSet);
 
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
 			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(bufferIndex);
@@ -372,7 +440,7 @@ namespace Vanta {
 		});
 	}
 
-	void VulkanRenderer::RenderGeometry(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer, const glm::mat4& transform, uint32_t indexCount /*= 0*/)
+	void VulkanRenderer::RenderGeometry(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer, const glm::mat4& transform, uint32_t indexCount /*= 0*/)
 	{
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
 		if (indexCount == 0)
@@ -401,7 +469,7 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-			const auto& writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
+			const auto& writeDescriptors = RT_RetrieveOrCreateUniformBufferWriteDescriptors(uniformBufferSet, vulkanMaterial);
 			vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
 
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
@@ -457,10 +525,35 @@ namespace Vanta {
 	}
 #endif
 
+	/* void VulkanRenderer::LightCulling(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> pipelineCompute, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec2& screenSize, const glm::ivec3& workGroups)
+	{
+		auto vulkanMaterial = material.As<VulkanMaterial>();
+		auto pipeline = pipelineCompute.As<VulkanComputePipeline>();
+		Renderer::Submit([renderCommandBuffer, pipeline, vulkanMaterial, uniformBufferSet, storageBufferSet, screenSize, workGroups]() mutable
+		{
+			const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+
+			RT_UpdateMaterialForRendering(vulkanMaterial, uniformBufferSet, storageBufferSet);
+
+			const VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(frameIndex);
+
+			pipeline->Begin(renderCommandBuffer);
+			pipeline->SetPushConstants(glm::value_ptr(screenSize), sizeof(glm::ivec2));
+			pipeline->Dispatch(descriptorSet, workGroups.x, workGroups.y, workGroups.z);
+			pipeline->End();
+		});
+	} */
+
 	void VulkanRenderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
 	{
+		SubmitFullscreenQuad(renderCommandBuffer, pipeline, uniformBufferSet, nullptr, material);
+	}
+
+	void VulkanRenderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet,
+		Ref<StorageBufferSet> storageBufferSet, Ref<Material> material)
+	{
 		Ref<VulkanMaterial> vulkanMaterial = material.As<VulkanMaterial>();
-		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, vulkanMaterial]() mutable
+		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, vulkanMaterial]() mutable
 		{
 			VA_PROFILE_FUNC("VulkanRenderer::SubmitFullscreenQuad");
 
@@ -483,15 +576,7 @@ namespace Vanta {
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-			if (uniformBufferSet)
-			{
-				const auto& writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
-				vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
-			}
-			else
-			{
-				vulkanMaterial->RT_UpdateForRendering();
-			}
+			RT_UpdateMaterialForRendering(vulkanMaterial, uniformBufferSet, storageBufferSet);
 
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
 			VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(bufferIndex);
@@ -548,7 +633,7 @@ namespace Vanta {
 
 			if (uniformBufferSet)
 			{
-				const auto& writeDescriptors = RT_RetrieveOrCreateWriteDescriptors(uniformBufferSet, vulkanMaterial);
+				const auto& writeDescriptors = RT_RetrieveOrCreateUniformBufferWriteDescriptors(uniformBufferSet, vulkanMaterial);
 				vulkanMaterial->RT_UpdateForRendering(writeDescriptors);
 			}
 			else
@@ -707,7 +792,7 @@ namespace Vanta {
 				renderPassBeginInfo.framebuffer = swapChain.GetCurrentFramebuffer();
 
 				viewport.x = 0.0f;
-				viewport.y = height;
+				viewport.y = (float)height;
 				viewport.width = (float)width;
 				viewport.height = -(float)height;
 			}

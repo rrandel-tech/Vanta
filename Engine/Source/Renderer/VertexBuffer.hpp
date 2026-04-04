@@ -83,10 +83,10 @@ namespace Vanta {
 		const std::vector<VertexBufferElement>& GetElements() const { return m_Elements; }
 		uint32_t GetElementCount() const { return (uint32_t)m_Elements.size(); }
 
-		std::vector<VertexBufferElement>::iterator begin() { return m_Elements.begin(); }
-		std::vector<VertexBufferElement>::iterator end() { return m_Elements.end(); }
-		std::vector<VertexBufferElement>::const_iterator begin() const { return m_Elements.begin(); }
-		std::vector<VertexBufferElement>::const_iterator end() const { return m_Elements.end(); }
+		[[nodiscard]] std::vector<VertexBufferElement>::iterator begin() { return m_Elements.begin(); }
+		[[nodiscard]] std::vector<VertexBufferElement>::iterator end() { return m_Elements.end(); }
+		[[nodiscard]] std::vector<VertexBufferElement>::const_iterator begin() const { return m_Elements.begin(); }
+		[[nodiscard]] std::vector<VertexBufferElement>::const_iterator end() const { return m_Elements.end(); }
 	private:
 		void CalculateOffsetsAndStride()
 		{
@@ -118,14 +118,13 @@ namespace Vanta {
 		virtual void RT_SetData(void* buffer, uint32_t size, uint32_t offset = 0) = 0;
 		virtual void Bind() const = 0;
 
-		virtual const VertexBufferLayout& GetLayout() const = 0;
-		virtual void SetLayout(const VertexBufferLayout& layout) = 0;
-
-		virtual uint32_t GetSize() const = 0;
+		virtual unsigned int GetSize() const = 0;
 		virtual RendererID GetRendererID() const = 0;
 
 		static Ref<VertexBuffer> Create(void* data, uint32_t size, VertexBufferUsage usage = VertexBufferUsage::Static);
 		static Ref<VertexBuffer> Create(uint32_t size, VertexBufferUsage usage = VertexBufferUsage::Dynamic);
 	};
+
+
 
 }

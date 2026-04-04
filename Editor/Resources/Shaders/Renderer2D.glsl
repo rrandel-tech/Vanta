@@ -23,17 +23,17 @@ struct VertexOutput
 {
 	vec4 Color;
 	vec2 TexCoord;
-	float TexIndex;
 	float TilingFactor;
 };
 
 layout (location = 0) out VertexOutput Output;
+layout (location = 5) out flat float TexIndex;
 
 void main()
 {
 	Output.Color = a_Color;
 	Output.TexCoord = a_TexCoord;
-	Output.TexIndex = a_TexIndex;
+	TexIndex = a_TexIndex;
 	Output.TilingFactor = a_TilingFactor;
 	gl_Position = u_ViewProjection * u_Renderer.Transform * vec4(a_Position, 1.0);
 }
@@ -47,16 +47,17 @@ struct VertexOutput
 {
 	vec4 Color;
 	vec2 TexCoord;
-	float TexIndex;
 	float TilingFactor;
 };
 
 layout (location = 0) in VertexOutput Input;
+layout (location = 5) in flat float TexIndex;
 
 layout (binding = 1) uniform sampler2D u_Textures[32];
 
 void main()
 {
-	//color = texture(u_Textures[int(Input.TexIndex)], Input.TexCoord * Input.TilingFactor) * Input.Color;
-	color = Input.Color;
+	color = texture(u_Textures[int(TexIndex)], Input.TexCoord * Input.TilingFactor) * Input.Color;
+	if (color.a < 0.5)
+	discard;
 }

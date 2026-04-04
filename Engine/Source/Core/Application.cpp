@@ -39,6 +39,7 @@ namespace Vanta {
         windowSpec.Title = m_Specification.Name;
         windowSpec.Width = m_Specification.WindowWidth;
         windowSpec.Height = m_Specification.WindowHeight;
+        windowSpec.VSync = m_Specification.VSync;
         m_Window = std::unique_ptr<Window>(Window::Create(windowSpec));
         m_Window->Init();
         m_Window->SetEventCallback([this](Event& e) { OnEvent(e); });
@@ -113,6 +114,7 @@ namespace Vanta {
 
     void Application::RenderImGui()
     {
+        VA_SCOPE_PERF("Application::RenderImGui");
         VA_PROFILE_FUNC();
 
         m_ImGuiLayer->Begin();
@@ -166,8 +168,11 @@ namespace Vanta {
             {
                 Renderer::BeginFrame();
 
-                for (Layer* layer : m_LayerStack)
-                    layer->OnUpdate(m_TimeStep);
+                {
+                    VA_SCOPE_PERF("Application Layer::OnUpdate");
+                    for (Layer* layer : m_LayerStack)
+                        layer->OnUpdate(m_TimeStep);
+                }
 
                 // Render ImGui on render thread
                 Application* app = this;
@@ -251,12 +256,14 @@ namespace Vanta {
 
         m_Window->GetSwapChain().OnResize(width, height);
 
+#if 0
         auto& fbs = FramebufferPool::GetGlobal()->GetAll();
         for (auto& fb : fbs)
         {
             if (!fb->GetSpecification().NoResize)
                 fb->Resize(width, height);
         }
+#endif
 
         return false;
     }

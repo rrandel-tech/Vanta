@@ -9,7 +9,7 @@
 namespace Vanta {
 
 	namespace Utils {
-		
+
 		static void InsertImageMemoryBarrier(
 			VkCommandBuffer cmdbuffer,
 			VkImage image,
@@ -47,8 +47,8 @@ namespace Vanta {
 		{
 			switch (wrap)
 			{
-				case TextureWrap::Clamp:   return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-				case TextureWrap::Repeat:  return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			case TextureWrap::Clamp:   return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			case TextureWrap::Repeat:  return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			}
 			VA_CORE_ASSERT(false, "Unknown wrap mode");
 			return (VkSamplerAddressMode)0;
@@ -58,8 +58,8 @@ namespace Vanta {
 		{
 			switch (filter)
 			{
-				case TextureFilter::Linear:   return VK_FILTER_LINEAR;
-				case TextureFilter::Nearest:  return VK_FILTER_NEAREST;
+			case TextureFilter::Linear:   return VK_FILTER_LINEAR;
+			case TextureFilter::Nearest:  return VK_FILTER_NEAREST;
 			}
 			VA_CORE_ASSERT(false, "Unknown filter");
 			return (VkFilter)0;
@@ -73,8 +73,9 @@ namespace Vanta {
 
 	VulkanTexture2D::VulkanTexture2D(const std::string& path, TextureProperties properties)
 		: m_Path(path), m_Properties(properties)
-	{
+	{ 
 		int width, height, channels;
+
 		if (stbi_is_hdr(path.c_str()))
 		{
 			m_ImageData.Data = (byte*)stbi_loadf(path.c_str(), &width, &height, &channels, 4);
@@ -100,9 +101,9 @@ namespace Vanta {
 
 		Ref<VulkanTexture2D> instance = this;
 		Renderer::Submit([instance]() mutable
-		{
-			instance->Invalidate();
-		});
+			{
+				instance->Invalidate();
+			});
 	}
 
 	VulkanTexture2D::VulkanTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties)
@@ -116,12 +117,12 @@ namespace Vanta {
 
 		m_ImageData = Buffer::Copy(data, size);
 		memcpy(m_ImageData.Data, data, m_ImageData.Size);
-		
+
 		Ref<VulkanTexture2D> instance = this;
 		Renderer::Submit([instance]() mutable
-		{
-			instance->Invalidate();
-		});
+			{
+				instance->Invalidate();
+			});
 	}
 
 	VulkanTexture2D::~VulkanTexture2D()
@@ -165,8 +166,8 @@ namespace Vanta {
 		bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		VkBuffer stagingBuffer;
-		VmaAllocation stagingBufferAllocation = allocator.AllocateBuffer(bufferCreateInfo, VMA_MEMORY_USAGE_CPU_ONLY, stagingBuffer);
-		
+		VmaAllocation stagingBufferAllocation = allocator.AllocateBuffer(bufferCreateInfo, VMA_MEMORY_USAGE_CPU_TO_GPU, stagingBuffer);
+
 		// Copy data to staging buffer
 		uint8_t* destData =	allocator.MapMemory<uint8_t>(stagingBufferAllocation);
 		VA_CORE_ASSERT(m_ImageData.Data);
@@ -272,8 +273,8 @@ namespace Vanta {
 		sampler.minFilter = Utils::VulkanSamplerFilter(m_Properties.SamplerFilter);
 		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		sampler.addressModeU = Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
-		sampler.addressModeV =  Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
-		sampler.addressModeW =  Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
+		sampler.addressModeV = Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
+		sampler.addressModeW = Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
 		sampler.mipLodBias = 0.0f;
 		sampler.compareOp = VK_COMPARE_OP_NEVER;
 		sampler.minLod = 0.0f;
@@ -349,9 +350,9 @@ namespace Vanta {
 		auto vulkanDevice = device->GetVulkanDevice();
 
 		Ref<VulkanImage2D> image = m_Image.As<VulkanImage2D>();
-		auto& info = image->GetImageInfo();
+		const auto& info = image->GetImageInfo();
 
-		VkCommandBuffer blitCmd = VulkanContext::GetCurrentDevice()->GetCommandBuffer(true);
+		const VkCommandBuffer blitCmd = VulkanContext::GetCurrentDevice()->GetCommandBuffer(true);
 
 		VkImageMemoryBarrier barrier = {};
 		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -359,8 +360,8 @@ namespace Vanta {
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-		auto mipLevels = GetMipLevelCount();
-		for (int32_t i = 1; i < mipLevels; i++)
+		const auto mipLevels = GetMipLevelCount();
+		for (uint32_t i = 1; i < mipLevels; i++)
 		{
 			VkImageBlit imageBlit{};
 
@@ -529,13 +530,13 @@ namespace Vanta {
 			uint32_t size = width * height * 4 * 6; // six layers
 			m_LocalStorage = Buffer::Copy(data, size);
 		}
-		
+
 		Ref<VulkanTextureCube> instance = this;
 		Renderer::Submit([instance]() mutable
-		{
-			instance->Invalidate();
-		});
-}
+			{
+				instance->Invalidate();
+			});
+	}
 
 	VulkanTextureCube::VulkanTextureCube(const std::string& path, TextureProperties properties)
 		: m_Properties(properties)
@@ -743,7 +744,7 @@ namespace Vanta {
 			bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			VkBuffer stagingBuffer;
-			VmaAllocation stagingBufferAllocation = allocator.AllocateBuffer(bufferCreateInfo, VMA_MEMORY_USAGE_CPU_ONLY, stagingBuffer);
+			VmaAllocation stagingBufferAllocation = allocator.AllocateBuffer(bufferCreateInfo, VMA_MEMORY_USAGE_CPU_TO_GPU, stagingBuffer);
 
 			// Copy data to staging buffer
 			uint8_t* destData = allocator.MapMemory<uint8_t>(stagingBufferAllocation);
@@ -843,9 +844,9 @@ namespace Vanta {
 		sampler.magFilter = Utils::VulkanSamplerFilter(m_Properties.SamplerFilter);
 		sampler.minFilter = Utils::VulkanSamplerFilter(m_Properties.SamplerFilter);
 		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		sampler.addressModeU =  Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
-		sampler.addressModeV =  Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
-		sampler.addressModeW =  Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
+		sampler.addressModeU = Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
+		sampler.addressModeV = Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
+		sampler.addressModeW = Utils::VulkanSamplerWrap(m_Properties.SamplerWrap);
 		sampler.mipLodBias = 0.0f;
 		sampler.compareOp = VK_COMPARE_OP_NEVER;
 		sampler.minLod = 0.0f;
@@ -934,8 +935,8 @@ namespace Vanta {
 				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
 				mipSubRange);
 		}
-		
-		for (int32_t i = 1; i < mipLevels; i++)
+
+		for (uint32_t i = 1; i < mipLevels; i++)
 		{
 			for (uint32_t face = 0; face < 6; face++)
 			{

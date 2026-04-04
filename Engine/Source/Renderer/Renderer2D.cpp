@@ -81,6 +81,7 @@ namespace Vanta {
 		LineVertex* LineVertexBufferPtr = nullptr;
 
 		glm::mat4 CameraViewProj;
+		glm::mat4 CameraView;
 		bool DepthTest = true;
 
 		float LineWidth = 1.0f;
@@ -107,6 +108,7 @@ namespace Vanta {
 		framebufferSpec.Samples = 1;
 		framebufferSpec.ClearOnLoad = false;
 		framebufferSpec.ClearColor = { 0.1f, 0.5f, 0.5f, 1.0f };
+		framebufferSpec.DebugName = "Renderer2D Framebuffer";
 
 		Ref<Framebuffer> framebuffer = Framebuffer::Create(framebufferSpec);
 
@@ -216,6 +218,7 @@ namespace Vanta {
 
 		s_Data->QuadMaterial = Material::Create(s_Data->QuadPipeline->GetSpecification().Shader, "QuadMaterial");
 		s_Data->LineMaterial = Material::Create(s_Data->LinePipeline->GetSpecification().Shader, "LineMaterial");
+
 	}
 
 	void Renderer2D::Shutdown()
@@ -223,9 +226,10 @@ namespace Vanta {
 		delete s_Data;
 	}
 
-	void Renderer2D::BeginScene(const glm::mat4& viewProj, bool depthTest)
+	void Renderer2D::BeginScene(const glm::mat4& viewProj, const glm::mat4& view, bool depthTest)
 	{
 		s_Data->CameraViewProj = viewProj;
+		s_Data->CameraView = view;
 		s_Data->DepthTest = depthTest;
 
 		Renderer::Submit([viewProj]() mutable
@@ -244,6 +248,9 @@ namespace Vanta {
 		s_Data->CircleVertexBufferPtr = s_Data->CircleVertexBufferBase;
 
 		s_Data->TextureSlotIndex = 1;
+
+		for (uint32_t i = 1; i < s_Data->TextureSlots.size(); i++)
+			s_Data->TextureSlots[i] = nullptr;
 	}
 
 	void Renderer2D::EndScene()
@@ -251,23 +258,25 @@ namespace Vanta {
 		s_Data->CommandBuffer->Begin();
 		Renderer::BeginRenderPass(s_Data->CommandBuffer, s_Data->QuadPipeline->GetSpecification().RenderPass);
 
-		uint32_t dataSize = (uint8_t*)s_Data->QuadVertexBufferPtr - (uint8_t*)s_Data->QuadVertexBufferBase;
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->QuadVertexBufferPtr - (uint8_t*)s_Data->QuadVertexBufferBase);
 		if (dataSize)
 		{
 			s_Data->QuadVertexBuffer->SetData(s_Data->QuadVertexBufferBase, dataSize);
 
-			for (uint32_t i = 0; i < s_Data->TextureSlotIndex; i++)
+			for (uint32_t i = 0; i < s_Data->TextureSlots.size(); i++)
 			{
-				//s_Data->QuadMaterial->Set("")
-				//s_Data->TextureSlots[i]->Bind(i);
+				if (s_Data->TextureSlots[i])
+					s_Data->QuadMaterial->Set("u_Textures", s_Data->TextureSlots[i], i);
+				else
+					s_Data->QuadMaterial->Set("u_Textures", s_Data->WhiteTexture, i);
 			}
 
-			Renderer::RenderGeometry(s_Data->CommandBuffer, s_Data->QuadPipeline, s_Data->UniformBufferSet, s_Data->QuadMaterial, s_Data->QuadVertexBuffer, s_Data->QuadIndexBuffer, glm::mat4(1.0f), s_Data->QuadIndexCount);
+			Renderer::RenderGeometry(s_Data->CommandBuffer, s_Data->QuadPipeline, s_Data->UniformBufferSet, nullptr, s_Data->QuadMaterial, s_Data->QuadVertexBuffer, s_Data->QuadIndexBuffer, glm::mat4(1.0f), s_Data->QuadIndexCount);
 
 			s_Data->Stats.DrawCalls++;
 		}
 
-		dataSize = (uint8_t*)s_Data->LineVertexBufferPtr - (uint8_t*)s_Data->LineVertexBufferBase;
+		dataSize = (uint32_t)((uint8_t*)s_Data->LineVertexBufferPtr - (uint8_t*)s_Data->LineVertexBufferBase);
 		if (dataSize)
 		{
 			s_Data->LineVertexBuffer->SetData(s_Data->LineVertexBufferBase, dataSize);
@@ -279,8 +288,8 @@ namespace Vanta {
 				VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 				vkCmdSetLineWidth(commandBuffer, s_Data->LineWidth);
 			});
-			Renderer::RenderGeometry(s_Data->CommandBuffer, s_Data->LineOnTopPipeline, s_Data->UniformBufferSet, s_Data->LineMaterial, s_Data->LineVertexBuffer, s_Data->LineIndexBuffer, glm::mat4(1.0f), s_Data->LineIndexCount);
-
+			Renderer::RenderGeometry(s_Data->CommandBuffer, s_Data->LinePipeline, s_Data->UniformBufferSet, nullptr, s_Data->LineMaterial, s_Data->LineVertexBuffer, s_Data->LineIndexBuffer, glm::mat4(1.0f), s_Data->LineIndexCount);
+		
 			s_Data->Stats.DrawCalls++;
 		}
 
@@ -543,6 +552,110 @@ namespace Vanta {
 		s_Data->Stats.QuadCount++;
 	}
 
+	void Renderer2D::DrawQuadBillboard(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color)
+	{
+		if (s_Data->QuadIndexCount >= Renderer2DData::MaxIndices)
+			FlushAndReset();
+
+		const float textureIndex = 0.0f; // White Texture
+		const float tilingFactor = 1.0f;
+
+		glm::vec3 camRightWS = { s_Data->CameraView[0][0], s_Data->CameraView[1][0], s_Data->CameraView[2][0] };
+		glm::vec3 camUpWS = { s_Data->CameraView[0][1], s_Data->CameraView[1][1], s_Data->CameraView[2][1] };
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * (s_Data->QuadVertexPositions[0].x) * size.x + camUpWS * s_Data->QuadVertexPositions[0].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 0.0f, 0.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * s_Data->QuadVertexPositions[1].x * size.x + camUpWS * s_Data->QuadVertexPositions[1].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 1.0f, 0.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * s_Data->QuadVertexPositions[2].x * size.x + camUpWS * s_Data->QuadVertexPositions[2].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 1.0f, 1.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * s_Data->QuadVertexPositions[3].x * size.x + camUpWS * s_Data->QuadVertexPositions[3].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 0.0f, 1.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadIndexCount += 6;
+
+		s_Data->Stats.QuadCount++;
+	}
+
+	void Renderer2D::DrawQuadBillboard(const glm::vec3& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor)
+	{
+		if (s_Data->QuadIndexCount >= Renderer2DData::MaxIndices)
+			FlushAndReset();
+
+		constexpr glm::vec4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+		float textureIndex = 0.0f;
+		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++)
+		{
+			if (*s_Data->TextureSlots[i].Raw() == *texture.Raw())
+			{
+				textureIndex = (float)i;
+				break;
+			}
+		}
+
+		if (textureIndex == 0.0f)
+		{
+			textureIndex = (float)s_Data->TextureSlotIndex;
+			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			s_Data->TextureSlotIndex++;
+		}
+
+		glm::vec3 camRightWS = { s_Data->CameraView[0][0], s_Data->CameraView[1][0], s_Data->CameraView[2][0] };
+		glm::vec3 camUpWS = { s_Data->CameraView[0][1], s_Data->CameraView[1][1], s_Data->CameraView[2][1] };
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * (s_Data->QuadVertexPositions[0].x) * size.x + camUpWS * s_Data->QuadVertexPositions[0].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 0.0f, 1.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * s_Data->QuadVertexPositions[1].x * size.x + camUpWS * s_Data->QuadVertexPositions[1].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 0.0f, 0.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * s_Data->QuadVertexPositions[2].x * size.x + camUpWS * s_Data->QuadVertexPositions[2].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 1.0f, 0.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadVertexBufferPtr->Position = position + camRightWS * s_Data->QuadVertexPositions[3].x * size.x + camUpWS * s_Data->QuadVertexPositions[3].y * size.y;
+		s_Data->QuadVertexBufferPtr->Color = color;
+		s_Data->QuadVertexBufferPtr->TexCoord = { 1.0f, 1.0f };
+		s_Data->QuadVertexBufferPtr->TexIndex = textureIndex;
+		s_Data->QuadVertexBufferPtr->TilingFactor = tilingFactor;
+		s_Data->QuadVertexBufferPtr++;
+
+		s_Data->QuadIndexCount += 6;
+
+		s_Data->Stats.QuadCount++;
+	}
+
 	void Renderer2D::DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size, float rotation, const glm::vec4& color)
 	{
 		DrawRotatedQuad({ position.x, position.y, 0.0f }, size, rotation, color);
@@ -699,12 +812,12 @@ namespace Vanta {
 		}
 	}
 
-	void Renderer2D::DrawCircle(const glm::vec2& position, float radius, const glm::vec4& color, float thickness)
+	void Renderer2D::FillCircle(const glm::vec2& position, float radius, const glm::vec4& color, float thickness)
 	{
-		DrawCircle({ position.x, position.y, 0.0f }, radius, color, thickness);
+		FillCircle({ position.x, position.y, 0.0f }, radius, color, thickness);
 	}
 
-	void Renderer2D::DrawCircle(const glm::vec3& position, float radius, const glm::vec4& color, float thickness)
+	void Renderer2D::FillCircle(const glm::vec3& position, float radius, const glm::vec4& color, float thickness)
 	{
 		if (s_Data->CircleIndexCount >= Renderer2DData::MaxIndices)
 			FlushAndReset();
@@ -744,6 +857,29 @@ namespace Vanta {
 		s_Data->Stats.LineCount++;
 	}
 
+	void Renderer2D::DrawCircle(const glm::vec3& position, const glm::vec3& rotation, float radius, const glm::vec4& color)
+	{
+		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
+			* glm::rotate(glm::mat4(1.0f), rotation.x, { 1.0f, 0.0f, 0.0f })
+			* glm::rotate(glm::mat4(1.0f), rotation.y, { 0.0f, 1.0f, 0.0f })
+			* glm::rotate(glm::mat4(1.0f), rotation.z, { 0.0f, 0.0f, 1.0f })
+			* glm::scale(glm::mat4(1.0f), glm::vec3(radius));
+
+		int segments = 32;
+		for (int i = 0; i < segments; i++)
+		{
+			float angle = 2.0f * glm::pi<float>() * (float)i / segments;
+			glm::vec4 startPosition = { glm::cos(angle), glm::sin(angle), 0.0f, 1.0f };
+			angle = 2.0f * glm::pi<float>() * (float)((i + 1) % segments) / segments;
+			glm::vec4 endPosition = { glm::cos(angle), glm::sin(angle), 0.0f, 1.0f };
+
+			glm::vec3 p0 = transform * startPosition;
+			glm::vec3 p1 = transform * endPosition;
+			DrawLine(p0, p1, color);
+		}
+
+	}
+
 	void Renderer2D::DrawAABB(Ref<Mesh> mesh, const glm::mat4& transform, const glm::vec4& color)
 	{
 		const auto& meshAssetSubmeshes = mesh->GetMeshAsset()->GetSubmeshes();
@@ -776,13 +912,13 @@ namespace Vanta {
 		};
 
 		for (uint32_t i = 0; i < 4; i++)
-			Renderer2D::DrawLine(corners[i], corners[(i + 1) % 4], color);
+			DrawLine(corners[i], corners[(i + 1) % 4], color);
 
 		for (uint32_t i = 0; i < 4; i++)
-			Renderer2D::DrawLine(corners[i + 4], corners[((i + 1) % 4) + 4], color);
+			DrawLine(corners[i + 4], corners[((i + 1) % 4) + 4], color);
 
 		for (uint32_t i = 0; i < 4; i++)
-			Renderer2D::DrawLine(corners[i], corners[i + 4], color);
+			DrawLine(corners[i], corners[i + 4], color);
 	}
 
 	void Renderer2D::SetLineWidth(float lineWidth)

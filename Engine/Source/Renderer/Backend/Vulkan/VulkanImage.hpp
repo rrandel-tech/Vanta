@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Renderer/Image.hpp"
-#include "VulkanContext.hpp"
+#include "Renderer/Backend/Vulkan/VulkanContext.hpp"
 
-#include "vulkan/vulkan.h"
-
+#include "vulkan/vulkan.hpp"
 #include "vk_mem_alloc.h"
 
 namespace Vanta {

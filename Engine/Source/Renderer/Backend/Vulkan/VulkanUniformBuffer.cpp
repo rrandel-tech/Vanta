@@ -60,8 +60,9 @@ namespace Vanta {
 	{
 		VulkanAllocator allocator("VulkanUniformBuffer");
 		uint8_t* pData = allocator.MapMemory<uint8_t>(m_MemoryAlloc);
-		memcpy(pData, (uint8_t*)data + offset, size);
+		memcpy(pData, (const uint8_t*)data + offset, size);
 		allocator.UnmapMemory(m_MemoryAlloc);
 	}
+
 
 }

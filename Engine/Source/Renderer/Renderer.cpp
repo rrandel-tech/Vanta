@@ -14,6 +14,7 @@
 #include "Debug/Profiler.hpp"
 
 #include "Renderer/Backend/OpenGL/OpenGLRenderer.hpp"
+#include "Renderer/Backend/Vulkan/VulkanComputePipeline.hpp"
 #include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
 
 #include "Renderer/Backend/Vulkan/VulkanContext.hpp"
@@ -79,6 +80,7 @@ namespace Vanta {
 		Ref<ShaderLibrary> m_ShaderLibrary;
 
 		Ref<Texture2D> WhiteTexture;
+		Ref<Texture2D> BlackTexture;
 		Ref<Texture2D> BRDFLutTexture;
 		Ref<TextureCube> BlackCubeTexture;
 		Ref<Environment> EmptyEnvironment;
@@ -92,13 +94,12 @@ namespace Vanta {
 	{
 		switch (RendererAPI::Current())
 		{
-			case RendererAPIType::OpenGL: return new OpenGLRenderer();
 			case RendererAPIType::Vulkan: return new VulkanRenderer();
 		}
 		VA_CORE_ASSERT(false, "Unknown RendererAPI");
 		return nullptr;
 	}
-
+	
 	void Renderer::Init()
 	{
 		s_Data = new RendererData();
@@ -109,6 +110,9 @@ namespace Vanta {
 		s_RendererAPI = InitRendererAPI();
 
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
+
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D.glsl");
+
 
 		// Compute shaders
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
@@ -124,18 +128,21 @@ namespace Vanta {
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Wireframe.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Skybox.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowMap.glsl");
-
+		
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreDepth.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/LightCulling.glsl", true);
+		
 		// Renderer2D Shaders
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Line.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Circle.glsl");
-
+		
 		// Jump Flood Shaders
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Init.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Pass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Composite.glsl");
-
+		
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SelectedGeometry.glsl");
+
 
 		// Compile shaders
 		Renderer::WaitAndRender();
@@ -143,14 +150,16 @@ namespace Vanta {
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data->WhiteTexture = Texture2D::Create(ImageFormat::RGBA, 1, 1, &whiteTextureData);
 
+		uint32_t blackTextureData = 0xff000000;
+		s_Data->BlackTexture = Texture2D::Create(ImageFormat::RGBA, 1, 1, &blackTextureData);
 		{
 			TextureProperties props;
 			props.SamplerWrap = TextureWrap::Clamp;
 			s_Data->BRDFLutTexture = Texture2D::Create("Resources/Renderer/BRDF_LUT.tga", props);
 		}
-
-		uint32_t blackTextureData[6] = { 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000 };
-		s_Data->BlackCubeTexture = TextureCube::Create(ImageFormat::RGBA, 1, 1, &blackTextureData);
+		
+		uint32_t blackCubeTextureData[6] = { 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000 };
+		s_Data->BlackCubeTexture = TextureCube::Create(ImageFormat::RGBA, 1, 1, &blackCubeTextureData);
 
 		s_Data->EmptyEnvironment = Ref<Environment>::Create(s_Data->BlackCubeTexture, s_Data->BlackCubeTexture);
 
@@ -218,33 +227,39 @@ namespace Vanta {
 		return s_RendererAPI->CreateEnvironmentMap(filepath);
 	}
 
+	/* void Renderer::LightCulling(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> computePipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec2& screenSize, const glm::ivec3& workGroups)
+	{
+		s_RendererAPI->LightCulling(renderCommandBuffer, computePipeline, uniformBufferSet, storageBufferSet, material, screenSize, workGroups);
+	} */
+
 	Ref<TextureCube> Renderer::CreatePreethamSky(float turbidity, float azimuth, float inclination)
 	{
 		return s_RendererAPI->CreatePreethamSky(turbidity, azimuth, inclination);
 	}
-
-	void Renderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
+	
+	void Renderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
 	{
-		s_RendererAPI->RenderMesh(renderCommandBuffer, pipeline, uniformBufferSet, mesh, transform);
+		s_RendererAPI->RenderMesh(renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, mesh, transform);
 	}
 
-	void Renderer::RenderMeshWithMaterial(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Mesh> mesh, const glm::mat4& transform, Ref<Material> material, Buffer additionalUniforms)
+	void Renderer::RenderMeshWithMaterial(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Mesh> mesh, const glm::mat4& transform, Ref<Material> material, Buffer additionalUniforms)
 	{
-		s_RendererAPI->RenderMeshWithMaterial(renderCommandBuffer, pipeline, uniformBufferSet, mesh, material, transform, additionalUniforms);
+		s_RendererAPI->RenderMeshWithMaterial(renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, mesh, material, transform, additionalUniforms);
 	}
 
-	void Renderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, const glm::mat4& transform)
+	void Renderer::RenderQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::mat4& transform)
 	{
-		s_RendererAPI->RenderQuad(renderCommandBuffer, pipeline, uniformBufferSet, material, transform);
+		s_RendererAPI->RenderQuad(renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, material, transform);
 	}
 
-	void Renderer::RenderGeometry(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer, const glm::mat4& transform, uint32_t indexCount /*= 0*/)
+	void Renderer::RenderGeometry(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer, const glm::mat4& transform, uint32_t indexCount /*= 0*/)
 	{
-		s_RendererAPI->RenderGeometry(renderCommandBuffer, pipeline, uniformBufferSet, material, vertexBuffer, indexBuffer, transform, indexCount);
+		s_RendererAPI->RenderGeometry(renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, material, vertexBuffer, indexBuffer, transform, indexCount);
 	}
 
 	void Renderer::SubmitQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Material> material, const glm::mat4& transform)
 	{
+		VA_CORE_ASSERT(false, "Not Implemented");
 		/*bool depthTest = true;
 		if (material)
 		{
@@ -265,6 +280,11 @@ namespace Vanta {
 	void Renderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
 	{
 		s_RendererAPI->SubmitFullscreenQuad(renderCommandBuffer, pipeline, uniformBufferSet, material);
+	}
+
+	void Renderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material)
+	{
+		s_RendererAPI->SubmitFullscreenQuad(renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, material);
 	}
 
 	void Renderer::SubmitFullscreenQuadWithOverrides(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material, Buffer vertexShaderOverrides, Buffer fragmentShaderOverrides)
@@ -310,6 +330,11 @@ namespace Vanta {
 		return s_Data->WhiteTexture;
 	}
 
+	Ref<Texture2D> Renderer::GetBlackTexture()
+	{
+		return s_Data->BlackTexture;
+	}
+	
 	Ref<Texture2D> Renderer::GetBRDFLutTexture()
 	{
 		return s_Data->BRDFLutTexture;

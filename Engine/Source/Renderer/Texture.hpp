@@ -52,9 +52,9 @@ namespace Vanta {
 	public:
 		static Ref<TextureCube> Create(ImageFormat format, uint32_t width, uint32_t height, const void* data = nullptr, TextureProperties properties = TextureProperties());
 		static Ref<TextureCube> Create(const std::string& path, TextureProperties properties = TextureProperties());
-
+#if NEEDED
 		virtual const std::string& GetPath() const = 0;
-
+#endif
 		virtual TextureType GetType() const override { return TextureType::TextureCube; }
 
 		static AssetType GetStaticType() { return AssetType::EnvMap; }

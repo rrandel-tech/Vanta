@@ -18,21 +18,33 @@ namespace Vanta {
 
 		virtual size_t GetHash() const override;
 
+
 		RendererID GetRendererID() const { return m_RendererID; }
 
 		void Bind();
 
-		void SetUniformBuffer(const std::string& name, const void* data, uint32_t size);
-		void SetUniform(const std::string& fullname, float value);
-		void SetUniform(const std::string& fullname, int value);
-		void SetUniform(const std::string& fullname, uint32_t value);
-		void SetUniform(const std::string& fullname, const glm::vec2& value);
-		void SetUniform(const std::string& fullname, const glm::vec3& value);
-		void SetUniform(const std::string& fullname, const glm::vec4& value);
-		void SetUniform(const std::string& fullname, const glm::mat3& value);
-		void SetUniform(const std::string& fullname, const glm::mat4& value);
+		static const ShaderUniformBuffer& FindUniformBuffer(const std::string& name);
+		static void SetUniformBuffer(const ShaderUniformBuffer& buffer, const void* data, uint32_t size, uint32_t offset = 0);
+		static void SetStorageBuffer(const ShaderStorageBuffer& buffer, const void* data, uint32_t size, uint32_t offset = 0);
 
-		void SetIntArray(const std::string& name, int* values, uint32_t size);
+		virtual void SetUniformBuffer(const std::string& name, const void* data, uint32_t size);
+		virtual void SetStorageBuffer(const std::string& name, const void* data, uint32_t size);
+
+		virtual void ResizeStorageBuffer(uint32_t bindingPoint, uint32_t newSize);
+
+		virtual void SetUniform(const std::string& fullname, float value);
+		virtual void SetUniform(const std::string& fullname, int value);
+		virtual void SetUniform(const std::string& fullname, const glm::ivec2& value);
+		virtual void SetUniform(const std::string& fullname, const glm::ivec3& value);
+		virtual void SetUniform(const std::string& fullname, const glm::ivec4& value);
+		virtual void SetUniform(const std::string& fullname, uint32_t value);
+		virtual void SetUniform(const std::string& fullname, const glm::vec2& value);
+		virtual void SetUniform(const std::string& fullname, const glm::vec3& value);
+		virtual void SetUniform(const std::string& fullname, const glm::vec4& value);
+		virtual void SetUniform(const std::string& fullname, const glm::mat3& value);
+		virtual void SetUniform(const std::string& fullname, const glm::mat4& value);
+
+
 
 		virtual const std::string& GetName() const override { return m_Name; }
 
@@ -46,6 +58,7 @@ namespace Vanta {
 		void Load(const std::string& source, bool forceCompile);
 		void Compile(const std::vector<uint32_t>& vertexBinary, const std::vector<uint32_t>& fragmentBinary);
 		void Reflect(std::vector<uint32_t>& data);
+
 
 		void CompileOrGetVulkanBinary(std::unordered_map<uint32_t, std::vector<uint32_t>>& outputBinary, bool forceCompile = false);
 		void CompileOrGetOpenGLBinary(const std::unordered_map<uint32_t, std::vector<uint32_t>>&, bool forceCompile = false);
@@ -91,10 +104,12 @@ namespace Vanta {
 
 		std::vector<ShaderReloadedCallback> m_ShaderReloadedCallbacks;
 		inline static std::unordered_map<uint32_t, ShaderUniformBuffer> s_UniformBuffers;
+		inline static std::unordered_map<uint32_t, ShaderStorageBuffer> s_StorageBuffers;
 
 		std::unordered_map<std::string, ShaderBuffer> m_Buffers;
 		std::unordered_map<std::string, ShaderResourceDeclaration> m_Resources;
 		std::unordered_map<std::string, GLint> m_UniformLocations;
+
 	};
 
 }

@@ -1,10 +1,9 @@
- #pragma once
+#pragma once
 
 #include "Renderer/Pipeline.hpp"
 
 #include "Vulkan.hpp"
 #include "VulkanShader.hpp"
-
 #include <map>
 
 namespace Vanta {

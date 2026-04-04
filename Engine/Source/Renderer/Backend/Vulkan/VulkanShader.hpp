@@ -3,7 +3,6 @@
 #include "Renderer/Shader.hpp"
 
 #include "Vulkan.hpp"
-
 #include "vk_mem_alloc.h"
 
 namespace Vanta {
@@ -20,10 +19,21 @@ namespace Vanta {
 			VkShaderStageFlagBits ShaderStage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 		};
 
+		struct StorageBuffer
+		{
+			VmaAllocation MemoryAlloc = nullptr;
+			VkDescriptorBufferInfo Descriptor;
+			uint32_t Size = 0;
+			uint32_t BindingPoint = 0;
+			std::string Name;
+			VkShaderStageFlagBits ShaderStage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
+		};
+
 		struct ImageSampler
 		{
 			uint32_t BindingPoint = 0;
 			uint32_t DescriptorSet = 0;
+			uint32_t ArraySize = 0;
 			std::string Name;
 			VkShaderStageFlagBits ShaderStage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 		};
@@ -66,16 +76,17 @@ namespace Vanta {
 		struct ShaderDescriptorSet
 		{
 			std::unordered_map<uint32_t, UniformBuffer*> UniformBuffers;
+			std::unordered_map<uint32_t, StorageBuffer*> StorageBuffers;
 			std::unordered_map<uint32_t, ImageSampler> ImageSamplers;
 			std::unordered_map<uint32_t, ImageSampler> StorageImages;
 
 			std::unordered_map<std::string, VkWriteDescriptorSet> WriteDescriptorSets;
 
-			operator bool() const { return !(UniformBuffers.empty() && ImageSamplers.empty() && StorageImages.empty()); }
+			operator bool() const { return !(StorageBuffers.empty() && UniformBuffers.empty() && ImageSamplers.empty() && StorageImages.empty()); }
 		};
 		const std::vector<ShaderDescriptorSet>& GetShaderDescriptorSets() const { return m_ShaderDescriptorSets; }
 		bool HasDescriptorSet(uint32_t set) const { return m_TypeCounts.find(set) != m_TypeCounts.end(); }
-
+		
 		const std::vector<PushConstantRange>& GetPushConstantRanges() const { return m_PushConstantRanges; }
 
 		struct ShaderMaterialDescriptorSet

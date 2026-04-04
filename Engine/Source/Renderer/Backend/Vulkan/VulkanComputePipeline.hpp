@@ -1,25 +1,27 @@
 #pragma once
 
+#include "Renderer/PipelineCompute.hpp"
+
 #include "VulkanShader.hpp"
 #include "VulkanTexture.hpp"
+#include "VulkanRenderCommandBuffer.hpp"
 
-#include "vulkan/vulkan.h"
+#include "vulkan/vulkan.hpp"
 
 namespace Vanta {
 
-	class VulkanComputePipeline : public RefCounted
+	class VulkanComputePipeline : public PipelineCompute
 	{
 	public:
 		VulkanComputePipeline(Ref<Shader> computeShader);
-		~VulkanComputePipeline();
 
 		void Execute(VkDescriptorSet* descriptorSets, uint32_t descriptorSetCount, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-		void Begin();
+		virtual void Begin(Ref<RenderCommandBuffer> renderCommandBuffer = nullptr) override;
 		void Dispatch(VkDescriptorSet descriptorSet, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
-		void End();
+		virtual void End() override;
 
-		Ref<VulkanShader> GetShader() { return m_Shader; }
+		virtual Ref<Shader> GetShader() override { return m_Shader; }
 
 		void SetPushConstants(const void* data, uint32_t size);
 	private:
@@ -32,6 +34,8 @@ namespace Vanta {
 		VkPipeline m_ComputePipeline = nullptr;
 
 		VkCommandBuffer m_ActiveComputeCommandBuffer = nullptr;
+
+		bool m_UsingGraphicsQueue = false;
 	};
 
 }

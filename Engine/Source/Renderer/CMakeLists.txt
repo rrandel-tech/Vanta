@@ -1,51 +1,59 @@
 set(RENDERER_SOURCES
 		Camera.cpp
 		Framebuffer.cpp
+		Image.cpp
 		IndexBuffer.cpp
 		Material.cpp
 		Mesh.cpp
+		MeshFactory.cpp
 		Pipeline.cpp
+		PipelineCompute.cpp
+		RenderCommandBuffer.cpp
 		RenderCommandQueue.cpp
 		Renderer.cpp
 		Renderer2D.cpp
+		RendererContext.cpp
 		RenderPass.cpp
 		SceneEnvironment.cpp
 		SceneRenderer.cpp
 		Shader.cpp
+		StorageBuffer.cpp
+		StorageBufferSet.cpp
 		Texture.cpp
-		VertexBuffer.cpp
-		Image.cpp
 		UniformBuffer.cpp
-		RendererContext.cpp
-		RenderCommandBuffer.cpp
 		UniformBufferSet.cpp
+		VertexBuffer.cpp
 )
 
 set(RENDERER_HEADERS
 		Camera.hpp
 		Framebuffer.hpp
+		Image.hpp
 		IndexBuffer.hpp
 		Material.hpp
 		Mesh.hpp
+		MeshFactory.hpp
 		Pipeline.hpp
+		PipelineCompute.hpp
+		RenderCommandBuffer.hpp
 		RenderCommandQueue.hpp
 		Renderer.hpp
 		Renderer2D.hpp
 		RendererAPI.hpp
+		RendererCapabilities.hpp
+		RendererContext.hpp
+		RendererTypes.hpp
 		RenderPass.hpp
 		SceneEnvironment.hpp
 		SceneRenderer.hpp
 		Shader.hpp
 		ShaderUniform.hpp
+		StorageBuffer.hpp
+		StorageBufferSet.hpp
 		Texture.hpp
-		VertexBuffer.hpp
-		Image.hpp
-		RendererCapabilities.hpp
-		RendererContext.hpp
 		UniformBuffer.hpp
-		RendererTypes.hpp
-		RenderCommandBuffer.hpp
 		UniformBufferSet.hpp
+		VertexBuffer.hpp
 )
 
 target_sources(Vanta

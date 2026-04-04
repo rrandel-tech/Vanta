@@ -21,7 +21,7 @@ namespace Vanta {
 		void Init(VkInstance instance, const Ref<VulkanDevice>& device);
 		void InitSurface(SDL_Window* windowHandle);
 		void Create(uint32_t* width, uint32_t* height, bool vsync);
-
+		
 		void OnResize(uint32_t width, uint32_t height);
 
 		void BeginFrame();

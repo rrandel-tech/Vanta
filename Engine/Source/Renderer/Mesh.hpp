@@ -15,7 +15,6 @@
 
 #include "Math/AABB.hpp"
 
-
 struct aiNode;
 struct aiAnimation;
 struct aiNodeAnim;
@@ -101,7 +100,7 @@ namespace Vanta {
 					return;
 				}
 			}
-
+			
 			// should never get here - more bones than we have space for
 			VA_CORE_ASSERT(false, "Too many bones!");
 		}
@@ -179,7 +178,7 @@ namespace Vanta {
 		glm::vec3 InterpolateScale(float animationTime, const aiNodeAnim* nodeAnim);
 	private:
 		std::vector<Submesh> m_Submeshes;
-
+		
 		std::unique_ptr<Assimp::Importer> m_Importer;
 
 		glm::mat4 m_InverseTransform;

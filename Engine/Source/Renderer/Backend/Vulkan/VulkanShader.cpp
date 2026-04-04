@@ -11,7 +11,7 @@
 
 #include <filesystem>
 
-#include "VulkanRenderer.hpp"
+#include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
 
 namespace Vanta {
 
@@ -35,16 +35,21 @@ namespace Vanta {
 			switch (type.basetype)
 			{
 			case spirv_cross::SPIRType::Boolean:  return ShaderUniformType::Bool;
-			case spirv_cross::SPIRType::Int:      return ShaderUniformType::Int;
+			case spirv_cross::SPIRType::Int:      
+				if (type.vecsize == 1)            return ShaderUniformType::Int;
+				if (type.vecsize == 2)            return ShaderUniformType::IVec2;
+				if (type.vecsize == 3)            return ShaderUniformType::IVec3;
+				if (type.vecsize == 4)            return ShaderUniformType::IVec4;
+				
 			case spirv_cross::SPIRType::UInt:     return ShaderUniformType::UInt;
 			case spirv_cross::SPIRType::Float:
+				if (type.columns == 3)            return ShaderUniformType::Mat3;
+				if (type.columns == 4)            return ShaderUniformType::Mat4;
+
 				if (type.vecsize == 1)            return ShaderUniformType::Float;
 				if (type.vecsize == 2)            return ShaderUniformType::Vec2;
 				if (type.vecsize == 3)            return ShaderUniformType::Vec3;
 				if (type.vecsize == 4)            return ShaderUniformType::Vec4;
-
-				if (type.columns == 3)            return ShaderUniformType::Mat3;
-				if (type.columns == 4)            return ShaderUniformType::Mat4;
 				break;
 			}
 			VA_CORE_ASSERT(false, "Unknown type!");
@@ -54,6 +59,7 @@ namespace Vanta {
 	}
 
 	static std::unordered_map<uint32_t, std::unordered_map<uint32_t, VulkanShader::UniformBuffer*>> s_UniformBuffers; // set -> binding point -> buffer
+	static std::unordered_map<uint32_t, std::unordered_map<uint32_t, VulkanShader::StorageBuffer*>> s_StorageBuffers; // set -> binding point -> buffer
 
 	VulkanShader::VulkanShader(const std::string& path, bool forceCompile)
 		: m_AssetPath(path)
@@ -74,6 +80,7 @@ namespace Vanta {
 	void VulkanShader::ClearUniformBuffers()
 	{
 		s_UniformBuffers.clear();
+		s_StorageBuffers.clear();
 	}
 
 	static std::string ReadShaderFromFile(const std::string& filepath)
@@ -186,10 +193,10 @@ namespace Vanta {
 		{
 			const auto& name = resource.name;
 			auto& bufferType = compiler.get_type(resource.base_type_id);
-			int memberCount = bufferType.member_types.size();
+			int memberCount = (uint32_t)bufferType.member_types.size();
 			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			uint32_t descriptorSet = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t size = compiler.get_declared_struct_size(bufferType);
+			uint32_t size = (uint32_t)compiler.get_declared_struct_size(bufferType);
 
 			if (descriptorSet >= m_ShaderDescriptorSets.size())
 				m_ShaderDescriptorSets.resize(descriptorSet + 1);
@@ -201,7 +208,7 @@ namespace Vanta {
 				uniformBuffer->BindingPoint = binding;
 				uniformBuffer->Size = size;
 				uniformBuffer->Name = name;
-				uniformBuffer->ShaderStage = shaderStage;
+				uniformBuffer->ShaderStage = VK_SHADER_STAGE_ALL;
 				s_UniformBuffers.at(descriptorSet)[binding] = uniformBuffer;
 			}
 			else
@@ -209,10 +216,48 @@ namespace Vanta {
 				UniformBuffer* uniformBuffer = s_UniformBuffers.at(descriptorSet).at(binding);
 				if (size > uniformBuffer->Size)
 					uniformBuffer->Size = size;
-				
+
 			}
 
 			shaderDescriptorSet.UniformBuffers[binding] = s_UniformBuffers.at(descriptorSet).at(binding);
+
+			VA_CORE_TRACE("  {0} ({1}, {2})", name, descriptorSet, binding);
+			VA_CORE_TRACE("  Member Count: {0}", memberCount);
+			VA_CORE_TRACE("  Size: {0}", size);
+			VA_CORE_TRACE("-------------------");
+		}
+
+		VA_CORE_TRACE("Storage Buffers:");
+		for (const auto& resource : resources.storage_buffers)
+		{
+			const auto& name = resource.name;
+			auto& bufferType = compiler.get_type(resource.base_type_id);
+			uint32_t memberCount = (uint32_t)bufferType.member_types.size();
+			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			uint32_t descriptorSet = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			uint32_t size = (uint32_t)compiler.get_declared_struct_size(bufferType);
+
+			if (descriptorSet >= m_ShaderDescriptorSets.size())
+				m_ShaderDescriptorSets.resize(descriptorSet + 1);
+
+			ShaderDescriptorSet& shaderDescriptorSet = m_ShaderDescriptorSets[descriptorSet];
+			if (s_StorageBuffers[descriptorSet].find(binding) == s_StorageBuffers[descriptorSet].end())
+			{
+				StorageBuffer* storageBuffer = new StorageBuffer();
+				storageBuffer->BindingPoint = binding;
+				storageBuffer->Size = size;
+				storageBuffer->Name = name;
+				storageBuffer->ShaderStage = VK_SHADER_STAGE_ALL;
+				s_StorageBuffers.at(descriptorSet)[binding] = storageBuffer;
+			}
+			else
+			{
+				StorageBuffer* storageBuffer = s_StorageBuffers.at(descriptorSet).at(binding);
+				if (size > storageBuffer->Size)
+					storageBuffer->Size = size;
+			}
+
+			shaderDescriptorSet.StorageBuffers[binding] = s_StorageBuffers.at(descriptorSet).at(binding);
 
 			VA_CORE_TRACE("  {0} ({1}, {2})", name, descriptorSet, binding);
 			VA_CORE_TRACE("  Member Count: {0}", memberCount);
@@ -225,8 +270,8 @@ namespace Vanta {
 		{
 			const auto& bufferName = resource.name;
 			auto& bufferType = compiler.get_type(resource.base_type_id);
-			auto bufferSize = compiler.get_declared_struct_size(bufferType);
-			int memberCount = bufferType.member_types.size();
+			auto bufferSize = (uint32_t)compiler.get_declared_struct_size(bufferType);
+			uint32_t memberCount = uint32_t(bufferType.member_types.size());
 			uint32_t bufferOffset = 0;
 			if (m_PushConstantRanges.size())
 				bufferOffset = m_PushConstantRanges.back().Offset + m_PushConstantRanges.back().Size;
@@ -248,14 +293,14 @@ namespace Vanta {
 			VA_CORE_TRACE("  Member Count: {0}", memberCount);
 			VA_CORE_TRACE("  Size: {0}", bufferSize);
 
-			for (int i = 0; i < memberCount; i++)
+			for (uint32_t i = 0; i < memberCount; i++)
 			{
 				auto type = compiler.get_type(bufferType.member_types[i]);
 				const auto& memberName = compiler.get_member_name(bufferType.self, i);
-				auto size = compiler.get_declared_struct_member_size(bufferType, i);
+				auto size = (uint32_t)compiler.get_declared_struct_member_size(bufferType, i);
 				auto offset = compiler.type_struct_member_offset(bufferType, i) - bufferOffset;
 
-				std::string uniformName = bufferName + "." + memberName;
+				std::string uniformName = std::format("{}.{}", bufferName, memberName);
 				buffer.Uniforms[uniformName] = ShaderUniform(uniformName, Utils::SPIRTypeToShaderUniformType(type), size, offset);
 			}
 		}
@@ -264,11 +309,14 @@ namespace Vanta {
 		for (const auto& resource : resources.sampled_images)
 		{
 			const auto& name = resource.name;
-			auto& type = compiler.get_type(resource.base_type_id);
+			auto& baseType = compiler.get_type(resource.base_type_id);
+			auto& type = compiler.get_type(resource.type_id);
 			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			uint32_t descriptorSet = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t dimension = type.image.dim;
-
+			uint32_t dimension = baseType.image.dim;
+			uint32_t arraySize = type.array[0];
+			if (arraySize == 0)
+				arraySize = 1;
 			if (descriptorSet >= m_ShaderDescriptorSets.size())
 				m_ShaderDescriptorSets.resize(descriptorSet + 1);
 
@@ -310,7 +358,7 @@ namespace Vanta {
 
 		VA_CORE_TRACE("===========================");
 
-	
+
 	}
 
 	void VulkanShader::CreateDescriptors()
@@ -330,19 +378,25 @@ namespace Vanta {
 			{
 				VkDescriptorPoolSize& typeCount = m_TypeCounts[set].emplace_back();
 				typeCount.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				typeCount.descriptorCount = shaderDescriptorSet.UniformBuffers.size();
+				typeCount.descriptorCount = (uint32_t)(shaderDescriptorSet.UniformBuffers.size());
+			}
+			if (shaderDescriptorSet.StorageBuffers.size())
+			{
+				VkDescriptorPoolSize& typeCount = m_TypeCounts[set].emplace_back();
+				typeCount.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				typeCount.descriptorCount = (uint32_t)(shaderDescriptorSet.StorageBuffers.size());
 			}
 			if (shaderDescriptorSet.ImageSamplers.size())
 			{
 				VkDescriptorPoolSize& typeCount = m_TypeCounts[set].emplace_back();
 				typeCount.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				typeCount.descriptorCount = shaderDescriptorSet.ImageSamplers.size();
+				typeCount.descriptorCount = (uint32_t)(shaderDescriptorSet.ImageSamplers.size());
 			}
 			if (shaderDescriptorSet.StorageImages.size())
 			{
 				VkDescriptorPoolSize& typeCount = m_TypeCounts[set].emplace_back();
 				typeCount.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				typeCount.descriptorCount = shaderDescriptorSet.StorageImages.size();
+				typeCount.descriptorCount = (uint32_t)(shaderDescriptorSet.StorageImages.size());
 			}
 
 #if 0
@@ -380,6 +434,23 @@ namespace Vanta {
 				set.dstBinding = layoutBinding.binding;
 			}
 
+			for (auto& [binding, strorageBuffer] : shaderDescriptorSet.StorageBuffers)
+			{
+				VkDescriptorSetLayoutBinding& layoutBinding = layoutBindings.emplace_back();
+				layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				layoutBinding.descriptorCount = 1;
+				layoutBinding.stageFlags = strorageBuffer->ShaderStage;
+				layoutBinding.pImmutableSamplers = nullptr;
+				layoutBinding.binding = binding;
+
+				VkWriteDescriptorSet& set = shaderDescriptorSet.WriteDescriptorSets[strorageBuffer->Name];
+				set = {};
+				set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				set.descriptorType = layoutBinding.descriptorType;
+				set.descriptorCount = 1;
+				set.dstBinding = layoutBinding.binding;
+			}
+
 			for (auto& [binding, imageSampler] : shaderDescriptorSet.ImageSamplers)
 			{
 				auto& layoutBinding = layoutBindings.emplace_back();
@@ -390,6 +461,7 @@ namespace Vanta {
 				layoutBinding.binding = binding;
 
 				VA_CORE_ASSERT(shaderDescriptorSet.UniformBuffers.find(binding) == shaderDescriptorSet.UniformBuffers.end(), "Binding is already present!");
+				VA_CORE_ASSERT(shaderDescriptorSet.StorageBuffers.find(binding) == shaderDescriptorSet.StorageBuffers.end(), "Binding is already present!");
 
 				VkWriteDescriptorSet& set = shaderDescriptorSet.WriteDescriptorSets[imageSampler.Name];
 				set = {};
@@ -408,10 +480,11 @@ namespace Vanta {
 				layoutBinding.pImmutableSamplers = nullptr;
 
 				uint32_t binding = bindingAndSet & 0xffffffff;
-				uint32_t descriptorSet = (bindingAndSet >> 32);
+				//uint32_t descriptorSet = (bindingAndSet >> 32);
 				layoutBinding.binding = binding;
 
 				VA_CORE_ASSERT(shaderDescriptorSet.UniformBuffers.find(binding) == shaderDescriptorSet.UniformBuffers.end(), "Binding is already present!");
+				VA_CORE_ASSERT(shaderDescriptorSet.StorageBuffers.find(binding) == shaderDescriptorSet.StorageBuffers.end(), "Binding is already present!");
 				VA_CORE_ASSERT(shaderDescriptorSet.ImageSamplers.find(binding) == shaderDescriptorSet.ImageSamplers.end(), "Binding is already present!");
 
 				VkWriteDescriptorSet& set = shaderDescriptorSet.WriteDescriptorSets[imageSampler.Name];
@@ -425,15 +498,16 @@ namespace Vanta {
 			VkDescriptorSetLayoutCreateInfo descriptorLayout = {};
 			descriptorLayout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			descriptorLayout.pNext = nullptr;
-			descriptorLayout.bindingCount = layoutBindings.size();
+			descriptorLayout.bindingCount = (uint32_t)(layoutBindings.size());
 			descriptorLayout.pBindings = layoutBindings.data();
 
-			VA_CORE_INFO("Creating descriptor set {0} with {1} ubos, {2} samplers and {3} storage images", set,
+			VA_CORE_INFO("Creating descriptor set {0} with {1} ubo's, {2} ssbo's, {3} samplers and {4} storage images", set,
 			shaderDescriptorSet.UniformBuffers.size(),
+			shaderDescriptorSet.StorageBuffers.size(),
 			shaderDescriptorSet.ImageSamplers.size(),
 			shaderDescriptorSet.StorageImages.size());
 			if (set >= m_DescriptorSetLayouts.size())
-				m_DescriptorSetLayouts.resize(set + 1);
+				m_DescriptorSetLayouts.resize((size_t)(set + 1));
 			VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &m_DescriptorSetLayouts[set]));
 		}
 	}
@@ -450,7 +524,7 @@ namespace Vanta {
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
 		descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		descriptorPoolInfo.pNext = nullptr;
-		descriptorPoolInfo.poolSizeCount = m_TypeCounts.at(set).size();
+		descriptorPoolInfo.poolSizeCount = (uint32_t)m_TypeCounts.at(set).size();
 		descriptorPoolInfo.pPoolSizes = m_TypeCounts.at(set).data();
 		descriptorPoolInfo.maxSets = 1;
 
@@ -484,7 +558,13 @@ namespace Vanta {
 			{
 				VkDescriptorPoolSize& typeCount = poolSizes[set].emplace_back();
 				typeCount.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				typeCount.descriptorCount = shaderDescriptorSet.UniformBuffers.size() * numberOfSets;
+				typeCount.descriptorCount = (uint32_t)shaderDescriptorSet.UniformBuffers.size() * numberOfSets;
+			}
+			if (shaderDescriptorSet.StorageBuffers.size())
+			{
+				VkDescriptorPoolSize& typeCount = poolSizes[set].emplace_back();
+				typeCount.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				typeCount.descriptorCount = (uint32_t)shaderDescriptorSet.StorageBuffers.size() * numberOfSets;
 			}
 			if (shaderDescriptorSet.ImageSamplers.size())
 			{
@@ -496,7 +576,7 @@ namespace Vanta {
 			{
 				VkDescriptorPoolSize& typeCount = poolSizes[set].emplace_back();
 				typeCount.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				typeCount.descriptorCount = shaderDescriptorSet.StorageImages.size() * numberOfSets;
+				typeCount.descriptorCount = (uint32_t)shaderDescriptorSet.StorageImages.size() * numberOfSets;
 			}
 
 		}
@@ -507,7 +587,7 @@ namespace Vanta {
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
 		descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		descriptorPoolInfo.pNext = nullptr;
-		descriptorPoolInfo.poolSizeCount = poolSizes.at(set).size();
+		descriptorPoolInfo.poolSizeCount = (uint32_t)poolSizes.at(set).size();
 		descriptorPoolInfo.pPoolSizes = poolSizes.at(set).data();
 		descriptorPoolInfo.maxSets = numberOfSets;
 
@@ -649,8 +729,9 @@ namespace Vanta {
 				auto path = cacheDirectory / (p.filename().string() + extension);
 				std::string cachedFilePath = path.string();
 
-				FILE* f = fopen(cachedFilePath.c_str(), "rb");
-				if (f)
+				FILE* f;
+				errno_t err = fopen_s(&f, cachedFilePath.c_str(), "rb");
+				if (!err)
 				{
 					fseek(f, 0, SEEK_END);
 					uint64_t size = ftell(f);
@@ -698,7 +779,8 @@ namespace Vanta {
 					auto path = cacheDirectory / (p.filename().string() + extension);
 					std::string cachedFilePath = path.string();
 
-					FILE* f = fopen(cachedFilePath.c_str(), "wb");
+					FILE* f;
+					fopen_s(&f, cachedFilePath.c_str(), "wb");
 					fwrite(outputBinary[stage].data(), sizeof(uint32_t), outputBinary[stage].size(), f);
 					fclose(f);
 				}

@@ -1,11 +1,10 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <map>
 
 #include "Renderer/RendererTypes.hpp"
 #include "Image.hpp"
-
-#include <map>
 
 namespace Vanta {
 
@@ -63,7 +62,7 @@ namespace Vanta {
 		// Note: these are used to attach multi-layered depth images
 		Ref<Image2D> ExistingImage;
 		uint32_t ExistingImageLayer;
-
+		
 		// Specify existing images to attach instead of creating
 		// new images. attachment index -> image
 		std::map<uint32_t, Ref<Image2D>> ExistingImages;

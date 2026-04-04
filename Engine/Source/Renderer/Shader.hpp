@@ -8,20 +8,20 @@
 
 #include <string>
 #include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 namespace Vanta
 {
 	enum class ShaderUniformType
 	{
-		None = 0, Bool, Int, UInt, Float, Vec2, Vec3, Vec4, Mat3, Mat4
+		None = 0, Bool, Int, UInt, Float, Vec2, Vec3, Vec4, Mat3, Mat4,
+		IVec2, IVec3, IVec4
 	};
 
 	class ShaderUniform
 	{
 	public:
 		ShaderUniform() = default;
-		ShaderUniform(const std::string& name, ShaderUniformType type, uint32_t size, uint32_t offset);
+		ShaderUniform(std::string name, ShaderUniformType type, uint32_t size, uint32_t offset);
 
 		const std::string& GetName() const { return m_Name; }
 		ShaderUniformType GetType() const { return m_Type; }
@@ -46,6 +46,16 @@ namespace Vanta
 		std::vector<ShaderUniform> Uniforms;
 	};
 
+	struct ShaderStorageBuffer
+	{
+		std::string Name;
+		uint32_t Index;
+		uint32_t BindingPoint;
+		uint32_t Size;
+		uint32_t RendererID;
+		//std::vector<ShaderUniform> Uniforms;
+	};
+
 	struct ShaderBuffer
 	{
 		std::string Name;
@@ -61,7 +71,7 @@ namespace Vanta
 		virtual void Reload(bool forceCompile = false) = 0;
 
 		virtual size_t GetHash() const = 0;
-
+		
 		virtual const std::string& GetName() const = 0;
 
 		// Represents a complete shader program stored in a single file.

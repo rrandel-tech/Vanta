@@ -17,8 +17,8 @@ namespace Vanta {
 		virtual void RT_SetData(void* data, uint32_t size, uint32_t offset = 0) {}
 		virtual void Bind() const;
 
-		virtual const VertexBufferLayout& GetLayout() const override { return m_Layout; }
-		virtual void SetLayout(const VertexBufferLayout& layout) override { m_Layout = layout; }
+		virtual const VertexBufferLayout& GetLayout() const { return m_Layout; }
+		virtual void SetLayout(const VertexBufferLayout& layout) { m_Layout = layout; }
 
 		virtual uint32_t GetSize() const { return m_Size; }
 		virtual RendererID GetRendererID() const { return m_RendererID; }
