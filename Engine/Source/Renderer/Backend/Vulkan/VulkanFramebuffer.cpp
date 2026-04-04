@@ -26,7 +26,7 @@ namespace Vanta {
 		uint32_t attachmentIndex = 0;
 		if (!m_Specification.ExistingFramebuffer)
 		{
-			for (auto attachmentSpec : m_Specification.Attachments.Attachments)
+			for (auto& attachmentSpec : m_Specification.Attachments.Attachments)
 			{
 				if (m_Specification.ExistingImages.find(attachmentIndex) != m_Specification.ExistingImages.end())
 				{
@@ -95,9 +95,9 @@ namespace Vanta {
 	{
 		Ref< VulkanFramebuffer> instance = this;
 		Renderer::Submit([instance]() mutable
-		{
-			instance->RT_Invalidate();
-		});
+			{
+				instance->RT_Invalidate();
+			});
 	}
 
 	void VulkanFramebuffer::RT_Invalidate()
@@ -110,16 +110,16 @@ namespace Vanta {
 		{
 			VkFramebuffer framebuffer = m_Framebuffer;
 			Renderer::SubmitResourceFree([framebuffer]()
-			{
-				auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
-				vkDestroyFramebuffer(device, framebuffer, nullptr);
-			});
+				{
+					const auto device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+					vkDestroyFramebuffer(device, framebuffer, nullptr);
+				});
 
 			// Don't free the images if we don't own them
 			if (!m_Specification.ExistingFramebuffer)
 			{
 				uint32_t attachmentIndex = 0;
-				for (auto image : m_AttachmentImages)
+				for (Ref<VulkanImage2D> image : m_AttachmentImages)
 				{
 					if (m_Specification.ExistingImages.find(attachmentIndex) != m_Specification.ExistingImages.end())
 						continue;
@@ -148,7 +148,6 @@ namespace Vanta {
 		m_ClearValues.resize(m_Specification.Attachments.Attachments.size());
 
 		bool createImages = m_AttachmentImages.empty();
-		bool createDepthImage = !(bool)m_DepthAttachmentImage;
 
 		if (m_Specification.ExistingFramebuffer)
 			m_AttachmentImages.clear();
@@ -207,7 +206,7 @@ namespace Vanta {
 			}
 			else
 			{
-				VA_CORE_ASSERT(!m_Specification.ExistingImage, "Not supported for color attachments");
+				//VA_CORE_ASSERT(!m_Specification.ExistingImage, "Not supported for color attachments");
 
 				Ref<VulkanImage2D> colorAttachment;
 				if (m_Specification.ExistingFramebuffer)
@@ -343,6 +342,7 @@ namespace Vanta {
 		for (uint32_t i = 0; i < m_AttachmentImages.size(); i++)
 		{
 			Ref<VulkanImage2D> image = m_AttachmentImages[i].As<VulkanImage2D>();
+
 			attachments[i] = image->GetImageInfo().ImageView;
 			VA_CORE_ASSERT(attachments[i]);
 		}
@@ -352,7 +352,7 @@ namespace Vanta {
 			Ref<VulkanImage2D> image = m_DepthAttachmentImage.As<VulkanImage2D>();
 			if (m_Specification.ExistingImage)
 			{
-				attachments.emplace_back(image->GetLayerImageView(m_Specification.ExistingImageLayer));
+				attachments.emplace_back(image->GetLayerImageView(m_Specification.ExistingImageLayers[0]));
 				VA_CORE_ASSERT(attachments.back());
 			}
 			else

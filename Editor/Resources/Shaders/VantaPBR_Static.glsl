@@ -662,7 +662,7 @@ void main()
 	}
 
 	vec3 lightContribution = CalculateDirLights(F0) * shadowAmount;
-	//lightContribution += m_Params.Albedo * u_MaterialUniforms.Emissive;
+	lightContribution += m_Params.Albedo * u_MaterialUniforms.Emissive;
 	vec3 iblContribution = IBL(F0, Lr) * u_EnvironmentMapIntensity;
 
 	color = vec4(iblContribution + lightContribution, 1.0);

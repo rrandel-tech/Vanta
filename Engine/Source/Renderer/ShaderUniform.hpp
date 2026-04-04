@@ -10,7 +10,7 @@ namespace Vanta {
 
 	enum class ShaderDomain
 	{
-		None = 0, Vertex = 0, Pixel = 1
+		None = 0, Vertex = 0, Pixel = 1 // unused
 	};
 
 	class ShaderResourceDeclaration

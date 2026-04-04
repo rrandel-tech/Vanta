@@ -13,7 +13,7 @@ namespace Vanta {
 	public:
 		VulkanTexture2D(const std::string& path, TextureProperties properties);
 		VulkanTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
-		virtual ~VulkanTexture2D();
+		~VulkanTexture2D() override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
 
@@ -58,21 +58,21 @@ namespace Vanta {
 	public:
 		VulkanTextureCube(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
 		VulkanTextureCube(const std::string& path, TextureProperties properties);
-		virtual ~VulkanTextureCube();
+		~VulkanTextureCube() override;
 
 #if EMPTY
 		virtual const std::string& GetPath() const override { return std::string(); }
 #endif
 		virtual void Bind(uint32_t slot = 0) const override {}
 
-		virtual ImageFormat GetFormat() const { return m_Format; }
+		virtual ImageFormat GetFormat() const override { return m_Format; }
 
 		virtual uint32_t GetWidth() const override{ return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
 		virtual uint32_t GetMipLevelCount() const override;
 		virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override;
 
-		virtual uint64_t GetHash() const { return (uint64_t)m_Image; }
+		virtual uint64_t GetHash() const override { return (uint64_t)m_Image; }
 
 		const VkDescriptorImageInfo& GetVulkanDescriptorInfo() const { return m_DescriptorImageInfo; }
 		VkImageView CreateImageViewSingleMip(uint32_t mip);

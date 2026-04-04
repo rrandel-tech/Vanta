@@ -5,14 +5,6 @@
 
 namespace Vanta {
 
-	SceneCamera::SceneCamera()
-	{
-	}
-
-	SceneCamera::~SceneCamera()
-	{
-	}
-
 	void SceneCamera::SetPerspective(float verticalFOV, float nearClip, float farClip)
 	{
 		m_ProjectionType = ProjectionType::Perspective;

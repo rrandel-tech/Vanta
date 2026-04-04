@@ -1,16 +1,16 @@
 #pragma once
 
 #include "Renderer/RenderCommandBuffer.hpp"
-#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan.h"
 
 namespace Vanta {
 
 	class VulkanRenderCommandBuffer : public RenderCommandBuffer
 	{
 	public:
-		VulkanRenderCommandBuffer(uint32_t count = 0, const std::string& debugName = "");
-		VulkanRenderCommandBuffer(const std::string& debugName, bool swapchain);
-		~VulkanRenderCommandBuffer();
+		VulkanRenderCommandBuffer(uint32_t count = 0, std::string debugName = "");
+		VulkanRenderCommandBuffer(std::string debugName, bool swapchain);
+		~VulkanRenderCommandBuffer() override;
 
 		virtual void Begin() override;
 		virtual void End() override;
@@ -35,13 +35,12 @@ namespace Vanta {
 			return m_CommandBuffers[frameIndex];
 		}
 	private:
+		std::string m_DebugName;
 		VkCommandPool m_CommandPool = nullptr;
 		std::vector<VkCommandBuffer> m_CommandBuffers;
 		std::vector<VkFence> m_WaitFences;
 
 		bool m_OwnedBySwapChain = false;
-
-		std::string m_DebugName;
 
 		uint32_t m_TimestampQueryCount = 0;
 		uint32_t m_TimestampNextAvailableQuery = 2;

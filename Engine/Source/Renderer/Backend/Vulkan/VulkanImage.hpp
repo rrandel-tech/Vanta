@@ -3,7 +3,7 @@
 #include "Renderer/Image.hpp"
 #include "Renderer/Backend/Vulkan/VulkanContext.hpp"
 
-#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan.h"
 #include "vk_mem_alloc.h"
 
 namespace Vanta {
@@ -20,7 +20,7 @@ namespace Vanta {
 	{
 	public:
 		VulkanImage2D(ImageSpecification specification);
-		virtual ~VulkanImage2D();
+		virtual ~VulkanImage2D() override;
 
 		virtual void Invalidate() override;
 		virtual void Release() override;
@@ -36,7 +36,9 @@ namespace Vanta {
 
 		virtual void CreatePerLayerImageViews() override;
 		void RT_CreatePerLayerImageViews();
-		VkImageView GetLayerImageView(uint32_t layer)
+		void RT_CreatePerSpecificLayerImageViews(const std::vector<uint32_t>& layerIndices);
+
+		virtual VkImageView GetLayerImageView(uint32_t layer)
 		{
 			VA_CORE_ASSERT(layer < m_PerLayerImageViews.size());
 			return m_PerLayerImageViews[layer];
@@ -65,6 +67,7 @@ namespace Vanta {
 		Buffer m_ImageData;
 
 		VulkanImageInfo m_Info;
+		
 		std::vector<VkImageView> m_PerLayerImageViews;
 		std::map<uint32_t, VkImageView> m_MipImageViews;
 		VkDescriptorImageInfo m_DescriptorImageInfo = {};
@@ -76,10 +79,14 @@ namespace Vanta {
 		{
 			switch (format)
 			{
-				case ImageFormat::RGBA:            return VK_FORMAT_R8G8B8A8_UNORM;
-				case ImageFormat::RGBA32F:         return VK_FORMAT_R32G32B32A32_SFLOAT;
-				case ImageFormat::DEPTH32F:        return VK_FORMAT_D32_SFLOAT;
-				case ImageFormat::DEPTH24STENCIL8: return VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetDepthFormat();
+			case ImageFormat::RED32F:          return VK_FORMAT_R32_SFLOAT;
+			case ImageFormat::RG16F:		   return VK_FORMAT_R16G16_SFLOAT;
+			case ImageFormat::RG32F:		   return VK_FORMAT_R32G32_SFLOAT;
+			case ImageFormat::RGBA:            return VK_FORMAT_R8G8B8A8_UNORM;
+			case ImageFormat::RGBA16F:         return VK_FORMAT_R16G16B16A16_SFLOAT;
+			case ImageFormat::RGBA32F:         return VK_FORMAT_R32G32B32A32_SFLOAT;
+			case ImageFormat::DEPTH32F:        return VK_FORMAT_D32_SFLOAT;
+			case ImageFormat::DEPTH24STENCIL8: return VulkanContext::GetCurrentDevice()->GetPhysicalDevice()->GetDepthFormat();
 			}
 			VA_CORE_ASSERT(false);
 			return VK_FORMAT_UNDEFINED;

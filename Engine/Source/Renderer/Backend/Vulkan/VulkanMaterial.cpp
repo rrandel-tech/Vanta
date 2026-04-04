@@ -192,10 +192,11 @@ namespace Vanta {
 
 	void VulkanMaterial::SetVulkanDescriptor(const std::string& name, const Ref<Image2D>& image)
 	{
+		VA_CORE_VERIFY(image);
 		VA_CORE_ASSERT(image.As<VulkanImage2D>()->GetImageInfo().ImageView, "ImageView is null");
 
 		const ShaderResourceDeclaration* resource = FindResourceDeclaration(name);
-		VA_CORE_ASSERT(resource);
+		VA_CORE_VERIFY(resource);
 
 		uint32_t binding = resource->GetRegister();
 		// TODO: replace with set/map

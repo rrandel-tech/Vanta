@@ -29,7 +29,7 @@ namespace Vanta {
 		};
 	public:
 		EditorLayer();
-		virtual ~EditorLayer();
+		virtual ~EditorLayer() override;
 
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;

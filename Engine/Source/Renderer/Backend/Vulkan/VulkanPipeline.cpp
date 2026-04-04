@@ -89,9 +89,9 @@ namespace Vanta {
 			VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
 			pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			pPipelineLayoutCreateInfo.pNext = nullptr;
-			pPipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
+			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayouts.size();
 			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
-			pPipelineLayoutCreateInfo.pushConstantRangeCount = vulkanPushConstantRanges.size();
+			pPipelineLayoutCreateInfo.pushConstantRangeCount = (uint32_t)vulkanPushConstantRanges.size();
 			pPipelineLayoutCreateInfo.pPushConstantRanges = vulkanPushConstantRanges.data();
 
 			VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pPipelineLayoutCreateInfo, nullptr, &instance->m_PipelineLayout));
@@ -146,6 +146,9 @@ namespace Vanta {
 			{
 				for (size_t i = 0; i < colorAttachmentCount; i++)
 				{
+					if (!framebuffer->GetSpecification().Blend)
+						break;
+
 					blendAttachmentStates[i].colorWriteMask = 0xf;
 					if (!framebuffer->GetSpecification().Blend)
 						break;
@@ -155,7 +158,6 @@ namespace Vanta {
 						? attachmentSpec.BlendMode
 						: framebuffer->GetSpecification().BlendMode;
 
-					blendAttachmentStates[i].colorWriteMask = 0xf;
 					blendAttachmentStates[i].blendEnable = attachmentSpec.Blend ? VK_TRUE : VK_FALSE;
 					if (blendMode == FramebufferBlendMode::SrcAlphaOneMinusSrcAlpha)
 					{
@@ -167,6 +169,11 @@ namespace Vanta {
 						blendAttachmentStates[i].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
 						blendAttachmentStates[i].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
 					}
+					else if(blendMode == FramebufferBlendMode::Zero_SrcColor)
+					{
+						blendAttachmentStates[i].srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+						blendAttachmentStates[i].dstColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
+					}
 					else
 					{
 						VA_CORE_VERIFY(false);
@@ -176,12 +183,11 @@ namespace Vanta {
 					blendAttachmentStates[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 					blendAttachmentStates[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 				}
-
 			}
-			
+
 			VkPipelineColorBlendStateCreateInfo colorBlendState = {};
 			colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-			colorBlendState.attachmentCount = blendAttachmentStates.size();
+			colorBlendState.attachmentCount = (uint32_t)blendAttachmentStates.size();
 			colorBlendState.pAttachments = blendAttachmentStates.data();
 
 			// Viewport state sets the number of viewports and scissor used in this pipeline
@@ -228,7 +234,6 @@ namespace Vanta {
 			multisampleState.pSampleMask = nullptr;
 
 			// Vertex input descriptor
-
 			VertexBufferLayout& layout = instance->m_Specification.Layout;
 
 			VkVertexInputBindingDescription vertexInputBinding = {};
@@ -315,75 +320,75 @@ namespace Vanta {
 					vertexInputAttributs[location].format = ShaderDataTypeToVulkanFormat(element.Type);
 					vertexInputAttributs[location].offset = element.Offset;
 
-					location++;
-				}
+				location++;
+			}
 
-				// Vertex input state used for pipeline creation
-				VkPipelineVertexInputStateCreateInfo vertexInputState = {};
-				vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-				vertexInputState.vertexBindingDescriptionCount = 1;
-				vertexInputState.pVertexBindingDescriptions = &vertexInputBinding;
-				vertexInputState.vertexAttributeDescriptionCount = (uint32_t)vertexInputAttributs.size();
-				vertexInputState.pVertexAttributeDescriptions = vertexInputAttributs.data();
+			// Vertex input state used for pipeline creation
+			VkPipelineVertexInputStateCreateInfo vertexInputState = {};
+			vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			vertexInputState.vertexBindingDescriptionCount = 1;
+			vertexInputState.pVertexBindingDescriptions = &vertexInputBinding;
+			vertexInputState.vertexAttributeDescriptionCount = (uint32_t)vertexInputAttributs.size();
+			vertexInputState.pVertexAttributeDescriptions = vertexInputAttributs.data();
 
-				const auto& shaderStages = vulkanShader->GetPipelineShaderStageCreateInfos();
+			const auto& shaderStages = vulkanShader->GetPipelineShaderStageCreateInfos();
 
-				// Set pipeline shader stage info
-				pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
-				pipelineCreateInfo.pStages = shaderStages.data();
+			// Set pipeline shader stage info
+			pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+			pipelineCreateInfo.pStages = shaderStages.data();
 
-				// Assign the pipeline states to the pipeline creation info structure
-				pipelineCreateInfo.pVertexInputState = &vertexInputState;
-				pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
-				pipelineCreateInfo.pRasterizationState = &rasterizationState;
-				pipelineCreateInfo.pColorBlendState = &colorBlendState;
-				pipelineCreateInfo.pMultisampleState = &multisampleState;
-				pipelineCreateInfo.pViewportState = &viewportState;
-				pipelineCreateInfo.pDepthStencilState = &depthStencilState;
-				pipelineCreateInfo.renderPass = framebuffer->GetRenderPass();
-				pipelineCreateInfo.pDynamicState = &dynamicState;
+			// Assign the pipeline states to the pipeline creation info structure
+			pipelineCreateInfo.pVertexInputState = &vertexInputState;
+			pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+			pipelineCreateInfo.pRasterizationState = &rasterizationState;
+			pipelineCreateInfo.pColorBlendState = &colorBlendState;
+			pipelineCreateInfo.pMultisampleState = &multisampleState;
+			pipelineCreateInfo.pViewportState = &viewportState;
+			pipelineCreateInfo.pDepthStencilState = &depthStencilState;
+			pipelineCreateInfo.renderPass = framebuffer->GetRenderPass();
+			pipelineCreateInfo.pDynamicState = &dynamicState;
 
-				// What is this pipeline cache?
-				VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
-				pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-				VkPipelineCache pipelineCache;
-				VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
+			// What is this pipeline cache?
+			VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+			pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+			VkPipelineCache pipelineCache;
+			VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCacheCreateInfo, nullptr, &pipelineCache));
 
-				// Create rendering pipeline using the specified states
-				VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &instance->m_VulkanPipeline));
+			// Create rendering pipeline using the specified states
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &instance->m_VulkanPipeline));
 
-				// Shader modules are no longer needed once the graphics pipeline has been created
-				// vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
-				// vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
+			// Shader modules are no longer needed once the graphics pipeline has been created
+			// vkDestroyShaderModule(device, shaderStages[0].module, nullptr);
+			// vkDestroyShaderModule(device, shaderStages[1].module, nullptr);
 
-				// instance->m_DescriptorSets = vulkanShader->AllocateDescriptorSets();
+			// instance->m_DescriptorSets = vulkanShader->AllocateDescriptorSets();
 
 #if OLD
-				const auto& shaderDescriptorSets = vulkanShader->GetShaderDescriptorSets();
-				if (!shaderDescriptorSets.empty())
+			const auto& shaderDescriptorSets = vulkanShader->GetShaderDescriptorSets();
+			if (!shaderDescriptorSets.empty())
+			{
+				// Write default descriptor set... this overlaps materials somewhat, definitely requires more thought
+				instance->m_DescriptorSet = vulkanShader->CreateDescriptorSets();
+				std::vector<VkWriteDescriptorSet> writeDescriptors;
+
+				for (auto&& [set, shaderDescriptorSet] : shaderDescriptorSets)
 				{
-					// Write default descriptor set... this overlaps materials somewhat, definitely requires more thought
-					instance->m_DescriptorSet = vulkanShader->CreateDescriptorSets();
-					std::vector<VkWriteDescriptorSet> writeDescriptors;
-
-					for (auto&& [set, shaderDescriptorSet] : shaderDescriptorSets)
+					for (auto&& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
 					{
-						for (auto&& [binding, uniformBuffer] : shaderDescriptorSet.UniformBuffers)
-						{
-							VkWriteDescriptorSet writeDescriptorSet = {};
-							writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-							writeDescriptorSet.descriptorCount = 1;
-							writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-							writeDescriptorSet.pBufferInfo = &uniformBuffer->Descriptor;
-							writeDescriptorSet.dstBinding = binding;
-							writeDescriptorSet.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
-							writeDescriptors.push_back(writeDescriptorSet);
-						}
+						VkWriteDescriptorSet writeDescriptorSet = {};
+						writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+						writeDescriptorSet.descriptorCount = 1;
+						writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						writeDescriptorSet.pBufferInfo = &uniformBuffer->Descriptor;
+						writeDescriptorSet.dstBinding = binding;
+						writeDescriptorSet.dstSet = instance->m_DescriptorSet.DescriptorSets[0];
+						writeDescriptors.push_back(writeDescriptorSet);
 					}
-
-					VA_CORE_WARN("VulkanPipeline - Updating {0} descriptor sets", writeDescriptors.size());
-					vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
 				}
+
+				VA_CORE_WARN("VulkanPipeline - Updating {0} descriptor sets", writeDescriptors.size());
+				vkUpdateDescriptorSets(device, writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+			}
 #endif
 			}
 		});
@@ -393,15 +398,15 @@ namespace Vanta {
 	{
 		Ref<VulkanPipeline> instance = this;
 		Renderer::Submit([instance, uniformBuffer, binding, set]() mutable
-			{
-				instance->RT_SetUniformBuffer(uniformBuffer, binding, set);
-			});
+		{
+			instance->RT_SetUniformBuffer(uniformBuffer, binding, set);
+		});
 	}
 
 	void VulkanPipeline::Bind()
 	{
 
-	}
+		}
 
 	void VulkanPipeline::RT_SetUniformBuffer(Ref<UniformBuffer> uniformBuffer, uint32_t binding, uint32_t set)
 	{
@@ -440,4 +445,4 @@ namespace Vanta {
 #endif
 	}
 
-}
+	}

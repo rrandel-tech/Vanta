@@ -6,7 +6,7 @@
 #include "VulkanTexture.hpp"
 #include "VulkanRenderCommandBuffer.hpp"
 
-#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan.h"
 
 namespace Vanta {
 
@@ -24,8 +24,9 @@ namespace Vanta {
 		virtual Ref<Shader> GetShader() override { return m_Shader; }
 
 		void SetPushConstants(const void* data, uint32_t size);
-	private:
 		void CreatePipeline();
+	private:
+		void RT_CreatePipeline();
 	private:
 		Ref<VulkanShader> m_Shader;
 

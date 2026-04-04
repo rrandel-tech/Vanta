@@ -64,10 +64,10 @@ namespace Vanta {
 		{
 			switch (vendorID)
 			{
-				case 0x10DE: return "NVIDIA";
-				case 0x1002: return "AMD";
-				case 0x8086: return "INTEL";
-				case 0x13B5: return "ARM";
+			case 0x10DE: return "NVIDIA";
+			case 0x1002: return "AMD";
+			case 0x8086: return "INTEL";
+			case 0x13B5: return "ARM";
 			}
 			return "Unknown";
 		}
@@ -120,7 +120,6 @@ namespace Vanta {
 				VK_CHECK_RESULT(vkCreateDescriptorPool(device, &pool_info, nullptr, &s_Data->DescriptorPools[i]));
 				s_Data->DescriptorPoolAllocationCount[i] = 0;
 			}
-
 		});
 
 		// Create fullscreen quad
@@ -204,7 +203,7 @@ namespace Vanta {
 						writeDescriptors[frame].push_back(writeDescriptorSet);
 					}
 				}
-			
+
 			}
 		}
 
@@ -263,7 +262,7 @@ namespace Vanta {
 			{
 				const auto& storageBufferWriteDescriptors = RT_RetrieveOrCreateStorageBufferWriteDescriptors(storageBufferSet, material);
 
-				uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+				const uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
 				for (uint32_t frame = 0; frame < framesInFlight; frame++)
 				{
 					writeDescriptors[frame].reserve(writeDescriptors[frame].size() + storageBufferWriteDescriptors[frame].size());
@@ -300,6 +299,7 @@ namespace Vanta {
 		
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VK_CHECK_RESULT(vkCreateSampler(device, &samplerCreateInfo, nullptr, &s_Data->SamplerClamp));
+		return s_Data->SamplerClamp;
 	}
 
 	int32_t& VulkanRenderer::GetSelectedDrawCall()
@@ -462,7 +462,7 @@ namespace Vanta {
 
 			VkPipeline pipeline = vulkanPipeline->GetVulkanPipeline();
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-			
+
 			RT_UpdateMaterialForRendering(vulkanMaterial, uniformBufferSet, storageBufferSet);
 
 			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
@@ -563,11 +563,27 @@ namespace Vanta {
 	}
 #endif
 
-	/* void VulkanRenderer::LightCulling(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> pipelineCompute, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec2& screenSize, const glm::ivec3& workGroups)
+	void VulkanRenderer::ClearImage(Ref<RenderCommandBuffer> commandBuffer, Ref<Image2D> image)
+	{
+		Renderer::Submit([commandBuffer, image = image.As<VulkanImage2D>()]
+		{
+			const auto vulkanCommandBuffer = commandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(Renderer::GetCurrentFrameIndex());
+			VkImageSubresourceRange subresourceRange{};
+			subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			subresourceRange.baseMipLevel = 0;
+			subresourceRange.levelCount = image->GetSpecification().Mips;
+			subresourceRange.layerCount = image->GetSpecification().Layers;
+
+			VkClearColorValue clearColor{ 0.f, 0.f, 0.f, 0.f };
+			vkCmdClearColorImage(vulkanCommandBuffer, image->GetImageInfo().Image, image->GetSpecification().Usage == ImageUsage::Storage ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &clearColor, 1, &subresourceRange);
+		});
+	}
+
+	void VulkanRenderer::DispatchComputeShader(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec3& workGroups)
 	{
 		auto vulkanMaterial = material.As<VulkanMaterial>();
-		auto pipeline = pipelineCompute.As<VulkanComputePipeline>();
-		Renderer::Submit([renderCommandBuffer, pipeline, vulkanMaterial, uniformBufferSet, storageBufferSet, screenSize, workGroups]() mutable
+		auto vulkanPipeline = pipeline.As<VulkanComputePipeline>();
+		Renderer::Submit([renderCommandBuffer, vulkanPipeline, vulkanMaterial, uniformBufferSet, storageBufferSet, workGroups]() mutable
 		{
 			const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
@@ -575,12 +591,11 @@ namespace Vanta {
 
 			const VkDescriptorSet descriptorSet = vulkanMaterial->GetDescriptorSet(frameIndex);
 
-			pipeline->Begin(renderCommandBuffer);
-			pipeline->SetPushConstants(glm::value_ptr(screenSize), sizeof(glm::ivec2));
-			pipeline->Dispatch(descriptorSet, workGroups.x, workGroups.y, workGroups.z);
-			pipeline->End();
+			vulkanPipeline->Begin(renderCommandBuffer);
+			vulkanPipeline->Dispatch(descriptorSet, workGroups.x, workGroups.y, workGroups.z);
+			vulkanPipeline->End();
 		});
-	} */
+	}
 
 	void VulkanRenderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
 	{
@@ -701,14 +716,14 @@ namespace Vanta {
 		Renderer::Submit([sceneRenderer, environment, shadow]() mutable
 		{
 			VA_PROFILE_FUNC("VulkanRenderer::SetSceneEnvironment");
-			
-			auto shader = Renderer::GetShaderLibrary()->Get("VantaPBR_Static");
+
+			const auto shader = Renderer::GetShaderLibrary()->Get("VantaPBR_Static");
 			Ref<VulkanShader> pbrShader = shader.As<VulkanShader>();
-			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+			const uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
 
 			if (s_Data->RendererDescriptorSet.find(sceneRenderer.Raw()) == s_Data->RendererDescriptorSet.end())
 			{
-				uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
+				const uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
 				s_Data->RendererDescriptorSet[sceneRenderer.Raw()].resize(framesInFlight);
 				for (uint32_t i = 0; i < framesInFlight; i++)
 					s_Data->RendererDescriptorSet.at(sceneRenderer.Raw())[i] = pbrShader->CreateDescriptorSets(1);
@@ -722,7 +737,7 @@ namespace Vanta {
 
 			Ref<VulkanTextureCube> radianceMap = environment->RadianceMap.As<VulkanTextureCube>();
 			Ref<VulkanTextureCube> irradianceMap = environment->IrradianceMap.As<VulkanTextureCube>();
-		
+
 			writeDescriptors[0] = *pbrShader->GetDescriptorSet("u_EnvRadianceTex", 1);
 			writeDescriptors[0].dstSet = descriptorSet;
 			const auto& radianceMapImageInfo = radianceMap->GetVulkanDescriptorInfo();
@@ -743,7 +758,7 @@ namespace Vanta {
 			const auto& shadowImageInfo = shadow.As<VulkanImage2D>()->GetDescriptor();
 			writeDescriptors[3].pImageInfo = &shadowImageInfo;
 
-			auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+			const auto vulkanDevice = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 			vkUpdateDescriptorSets(vulkanDevice, (uint32_t)writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
 		});
 	}
@@ -793,8 +808,8 @@ namespace Vanta {
 	{
 		Renderer::Submit([renderCommandBuffer, renderPass, explicitClear]()
 		{
-			VA_PROFILE_FUNC("VulkanRenderer::BeginRenderPass");
-			
+			VA_PROFILE_SCOPE_DYNAMIC(std::format("VulkanRenderer::BeginRenderPass ({})", renderPass->GetSpecification().DebugName).c_str());
+
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
 
@@ -864,8 +879,8 @@ namespace Vanta {
 
 			if (explicitClear)
 			{
-				uint32_t colorAttachmentCount = (uint32_t)framebuffer->GetColorAttachmentCount();
-				uint32_t totalAttachmentCount = colorAttachmentCount + (framebuffer->HasDepthAttachment() ? 1 : 0);
+				const uint32_t colorAttachmentCount = (uint32_t)framebuffer->GetColorAttachmentCount();
+				const uint32_t totalAttachmentCount = colorAttachmentCount + (framebuffer->HasDepthAttachment() ? 1 : 0);
 				VA_CORE_ASSERT(clearValues.size() == totalAttachmentCount);
 
 				std::vector<VkClearAttachment> attachments(totalAttachmentCount);
@@ -935,7 +950,7 @@ namespace Vanta {
 
 		Ref<TextureCube> envUnfiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
 		Ref<TextureCube> envFiltered = TextureCube::Create(ImageFormat::RGBA32F, cubemapSize, cubemapSize);
-		
+
 		// Convert equirectangular to cubemap
 		Ref<Shader> equirectangularConversionShader = Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap");
 		Ref<VulkanComputePipeline> equirectangularConversionPipeline = Ref<VulkanComputePipeline>::Create(equirectangularConversionShader);
@@ -1078,6 +1093,185 @@ namespace Vanta {
 		});
 
 		return environmentMap;
+	}
+
+	namespace Utils {
+
+		void InsertImageMemoryBarrier(
+			VkCommandBuffer cmdbuffer,
+			VkImage image,
+			VkAccessFlags srcAccessMask,
+			VkAccessFlags dstAccessMask,
+			VkImageLayout oldImageLayout,
+			VkImageLayout newImageLayout,
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask,
+			VkImageSubresourceRange subresourceRange)
+		{
+			VkImageMemoryBarrier imageMemoryBarrier{};
+			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+			imageMemoryBarrier.srcAccessMask = srcAccessMask;
+			imageMemoryBarrier.dstAccessMask = dstAccessMask;
+			imageMemoryBarrier.oldLayout = oldImageLayout;
+			imageMemoryBarrier.newLayout = newImageLayout;
+			imageMemoryBarrier.image = image;
+			imageMemoryBarrier.subresourceRange = subresourceRange;
+
+			vkCmdPipelineBarrier(
+				cmdbuffer,
+				srcStageMask,
+				dstStageMask,
+				0,
+				0, nullptr,
+				0, nullptr,
+				1, &imageMemoryBarrier);
+		}
+
+		void SetImageLayout(
+			VkCommandBuffer cmdbuffer,
+			VkImage image,
+			VkImageLayout oldImageLayout,
+			VkImageLayout newImageLayout,
+			VkImageSubresourceRange subresourceRange,
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask)
+		{
+			// Create an image barrier object
+			VkImageMemoryBarrier imageMemoryBarrier = {};
+			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageMemoryBarrier.oldLayout = oldImageLayout;
+			imageMemoryBarrier.newLayout = newImageLayout;
+			imageMemoryBarrier.image = image;
+			imageMemoryBarrier.subresourceRange = subresourceRange;
+
+			// Source layouts (old)
+			// Source access mask controls actions that have to be finished on the old layout
+			// before it will be transitioned to the new layout
+			switch (oldImageLayout)
+			{
+			case VK_IMAGE_LAYOUT_UNDEFINED:
+				// Image layout is undefined (or does not matter)
+				// Only valid as initial layout
+				// No flags required, listed only for completeness
+				imageMemoryBarrier.srcAccessMask = 0;
+				break;
+
+			case VK_IMAGE_LAYOUT_PREINITIALIZED:
+				// Image is preinitialized
+				// Only valid as initial layout for linear images, preserves memory contents
+				// Make sure host writes have been finished
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+				// Image is a color attachment
+				// Make sure any writes to the color buffer have been finished
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+				// Image is a depth/stencil attachment
+				// Make sure any writes to the depth/stencil buffer have been finished
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+				// Image is a transfer source
+				// Make sure any reads from the image have been finished
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+				// Image is a transfer destination
+				// Make sure any writes to the image have been finished
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				// Image is read by a shader
+				// Make sure any shader reads from the image have been finished
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				break;
+			default:
+				// Other source layouts aren't handled (yet)
+				break;
+			}
+
+			// Target layouts (new)
+			// Destination access mask controls the dependency for the new image layout
+			switch (newImageLayout)
+			{
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+				// Image will be used as a transfer destination
+				// Make sure any writes to the image have been finished
+				imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+				// Image will be used as a transfer source
+				// Make sure any reads from the image have been finished
+				imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+				// Image will be used as a color attachment
+				// Make sure any writes to the color buffer have been finished
+				imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+				// Image layout will be used as a depth/stencil attachment
+				// Make sure any writes to depth/stencil buffer have been finished
+				imageMemoryBarrier.dstAccessMask = imageMemoryBarrier.dstAccessMask | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				// Image will be read in a shader (sampler, input attachment)
+				// Make sure any writes to the image have been finished
+				if (imageMemoryBarrier.srcAccessMask == 0)
+				{
+					imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+				}
+				imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				break;
+			default:
+				// Other source layouts aren't handled (yet)
+				break;
+			}
+
+			// Put barrier inside setup command buffer
+			vkCmdPipelineBarrier(
+				cmdbuffer,
+				srcStageMask,
+				dstStageMask,
+				0,
+				0, nullptr,
+				0, nullptr,
+				1, &imageMemoryBarrier);
+		}
+
+		void SetImageLayout(
+			VkCommandBuffer cmdbuffer,
+			VkImage image,
+			VkImageAspectFlags aspectMask,
+			VkImageLayout oldImageLayout,
+			VkImageLayout newImageLayout,
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask)
+		{
+			VkImageSubresourceRange subresourceRange = {};
+			subresourceRange.aspectMask = aspectMask;
+			subresourceRange.baseMipLevel = 0;
+			subresourceRange.levelCount = 1;
+			subresourceRange.layerCount = 1;
+			SetImageLayout(cmdbuffer, image, oldImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+		}
+
 	}
 
 }

@@ -263,7 +263,7 @@ namespace Vanta {
 					albedoColor = { aiColor.r, aiColor.g, aiColor.b };
 
 				mi->Set("u_MaterialUniforms.AlbedoColor", albedoColor);
-				//mi->Set("u_MaterialUniforms.Emissive", 0.0f);
+				mi->Set("u_MaterialUniforms.Emissive", 0.0f);
 
 				float shininess, metalness;
 				if (aiMaterial->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)

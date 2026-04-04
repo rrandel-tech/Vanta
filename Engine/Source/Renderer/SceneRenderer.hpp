@@ -48,7 +48,6 @@ namespace Vanta {
 	{
 	public:
 		SceneRenderer(Ref<Scene> scene, SceneRendererSpecification specification = SceneRendererSpecification());
-		~SceneRenderer();
 
 		void Init();
 
@@ -92,6 +91,8 @@ namespace Vanta {
 		void BloomCompute();
 		void CompositePass();
 
+		void ClearPass(Ref<RenderPass> renderPass, bool explicitClear = false);
+
 		struct CascadeData
 		{
 			glm::mat4 ViewProj;
@@ -126,7 +127,7 @@ namespace Vanta {
 			glm::mat4 InverseViewProjection;
 			glm::mat4 Projection;
 			glm::mat4 View;
-		} CameraData;
+		} CameraDataUB;
 
 		struct UBShadow
 		{
@@ -168,7 +169,6 @@ namespace Vanta {
 		Ref<StorageBufferSet> m_StorageBufferSet;
 
 		Ref<Shader> ShadowMapShader, ShadowMapAnimShader;
-		Ref<RenderPass> ShadowMapRenderPass[4];
 		float LightDistance = 0.1f;
 		float CascadeSplitLambda = 0.92f;
 		glm::vec4 CascadeSplits;
@@ -179,7 +179,6 @@ namespace Vanta {
 
 		glm::vec2 FocusPoint = { 0.5f, 0.5f };
 
-		RendererID ShadowMapSampler;
 		Ref<Material> CompositeMaterial;
 
 		Ref<Pipeline> m_GeometryPipeline;
@@ -230,6 +229,7 @@ namespace Vanta {
 		SceneRendererOptions m_Options;
 
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
+		float m_InvViewportWidth = 0.f, m_InvViewportHeight = 0.f;
 		bool m_NeedsResize = false;
 		bool m_Active = false;
 		bool m_ResourcesCreated = false;

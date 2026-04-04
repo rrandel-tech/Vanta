@@ -145,7 +145,7 @@ namespace Vanta {
 
 		auto group = m_Registry.group<MeshComponent>(entt::get<TransformComponent>);
 		renderer->SetScene(this);
-		renderer->BeginScene({ camera, cameraViewMatrix });
+		renderer->BeginScene({ camera, cameraViewMatrix, 0.1f, 1000.0f, 45.0f }); //TODO: real values
 		for (auto entity : group)
 		{
 			auto [transformComponent, meshComponent] = group.get<TransformComponent, MeshComponent>(entity);
@@ -309,7 +309,10 @@ namespace Vanta {
 		{
 			auto& comp = view.get<CameraComponent>(entity);
 			if (comp.Primary)
+			{
+				VA_CORE_ASSERT(comp.Camera.GetOrthographicSize() || comp.Camera.GetPerspectiveVerticalFOV(), "Camera is not fully initialized");
 				return { entity, this };
+			}
 		}
 		return {};
 	}

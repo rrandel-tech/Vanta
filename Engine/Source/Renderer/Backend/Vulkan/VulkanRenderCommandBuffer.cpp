@@ -1,12 +1,14 @@
 #include "vapch.hpp"
 #include "VulkanRenderCommandBuffer.hpp"
 
+#include <utility>
+
 #include "Renderer/Backend/Vulkan/VulkanContext.hpp"
 
 namespace Vanta {
 
-	VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count, const std::string& debugName)
-		: m_DebugName(debugName)
+	VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(uint32_t count, std::string debugName)
+		: m_DebugName(std::move(debugName))
 	{
 		auto device = VulkanContext::GetCurrentDevice();
 		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
@@ -72,12 +74,12 @@ namespace Vanta {
 		m_PipelineStatisticsQueryPools.resize(framesInFlight);
 		for (auto& pipelineStatisticsQueryPools : m_PipelineStatisticsQueryPools)
 			VK_CHECK_RESULT(vkCreateQueryPool(device->GetVulkanDevice(), &queryPoolCreateInfo, nullptr, &pipelineStatisticsQueryPools));
-
+		
 		m_PipelineStatisticsQueryResults.resize(framesInFlight);
 	}
 
-	VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(const std::string& debugName, bool swapchain)
-		: m_DebugName(debugName), m_OwnedBySwapChain(true)
+	VulkanRenderCommandBuffer::VulkanRenderCommandBuffer(std::string debugName, bool swapchain)
+		: m_DebugName(std::move(debugName)), m_OwnedBySwapChain(true)
 	{
 		auto device = VulkanContext::GetCurrentDevice();
 		uint32_t framesInFlight = Renderer::GetConfig().FramesInFlight;
@@ -155,7 +157,7 @@ namespace Vanta {
 			cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			cmdBufInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 			cmdBufInfo.pNext = nullptr;
-
+			
 			VkCommandBuffer commandBuffer = instance->m_CommandBuffers[frameIndex];
 			VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &cmdBufInfo));
 
@@ -215,7 +217,7 @@ namespace Vanta {
 				float nsTime = endTime > startTime ? (endTime - startTime) * device->GetPhysicalDevice()->GetLimits().timestampPeriod : 0.0f;
 				instance->m_ExecutionGPUTimes[frameIndex][i / 2] = nsTime * 0.000001f; // Time in ms
 			}
-
+			
 			// Retrieve pipeline stats results
 			vkGetQueryPoolResults(device->GetVulkanDevice(), instance->m_PipelineStatisticsQueryPools[frameIndex], 0, 1,
 				sizeof(PipelineStatistics), &instance->m_PipelineStatisticsQueryResults[frameIndex], sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);

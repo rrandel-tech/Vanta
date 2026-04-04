@@ -95,6 +95,8 @@ namespace Vanta {
 		m_SelectionContext.clear();
 
 		m_SceneState = SceneState::Play;
+		UI::SetMouseEnabled(true);
+		Input::SetCursorMode(CursorMode::Normal);
 
 		m_RuntimeScene = Ref<Scene>::Create();
 		m_EditorScene->CopyTo(m_RuntimeScene);
@@ -108,6 +110,9 @@ namespace Vanta {
 	{
 		m_RuntimeScene->OnRuntimeStop();
 		m_SceneState = SceneState::Edit;
+		Input::SetCursorMode(CursorMode::Normal);
+		UI::SetMouseEnabled(true);
+
 
 		// Unload runtime scene
 		m_RuntimeScene = nullptr;
@@ -168,7 +173,7 @@ namespace Vanta {
 
 			m_EditorCamera.SetActive(m_AllowViewportCameraEvents || SDL_GetWindowRelativeMouseMode(static_cast<SDL_Window*>(Application::Get().GetWindow().GetNativeWindow())));
 			m_EditorCamera.OnUpdate(ts);
-
+			UI::SetMouseEnabled(true);
 			m_EditorScene->OnRenderEditor(m_ViewportRenderer, ts, m_EditorCamera);
 
 			if (m_ShowSecondViewport)
@@ -194,6 +199,7 @@ namespace Vanta {
 		case SceneState::Pause:
 		{
 			m_EditorCamera.SetActive(m_ViewportPanelMouseOver);
+			UI::SetMouseEnabled(true);
 			m_EditorCamera.OnUpdate(ts);
 
 			m_RuntimeScene->OnRenderRuntime(m_ViewportRenderer, ts);
@@ -209,19 +215,14 @@ namespace Vanta {
 	void EditorLayer::SelectEntity(Entity entity)
 	{
 		if (!entity)
-		{
 			return;
-		}
 
 		SelectedSubmesh selection;
 		if (entity.HasComponent<MeshComponent>())
 		{
 			auto& meshComp = entity.GetComponent<MeshComponent>();
-
 			if (meshComp.Mesh && !meshComp.Mesh->IsFlagSet(AssetFlag::Missing))
-			{
 				selection.Mesh = &meshComp.Mesh->GetMeshAsset()->GetSubmeshes()[0];
-			}
 		}
 		selection.Entity = entity;
 		m_SelectionContext.clear();
@@ -238,11 +239,10 @@ namespace Vanta {
 			return;
 
 		Renderer2D::BeginScene(m_EditorCamera.GetViewProjection(), m_EditorCamera.GetViewMatrix());
+		Renderer2D::SetTargetRenderPass(m_ViewportRenderer->GetExternalCompositeRenderPass());
 
 		if (m_DrawOnTopBoundingBoxes)
 		{
-			Renderer2D::SetTargetRenderPass(m_ViewportRenderer->GetExternalCompositeRenderPass());
-
 			if (m_ShowBoundingBoxes)
 			{
 				if (m_ShowBoundingBoxSelectedMeshOnly)
@@ -771,7 +771,7 @@ namespace Vanta {
 
 		ImGui::Begin("##tool_bar", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 		{
-			float size = ImGui::GetWindowHeight() - 4.0F;
+			float size = ImGui::GetWindowHeight() - 4.0f;
 			ImGui::SameLine((ImGui::GetWindowContentRegionMax().x / 2.0f) - (1.5f * (ImGui::GetFontSize() + ImGui::GetStyle().ItemSpacing.x)) - (size / 2.0f));
 			Ref<Texture2D> buttonTex = m_SceneState == SceneState::Play ? m_StopButtonTex : m_PlayButtonTex;
 			if (UI::ImageButton(buttonTex, ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0)))
@@ -963,6 +963,26 @@ namespace Vanta {
 
 		ImGui::End();
 		ImGui::PopStyleVar();
+
+#if CameraDebug
+		ImGui::Begin("Camera Debug");
+		ImGui::Text(fmt::format("Distance: {}", m_EditorCamera.m_Distance).c_str());
+		ImGui::Text(fmt::format("Focal Point: {}, {}, {}", m_EditorCamera.m_FocalPoint.x, m_EditorCamera.m_FocalPoint.y, m_EditorCamera.m_FocalPoint.z).c_str());
+		ImGui::Text(fmt::format("Rotation: {}, {}, {}", m_EditorCamera.m_WorldRotation.x, m_EditorCamera.m_WorldRotation.y, m_EditorCamera.m_WorldRotation.z).c_str());
+		ImGui::Text(fmt::format("Up Dir: {}, {}, {}", m_EditorCamera.GetUpDirection().x, m_EditorCamera.GetUpDirection().y, m_EditorCamera.GetUpDirection().z).c_str());
+		ImGui::Text(fmt::format("Strafe Dir: {}, {}, {}", m_EditorCamera.GetRightDirection().x, m_EditorCamera.GetRightDirection().y, m_EditorCamera.GetRightDirection().z).c_str());
+		ImGui::Text(fmt::format("Yaw: {}", m_EditorCamera.m_Yaw).c_str());
+		ImGui::Text(fmt::format("Yaw Delta: {}", m_EditorCamera.m_YawDelta).c_str());
+		ImGui::Text(fmt::format("Pitch: {}", m_EditorCamera.m_Pitch).c_str());
+		ImGui::Text(fmt::format("Pitch Delta: {}", m_EditorCamera.m_PitchDelta).c_str());
+		ImGui::Text(fmt::format("Position: ({}, {}, {})", m_EditorCamera.m_Position.x, m_EditorCamera.m_Position.y, m_EditorCamera.m_Position.z).c_str());
+		ImGui::Text(fmt::format("Position Delta: ({}, {}, {})", m_EditorCamera.m_PositionDelta.x, m_EditorCamera.m_PositionDelta.y, m_EditorCamera.m_PositionDelta.z).c_str());
+		ImGui::Text(fmt::format("View matrix: [{}, {}, {}, {}]", m_EditorCamera.m_ViewMatrix[0].x, m_EditorCamera.m_ViewMatrix[0].y, m_EditorCamera.m_ViewMatrix[0].z, m_EditorCamera.m_ViewMatrix[0].w).c_str());
+		ImGui::Text(fmt::format("		      [{}, {}, {}, {}]", m_EditorCamera.m_ViewMatrix[1].x, m_EditorCamera.m_ViewMatrix[1].y, m_EditorCamera.m_ViewMatrix[1].z, m_EditorCamera.m_ViewMatrix[1].w).c_str());
+		ImGui::Text(fmt::format("		      [{}, {}, {}, {}]", m_EditorCamera.m_ViewMatrix[2].x, m_EditorCamera.m_ViewMatrix[2].y, m_EditorCamera.m_ViewMatrix[2].z, m_EditorCamera.m_ViewMatrix[2].w).c_str());
+		ImGui::Text(fmt::format("		      [{}, {}, {}, {}]", m_EditorCamera.m_ViewMatrix[3].x, m_EditorCamera.m_ViewMatrix[3].y, m_EditorCamera.m_ViewMatrix[3].z, m_EditorCamera.m_ViewMatrix[3].w).c_str());
+		ImGui::End();
+#endif
 
 		if (m_ShowSecondViewport)
 		{
@@ -1509,8 +1529,8 @@ namespace Vanta {
 		}
 
 		EventDispatcher dispatcher(e);
-		dispatcher.Dispatch<KeyPressedEvent>(VA_BIND_EVENT_FN(EditorLayer::OnKeyPressedEvent));
-		dispatcher.Dispatch<MouseButtonPressedEvent>(VA_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
+		dispatcher.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& event){ return OnKeyPressedEvent(event); });
+		dispatcher.Dispatch<MouseButtonPressedEvent>([this](MouseButtonPressedEvent& event) { return OnMouseButtonPressed(event); });
 
 		AssetEditorPanel::OnEvent(e);
 	}

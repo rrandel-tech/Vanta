@@ -15,8 +15,10 @@ namespace Vanta {
 		None = 0,
 		OneZero,
 		SrcAlphaOneMinusSrcAlpha,
-		Additive
+		Additive,
+		Zero_SrcColor
 	};
+
 
 	struct FramebufferTextureSpecification
 	{
@@ -59,9 +61,9 @@ namespace Vanta {
 		// SwapChainTarget = screen buffer (i.e. no framebuffer)
 		bool SwapChainTarget = false;
 
-		// Note: these are used to attach multi-layered depth images
+		// Note: these are used to attach multi-layered depth images and color image arrays
 		Ref<Image2D> ExistingImage;
-		uint32_t ExistingImageLayer;
+		std::vector<uint32_t> ExistingImageLayers;
 		
 		// Specify existing images to attach instead of creating
 		// new images. attachment index -> image

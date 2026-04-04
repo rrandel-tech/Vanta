@@ -132,7 +132,7 @@ namespace Vanta {
 			return 0;
 		}
 
-		while (s_Watching)
+		while (s_Watching & false)
 		{
 			const DWORD status = ReadDirectoryChangesW(
 				handle,

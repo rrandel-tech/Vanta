@@ -4,12 +4,12 @@
 #include "Renderer.hpp"
 #include "SceneEnvironment.hpp"
 
-#include <glad/glad.h>
 #include <imgui.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Renderer2D.hpp"
 #include "UniformBuffer.hpp"
+#include "Math/Noise.hpp"
 
 #include "ImGui/ImGui.hpp"
 #include "Debug/Profiler.hpp"
@@ -28,9 +28,6 @@ namespace Vanta {
 		Init();
 	}
 
-	SceneRenderer::~SceneRenderer()
-	{
-	}
 
 	void SceneRenderer::Init()
 	{
@@ -74,7 +71,6 @@ namespace Vanta {
 
 			// 4 cascades
 			auto shadowPassShader = Renderer::GetShaderLibrary()->Get("ShadowMap");
-
 			PipelineSpecification pipelineSpec;
 			pipelineSpec.DebugName = "ShadowPass";
 			pipelineSpec.Shader = shadowPassShader;
@@ -86,27 +82,29 @@ namespace Vanta {
 				{ ShaderDataType::Float2, "a_TexCoord" }
 			};
 
+			// 4 cascades
 			for (int i = 0; i < 4; i++)
 			{
-				shadowMapFramebufferSpec.ExistingImageLayer = i;
+				shadowMapFramebufferSpec.ExistingImageLayers.clear();
+				shadowMapFramebufferSpec.ExistingImageLayers.emplace_back(i);
 
 				RenderPassSpecification shadowMapRenderPassSpec;
 				shadowMapRenderPassSpec.TargetFramebuffer = Framebuffer::Create(shadowMapFramebufferSpec);
 				shadowMapRenderPassSpec.DebugName = "ShadowMap";
-				ShadowMapRenderPass[i] = RenderPass::Create(shadowMapRenderPassSpec);
-
-				pipelineSpec.RenderPass = ShadowMapRenderPass[i];
+				pipelineSpec.RenderPass = RenderPass::Create(shadowMapRenderPassSpec);
 				m_ShadowPassPipelines[i] = Pipeline::Create(pipelineSpec);
-				m_ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
 			}
+
+
+			m_ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
 		}
 
 		// Geometry
 		{
 			FramebufferSpecification geoFramebufferSpec;
-			geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::Depth };
+			geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::RGBA16F, ImageFormat::RGBA16F, ImageFormat::Depth };
 			geoFramebufferSpec.Samples = 1;
-			geoFramebufferSpec.ClearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+			geoFramebufferSpec.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 			geoFramebufferSpec.DebugName = "Geometry";
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(geoFramebufferSpec);
@@ -218,7 +216,7 @@ namespace Vanta {
 			extCompFramebufferSpec.ClearColor = { 0.5f, 0.1f, 0.1f, 1.0f };
 			extCompFramebufferSpec.ClearOnLoad = false;
 			extCompFramebufferSpec.DebugName = "External Composite";
-			
+
 			// Use the color buffer from the final compositing pass, but the depth buffer from
 			// the actual 3D geometry pass, in case we want to composite elements behind meshes
 			// in the scene
@@ -351,129 +349,9 @@ namespace Vanta {
 		{
 			m_ViewportWidth = width;
 			m_ViewportHeight = height;
+			m_InvViewportWidth = 1.f / (float)width;
+			m_InvViewportHeight = 1.f / (float)height;
 			m_NeedsResize = true;
-		}
-	}
-
-	void SceneRenderer::CalculateCascades(CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection) const
-	{
-		struct FrustumBounds
-		{
-			float r, l, b, t, f, n;
-		};
-
-		//FrustumBounds frustumBounds[3];
-
-		auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * sceneCamera.ViewMatrix;
-
-		const int SHADOW_MAP_CASCADE_COUNT = 4;
-		float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
-
-		// TODO: less hard-coding!
-		float nearClip = 0.1f;
-		float farClip = 1000.0f;
-		float clipRange = farClip - nearClip;
-
-		float minZ = nearClip;
-		float maxZ = nearClip + clipRange;
-
-		float range = maxZ - minZ;
-		float ratio = maxZ / minZ;
-
-		// Calculate split depths based on view camera frustum
-		// Based on method presented in https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
-		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
-		{
-			float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
-			float log = minZ * std::pow(ratio, p);
-			float uniform = minZ + range * p;
-			float d = CascadeSplitLambda * (log - uniform) + uniform;
-			cascadeSplits[i] = (d - nearClip) / clipRange;
-		}
-
-		cascadeSplits[3] = 0.3f;
-
-		// Manually set cascades here
-		// cascadeSplits[0] = 0.05f;
-		// cascadeSplits[1] = 0.15f;
-		// cascadeSplits[2] = 0.3f;
-		// cascadeSplits[3] = 1.0f;
-
-		// Calculate orthographic projection matrix for each cascade
-		float lastSplitDist = 0.0;
-		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
-		{
-			float splitDist = cascadeSplits[i];
-
-			glm::vec3 frustumCorners[8] =
-			{
-				glm::vec3(-1.0f,  1.0f, -1.0f),
-				glm::vec3(1.0f,  1.0f, -1.0f),
-				glm::vec3(1.0f, -1.0f, -1.0f),
-				glm::vec3(-1.0f, -1.0f, -1.0f),
-				glm::vec3(-1.0f,  1.0f,  1.0f),
-				glm::vec3(1.0f,  1.0f,  1.0f),
-				glm::vec3(1.0f, -1.0f,  1.0f),
-				glm::vec3(-1.0f, -1.0f,  1.0f),
-			};
-
-			// Project frustum corners into world space
-			glm::mat4 invCam = glm::inverse(viewProjection);
-			for (uint32_t i = 0; i < 8; i++)
-			{
-				glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
-				frustumCorners[i] = invCorner / invCorner.w;
-			}
-
-			for (uint32_t i = 0; i < 4; i++)
-			{
-				glm::vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
-				frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
-				frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
-			}
-
-			// Get frustum center
-			glm::vec3 frustumCenter = glm::vec3(0.0f);
-			for (uint32_t i = 0; i < 8; i++)
-				frustumCenter += frustumCorners[i];
-
-			frustumCenter /= 8.0f;
-
-			//frustumCenter *= 0.01f;
-
-			float radius = 0.0f;
-			for (uint32_t i = 0; i < 8; i++)
-			{
-				float distance = glm::length(frustumCorners[i] - frustumCenter);
-				radius = glm::max(radius, distance);
-			}
-			radius = std::ceil(radius * 16.0f) / 16.0f;
-
-			glm::vec3 maxExtents = glm::vec3(radius);
-			glm::vec3 minExtents = -maxExtents;
-
-			glm::vec3 lightDir = -lightDirection;
-			glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDir * -minExtents.z, frustumCenter, glm::vec3(0.0f, 0.0f, 1.0f));
-			glm::mat4 lightOrthoMatrix = glm::ortho(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.0f + CascadeNearPlaneOffset, maxExtents.z - minExtents.z + CascadeFarPlaneOffset);
-
-			// Offset to texel space to avoid shimmering (from https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
-			glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
-			const float ShadowMapResolution = 4096.0f;
-			glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
-			glm::vec4 roundedOrigin = glm::round(shadowOrigin);
-			glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
-			roundOffset = roundOffset * 2.0f / ShadowMapResolution;
-			roundOffset.z = 0.0f;
-			roundOffset.w = 0.0f;
-
-			lightOrthoMatrix[3] += roundOffset;
-
-			// Store split distance and matrix in cascade
-			cascades[i].SplitDepth = (nearClip + splitDist * clipRange) * -1.0f;
-			cascades[i].ViewProj = lightOrthoMatrix * lightViewMatrix;
-			cascades[i].View = lightViewMatrix;
-
-			lastSplitDist = cascadeSplits[i];
 		}
 	}
 
@@ -525,16 +403,16 @@ namespace Vanta {
 		}
 
 		// Update uniform buffers
-		UBCamera& cameraData = CameraData;
+		UBCamera& cameraData = CameraDataUB;
 		UBScene& sceneData = SceneDataUB;
 		UBShadow& shadowData = ShadowData;
 		UBRendererData& rendererData = RendererDataUB;
 
 		auto& sceneCamera = m_SceneData.SceneCamera;
-		auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * sceneCamera.ViewMatrix;
-		glm::vec3 cameraPosition = glm::inverse(sceneCamera.ViewMatrix)[3];
+		const auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * sceneCamera.ViewMatrix;
+		const glm::vec3 cameraPosition = glm::inverse(sceneCamera.ViewMatrix)[3];
 
-		auto inverseVP = glm::inverse(viewProjection);
+		const auto inverseVP = glm::inverse(viewProjection);
 		cameraData.ViewProjection = viewProjection;
 		cameraData.InverseViewProjection = inverseVP;
 		cameraData.Projection = sceneCamera.Camera.GetProjectionMatrix();
@@ -553,10 +431,10 @@ namespace Vanta {
 		sceneData.u_CameraPosition = cameraPosition;
 		sceneData.EnvironmentMapIntensity = m_SceneData.SceneEnvironmentIntensity;
 		Renderer::Submit([instance, sceneData]() mutable
-			{
-				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-				instance->m_UniformBufferSet->Get(2, 0, bufferIndex)->RT_SetData(&sceneData, sizeof(sceneData));
-			});
+		{
+			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+			instance->m_UniformBufferSet->Get(2, 0, bufferIndex)->RT_SetData(&sceneData, sizeof(sceneData));
+		});
 
 		CascadeData cascades[4];
 		CalculateCascades(cascades, sceneCamera, directionalLight.Direction);
@@ -568,17 +446,17 @@ namespace Vanta {
 			shadowData.ViewProjection[i] = cascades[i].ViewProj;
 		}
 		Renderer::Submit([instance, shadowData]() mutable
-			{
-				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-				instance->m_UniformBufferSet->Get(1, 0, bufferIndex)->RT_SetData(&shadowData, sizeof(shadowData));
-			});
+		{
+			const uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+			instance->m_UniformBufferSet->Get(1, 0, bufferIndex)->RT_SetData(&shadowData, sizeof(shadowData));
+		});
 
 		rendererData.CascadeSplits = CascadeSplits;
 		Renderer::Submit([instance, rendererData]() mutable
-			{
-				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-				instance->m_UniformBufferSet->Get(3, 0, bufferIndex)->RT_SetData(&rendererData, sizeof(rendererData));
-			});
+		{
+			const uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+			instance->m_UniformBufferSet->Get(3, 0, bufferIndex)->RT_SetData(&rendererData, sizeof(rendererData));
+		});
 
 		Renderer::SetSceneEnvironment(this, m_SceneData.SceneEnvironment, m_ShadowPassPipelines[0]->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage());
 	}
@@ -591,15 +469,15 @@ namespace Vanta {
 #if MULTI_THREAD
 		Ref<SceneRenderer> instance = this;
 		s_ThreadPool.emplace_back(([instance]() mutable
-			{
-				instance->FlushDrawList();
-	}));
+		{
+			instance->FlushDrawList();
+		}));
 #else 
 		FlushDrawList();
 #endif
 
 		m_Active = false;
-}
+	}
 
 	void SceneRenderer::WaitForThreads()
 	{
@@ -622,6 +500,14 @@ namespace Vanta {
 		m_ShadowPassDrawList.push_back({ mesh, nullptr, transform });
 	}
 
+	void SceneRenderer::ClearPass(Ref<RenderPass> renderPass, bool explicitClear)
+	{
+		VA_PROFILE_FUNC();
+
+		Renderer::BeginRenderPass(m_CommandBuffer, renderPass, explicitClear);
+		Renderer::EndRenderPass(m_CommandBuffer);
+	}
+
 	void SceneRenderer::ShadowMapPass()
 	{
 		VA_PROFILE_FUNC();
@@ -631,24 +517,22 @@ namespace Vanta {
 		auto& directionalLights = m_SceneData.SceneLightEnvironment.DirectionalLights;
 		if (directionalLights[0].Multiplier == 0.0f || !directionalLights[0].CastShadows)
 		{
+			// Clear shadow maps
 			for (int i = 0; i < 4; i++)
-			{
-				// Clear shadow maps
-				Renderer::BeginRenderPass(m_CommandBuffer, ShadowMapRenderPass[i]);
-				Renderer::EndRenderPass(m_CommandBuffer);
-			}
+				ClearPass(m_ShadowPassPipelines[i]->GetSpecification().RenderPass);
+
 			return;
 		}
 
 		// TODO: change to four cascades (or set number)
 		for (int i = 0; i < 4; i++)
 		{
-			Renderer::BeginRenderPass(m_CommandBuffer, ShadowMapRenderPass[i]);
+			Renderer::BeginRenderPass(m_CommandBuffer, m_ShadowPassPipelines[i]->GetSpecification().RenderPass);
 
 			// static glm::mat4 scaleBiasMatrix = glm::scale(glm::mat4(1.0f), { 0.5f, 0.5f, 0.5f }) * glm::translate(glm::mat4(1.0f), { 1, 1, 1 });
 
 			// Render entities
-			Buffer cascade(&i, sizeof(uint32_t));
+			const Buffer cascade(&i, sizeof(uint32_t));
 			for (auto& dc : m_ShadowPassDrawList)
 			{
 				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_ShadowPassPipelines[i], m_UniformBufferSet, nullptr, dc.Mesh, dc.Transform, m_ShadowPassMaterial, cascade);
@@ -678,7 +562,7 @@ namespace Vanta {
 		m_SkyboxMaterial->Set("u_Uniforms.TextureLod", m_SceneData.SkyboxLod);
 		m_SkyboxMaterial->Set("u_Uniforms.Intensity", m_SceneData.SceneEnvironmentIntensity);
 
-		Ref<TextureCube> radianceMap = m_SceneData.SceneEnvironment ? m_SceneData.SceneEnvironment->RadianceMap : Renderer::GetBlackCubeTexture();
+		const Ref<TextureCube> radianceMap = m_SceneData.SceneEnvironment ? m_SceneData.SceneEnvironment->RadianceMap : Renderer::GetBlackCubeTexture();
 		m_SkyboxMaterial->Set("u_Texture", radianceMap);
 		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_SkyboxPipeline, m_UniformBufferSet, nullptr, m_SkyboxMaterial);
 
@@ -970,7 +854,7 @@ namespace Vanta {
 			CompositeMaterial->Set("u_Uniforms.BloomDirtIntensity", 0.0f);
 		}
 
-		//CompositeMaterial->Set("u_Uniforms.TextureSamples", textureSamples);
+		// CompositeMaterial->Set("u_Uniforms.TextureSamples", textureSamples);
 
 		CompositeMaterial->Set("u_Texture", framebuffer->GetImage());
 		CompositeMaterial->Set("u_BloomTexture", m_BloomComputeTextures[2]);
@@ -1054,6 +938,128 @@ namespace Vanta {
 	SceneRendererOptions& SceneRenderer::GetOptions()
 	{
 		return m_Options;
+	}
+
+	void SceneRenderer::CalculateCascades(CascadeData* cascades, const SceneRendererCamera& sceneCamera, const glm::vec3& lightDirection) const
+	{
+		struct FrustumBounds
+		{
+			float r, l, b, t, f, n;
+		};
+
+		//FrustumBounds frustumBounds[3];
+
+		auto viewProjection = sceneCamera.Camera.GetProjectionMatrix() * sceneCamera.ViewMatrix;
+
+		const int SHADOW_MAP_CASCADE_COUNT = 4;
+		float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
+
+		// TODO: less hard-coding!
+		float nearClip = 0.1f;
+		float farClip = 1000.0f;
+		float clipRange = farClip - nearClip;
+
+		float minZ = nearClip;
+		float maxZ = nearClip + clipRange;
+
+		float range = maxZ - minZ;
+		float ratio = maxZ / minZ;
+
+		// Calculate split depths based on view camera frustum
+		// Based on method presented in https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
+		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
+		{
+			float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
+			float log = minZ * std::pow(ratio, p);
+			float uniform = minZ + range * p;
+			float d = CascadeSplitLambda * (log - uniform) + uniform;
+			cascadeSplits[i] = (d - nearClip) / clipRange;
+		}
+
+		cascadeSplits[3] = 0.3f;
+
+		// Manually set cascades here
+		// cascadeSplits[0] = 0.05f;
+		// cascadeSplits[1] = 0.15f;
+		// cascadeSplits[2] = 0.3f;
+		// cascadeSplits[3] = 1.0f;
+
+		// Calculate orthographic projection matrix for each cascade
+		float lastSplitDist = 0.0;
+		for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
+		{
+			float splitDist = cascadeSplits[i];
+
+			glm::vec3 frustumCorners[8] =
+			{
+				glm::vec3(-1.0f,  1.0f, -1.0f),
+				glm::vec3(1.0f,  1.0f, -1.0f),
+				glm::vec3(1.0f, -1.0f, -1.0f),
+				glm::vec3(-1.0f, -1.0f, -1.0f),
+				glm::vec3(-1.0f,  1.0f,  1.0f),
+				glm::vec3(1.0f,  1.0f,  1.0f),
+				glm::vec3(1.0f, -1.0f,  1.0f),
+				glm::vec3(-1.0f, -1.0f,  1.0f),
+			};
+
+			// Project frustum corners into world space
+			glm::mat4 invCam = glm::inverse(viewProjection);
+			for (uint32_t i = 0; i < 8; i++)
+			{
+				glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
+				frustumCorners[i] = invCorner / invCorner.w;
+			}
+
+			for (uint32_t i = 0; i < 4; i++)
+			{
+				glm::vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
+				frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
+				frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
+			}
+
+			// Get frustum center
+			glm::vec3 frustumCenter = glm::vec3(0.0f);
+			for (uint32_t i = 0; i < 8; i++)
+				frustumCenter += frustumCorners[i];
+
+			frustumCenter /= 8.0f;
+
+			//frustumCenter *= 0.01f;
+
+			float radius = 0.0f;
+			for (uint32_t i = 0; i < 8; i++)
+			{
+				float distance = glm::length(frustumCorners[i] - frustumCenter);
+				radius = glm::max(radius, distance);
+			}
+			radius = std::ceil(radius * 16.0f) / 16.0f;
+
+			glm::vec3 maxExtents = glm::vec3(radius);
+			glm::vec3 minExtents = -maxExtents;
+
+			glm::vec3 lightDir = -lightDirection;
+			glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDir * -minExtents.z, frustumCenter, glm::vec3(0.0f, 0.0f, 1.0f));
+			glm::mat4 lightOrthoMatrix = glm::ortho(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.0f + CascadeNearPlaneOffset, maxExtents.z - minExtents.z + CascadeFarPlaneOffset);
+
+			// Offset to texel space to avoid shimmering (from https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
+			glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
+			const float ShadowMapResolution = 4096.0f;
+			glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
+			glm::vec4 roundedOrigin = glm::round(shadowOrigin);
+			glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
+			roundOffset = roundOffset * 2.0f / ShadowMapResolution;
+			roundOffset.z = 0.0f;
+			roundOffset.w = 0.0f;
+
+			lightOrthoMatrix[3] += roundOffset;
+
+			// Store split distance and matrix in cascade
+			cascades[i].SplitDepth = (nearClip + splitDist * clipRange) * -1.0f;
+			cascades[i].ViewProj = lightOrthoMatrix * lightViewMatrix;
+			cascades[i].View = lightViewMatrix;
+
+			lastSplitDist = cascadeSplits[i];
+		}
 	}
 
 	void SceneRenderer::OnImGuiRender()
@@ -1164,7 +1170,7 @@ namespace Vanta {
 			if (UI::BeginTreeNode("Shadow Map", false))
 			{
 				static int cascadeIndex = 0;
-				auto fb = ShadowMapRenderPass[cascadeIndex]->GetSpecification().TargetFramebuffer;
+				auto fb = m_ShadowPassPipelines[cascadeIndex]->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
 				auto image = fb->GetDepthImage();
 
 				float size = ImGui::GetContentRegionAvail().x; // (float)fb->GetWidth() * 0.5f, (float)fb->GetHeight() * 0.5f

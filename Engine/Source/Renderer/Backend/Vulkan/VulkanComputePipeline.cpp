@@ -17,11 +17,20 @@ namespace Vanta {
 	{
 		Ref<VulkanComputePipeline> instance = this;
 		Renderer::Submit([instance]() mutable {
-			instance->CreatePipeline();
+			instance->RT_CreatePipeline();
 		});
+		Renderer::RegisterShaderDependency(computeShader, this);
 	}
 
 	void VulkanComputePipeline::CreatePipeline()
+	{
+		Renderer::Submit([instance = Ref(this)]() mutable
+			{
+				instance->RT_CreatePipeline();
+			});
+	}
+
+	void VulkanComputePipeline::RT_CreatePipeline()
 	{
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 
@@ -184,5 +193,6 @@ namespace Vanta {
 	{
 		vkCmdPushConstants(m_ActiveComputeCommandBuffer, m_ComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, size, data);
 	}
+
 
 }

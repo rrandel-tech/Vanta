@@ -31,11 +31,17 @@ namespace Vanta {
 
 	struct ShaderDependencies
 	{
+		std::vector<Ref<PipelineCompute>> ComputePipelines;
 		std::vector<Ref<Pipeline>> Pipelines;
 		std::vector<Ref<Material>> Materials;
 	};
 	static std::unordered_map<size_t, ShaderDependencies> s_ShaderDependencies;
 
+	void Renderer::RegisterShaderDependency(Ref<Shader> shader, Ref<PipelineCompute> computePipeline)
+	{
+		s_ShaderDependencies[shader->GetHash()].ComputePipelines.push_back(computePipeline);
+	}
+	
 	void Renderer::RegisterShaderDependency(Ref<Shader> shader, Ref<Pipeline> pipeline)
 	{
 		s_ShaderDependencies[shader->GetHash()].Pipelines.push_back(pipeline);
@@ -54,6 +60,11 @@ namespace Vanta {
 			for (auto& pipeline : dependencies.Pipelines)
 			{
 				pipeline->Invalidate();
+			}
+
+			for (auto& computePipeline : dependencies.ComputePipelines)
+			{
+				computePipeline.As<VulkanComputePipeline>()->CreatePipeline();
 			}
 
 			for (auto& material : dependencies.Materials)
@@ -110,7 +121,7 @@ namespace Vanta {
 		s_RendererAPI = InitRendererAPI();
 
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
-
+		
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VantaPBR_Static.glsl");
 		// Renderer::GetShaderLibrary()->LoadResources/Shaders("assets/shaders/VantaPBR_Anim.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Grid.glsl");
@@ -127,17 +138,17 @@ namespace Vanta {
 		// Post-processing
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PostProcessing/Bloom.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SceneComposite.glsl");
-
+		
 		// Renderer2D Shaders
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Line.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Circle.glsl");
-
+		
 		// Jump Flood Shaders
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Init.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Pass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Composite.glsl");
-
+		
 		// Misc
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SelectedGeometry.glsl");
 
@@ -224,10 +235,11 @@ namespace Vanta {
 		return s_RendererAPI->CreateEnvironmentMap(filepath);
 	}
 
-	/* void Renderer::LightCulling(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> computePipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec2& screenSize, const glm::ivec3& workGroups)
+
+	void Renderer::DispatchComputeShader(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> computePipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec3& workGroups)
 	{
-		s_RendererAPI->LightCulling(renderCommandBuffer, computePipeline, uniformBufferSet, storageBufferSet, material, screenSize, workGroups);
-	} */
+		s_RendererAPI->DispatchComputeShader(renderCommandBuffer, computePipeline, uniformBufferSet, storageBufferSet, material, workGroups);
+	}
 
 	Ref<TextureCube> Renderer::CreatePreethamSky(float turbidity, float azimuth, float inclination)
 	{
@@ -274,6 +286,11 @@ namespace Vanta {
 		Renderer::DrawIndexed(6, PrimitiveType::Triangles, depthTest);*/
 	}
 
+	void Renderer::ClearImage(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Image2D> image)
+	{
+		s_RendererAPI->ClearImage(renderCommandBuffer, image);
+	}
+	
 	void Renderer::SubmitFullscreenQuad(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<Material> material)
 	{
 		s_RendererAPI->SubmitFullscreenQuad(renderCommandBuffer, pipeline, uniformBufferSet, material);
