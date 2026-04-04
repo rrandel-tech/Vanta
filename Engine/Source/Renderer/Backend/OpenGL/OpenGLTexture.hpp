@@ -12,6 +12,8 @@ namespace Vanta {
 		OpenGLTexture2D(const std::string& path, TextureProperties properties);
 		virtual ~OpenGLTexture2D();
 
+		virtual void Resize(uint32_t width, uint32_t height) override {}
+
 		virtual void Bind(uint32_t slot = 0) const;
 
 		virtual Ref<Image2D> GetImage() const override { return m_Image; }
@@ -22,6 +24,8 @@ namespace Vanta {
 		// This function currently returns the expected number of mips based on image size,
 		// not present mips in data
 		virtual uint32_t GetMipLevelCount() const override;
+
+		virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override { return { 0, 0 }; }
 
 		virtual void Lock() override;
 		virtual void Unlock() override;
@@ -61,6 +65,8 @@ namespace Vanta {
 		// This function currently returns the expected number of mips based on image size,
 		// not present mips in data
 		virtual uint32_t GetMipLevelCount() const override;
+
+		virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override { return { 0, 0 }; }
 #if NEEDED
 		virtual const std::string& GetPath() const override { return m_FilePath; }
 #endif

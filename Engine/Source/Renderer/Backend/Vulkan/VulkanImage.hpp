@@ -27,6 +27,7 @@ namespace Vanta {
 
 		virtual uint32_t GetWidth() const override { return m_Specification.Width; }
 		virtual uint32_t GetHeight() const override { return m_Specification.Height; }
+		virtual float GetAspectRatio() const override { return (float)m_Specification.Width / (float)m_Specification.Height; }
 
 		virtual ImageSpecification& GetSpecification() override { return m_Specification; }
 		virtual const ImageSpecification& GetSpecification() const override { return m_Specification; }
@@ -41,6 +42,9 @@ namespace Vanta {
 			return m_PerLayerImageViews[layer];
 		}
 
+		VkImageView GetMipImageView(uint32_t mip);
+		VkImageView RT_GetMipImageView(uint32_t mip);
+
 		VulkanImageInfo& GetImageInfo() { return m_Info; }
 		const VulkanImageInfo& GetImageInfo() const { return m_Info; }
 
@@ -52,6 +56,9 @@ namespace Vanta {
 		virtual uint64_t GetHash() const override { return (uint64_t)m_Info.Image; }
 
 		void UpdateDescriptor();
+
+		// Debug
+		static const std::map<VkImage, WeakRef<VulkanImage2D>>& GetImageRefs();
 	private:
 		ImageSpecification m_Specification;
 
@@ -59,6 +66,7 @@ namespace Vanta {
 
 		VulkanImageInfo m_Info;
 		std::vector<VkImageView> m_PerLayerImageViews;
+		std::map<uint32_t, VkImageView> m_MipImageViews;
 		VkDescriptorImageInfo m_DescriptorImageInfo = {};
 	};
 

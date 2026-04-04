@@ -14,6 +14,10 @@
 #include "ImGui/ImGui.hpp"
 #include "Debug/Profiler.hpp"
 
+#include "Renderer/Backend/Vulkan/VulkanComputePipeline.hpp"
+#include "Renderer/Backend/Vulkan/VulkanMaterial.hpp"
+#include "Renderer/Backend/Vulkan/VulkanRenderer.hpp"
+
 namespace Vanta {
 
 	static std::vector<std::thread> s_ThreadPool;
@@ -69,16 +73,6 @@ namespace Vanta {
 			shadowMapFramebufferSpec.DebugName = "Shadow Map";
 
 			// 4 cascades
-			for (int i = 0; i < 4; i++)
-			{
-				shadowMapFramebufferSpec.ExistingImageLayer = i;
-
-				RenderPassSpecification shadowMapRenderPassSpec;
-				shadowMapRenderPassSpec.TargetFramebuffer = Framebuffer::Create(shadowMapFramebufferSpec);
-				shadowMapRenderPassSpec.DebugName = "ShadowMap";
-				ShadowMapRenderPass[i] = RenderPass::Create(shadowMapRenderPassSpec);
-			}
-
 			auto shadowPassShader = Renderer::GetShaderLibrary()->Get("ShadowMap");
 
 			PipelineSpecification pipelineSpec;
@@ -91,17 +85,28 @@ namespace Vanta {
 				{ ShaderDataType::Float3, "a_Binormal" },
 				{ ShaderDataType::Float2, "a_TexCoord" }
 			};
-			pipelineSpec.RenderPass = ShadowMapRenderPass[0];
-			m_ShadowPassPipeline = Pipeline::Create(pipelineSpec);
-			m_ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
+
+			for (int i = 0; i < 4; i++)
+			{
+				shadowMapFramebufferSpec.ExistingImageLayer = i;
+
+				RenderPassSpecification shadowMapRenderPassSpec;
+				shadowMapRenderPassSpec.TargetFramebuffer = Framebuffer::Create(shadowMapFramebufferSpec);
+				shadowMapRenderPassSpec.DebugName = "ShadowMap";
+				ShadowMapRenderPass[i] = RenderPass::Create(shadowMapRenderPassSpec);
+
+				pipelineSpec.RenderPass = ShadowMapRenderPass[i];
+				m_ShadowPassPipelines[i] = Pipeline::Create(pipelineSpec);
+				m_ShadowPassMaterial = Material::Create(shadowPassShader, "ShadowPass");
+			}
 		}
 
 		// Geometry
 		{
 			FramebufferSpecification geoFramebufferSpec;
-			geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::RGBA32F, ImageFormat::Depth };
+			geoFramebufferSpec.Attachments = { ImageFormat::RGBA32F, ImageFormat::Depth };
 			geoFramebufferSpec.Samples = 1;
-			geoFramebufferSpec.ClearColor = { 0.1f, 0.5f, 0.1f, 1.0f };
+			geoFramebufferSpec.ClearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 			geoFramebufferSpec.DebugName = "Geometry";
 
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(geoFramebufferSpec);
@@ -131,7 +136,7 @@ namespace Vanta {
 			m_GeometryWireframePipeline = Pipeline::Create(pipelineSpecification);
 
 		}
-		
+
 		// Selected Geometry isolation (for outline pass)
 		{
 			PipelineSpecification pipelineSpecification;
@@ -158,6 +163,20 @@ namespace Vanta {
 			m_SelectedGeometryPipeline = Pipeline::Create(pipelineSpecification);
 
 			m_SelectedGeometryMaterial = Material::Create(pipelineSpecification.Shader);
+		}
+
+		// Bloom Compute
+		{
+			auto shader = Renderer::GetShaderLibrary()->Get("Bloom");
+			m_BloomComputePipeline = PipelineCompute::Create(shader);
+			TextureProperties props;
+			props.SamplerWrap = TextureWrap::Clamp;
+			m_BloomComputeTextures[0] = Texture2D::Create(ImageFormat::RGBA32F, 1, 1, nullptr, props);
+			m_BloomComputeTextures[1] = Texture2D::Create(ImageFormat::RGBA32F, 1, 1, nullptr, props);
+			m_BloomComputeTextures[2] = Texture2D::Create(ImageFormat::RGBA32F, 1, 1, nullptr, props);
+			m_BloomComputeMaterial = Material::Create(shader);
+			
+			m_BloomDirtTexture = Renderer::GetBlackTexture();
 		}
 
 		// Composite
@@ -201,7 +220,7 @@ namespace Vanta {
 			extCompFramebufferSpec.DebugName = "External Composite";
 			
 			// Use the color buffer from the final compositing pass, but the depth buffer from
-			// the actual 3D geometry pass, incase we want to composite elements behind meshes
+			// the actual 3D geometry pass, in case we want to composite elements behind meshes
 			// in the scene
 			extCompFramebufferSpec.ExistingImages[0] = m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetImage();
 			extCompFramebufferSpec.ExistingImages[1] = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage();
@@ -315,9 +334,9 @@ namespace Vanta {
 
 		Ref<SceneRenderer> instance = this;
 		Renderer::Submit([instance]() mutable
-			{
-				instance->m_ResourcesCreated = true;
-			});
+		{
+			instance->m_ResourcesCreated = true;
+		});
 	}
 
 	void SceneRenderer::SetScene(Ref<Scene> scene)
@@ -483,6 +502,17 @@ namespace Vanta {
 
 			m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+			
+			// Half-size bloom texture
+			{
+				uint32_t viewportWidth = m_ViewportWidth / 2;
+				uint32_t viewportHeight = m_ViewportHeight / 2;
+				viewportWidth += (m_BloomComputeWorkgroupSize - (viewportWidth % m_BloomComputeWorkgroupSize));
+				viewportHeight += (m_BloomComputeWorkgroupSize - (viewportHeight % m_BloomComputeWorkgroupSize));
+				m_BloomComputeTextures[0]->Resize(viewportWidth, viewportHeight);
+				m_BloomComputeTextures[1]->Resize(viewportWidth, viewportHeight);
+				m_BloomComputeTextures[2]->Resize(viewportWidth, viewportHeight);
+			}
 
 			for (auto& tempFB : m_TempFramebuffers)
 				tempFB->Resize(m_ViewportWidth, m_ViewportHeight);
@@ -511,10 +541,10 @@ namespace Vanta {
 		cameraData.View = sceneCamera.ViewMatrix;
 		Ref<SceneRenderer> instance = this;
 		Renderer::Submit([instance, cameraData]() mutable
-			{
-				uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
-				instance->m_UniformBufferSet->Get(0, 0, bufferIndex)->RT_SetData(&cameraData, sizeof(cameraData));
-			});
+		{
+			uint32_t bufferIndex = Renderer::GetCurrentFrameIndex();
+			instance->m_UniformBufferSet->Get(0, 0, bufferIndex)->RT_SetData(&cameraData, sizeof(cameraData));
+		});
 
 		const auto& directionalLight = m_SceneData.SceneLightEnvironment.DirectionalLights[0];
 		sceneData.lights.Direction = directionalLight.Direction;
@@ -550,7 +580,7 @@ namespace Vanta {
 				instance->m_UniformBufferSet->Get(3, 0, bufferIndex)->RT_SetData(&rendererData, sizeof(rendererData));
 			});
 
-		Renderer::SetSceneEnvironment(this, m_SceneData.SceneEnvironment, m_ShadowPassPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage());
+		Renderer::SetSceneEnvironment(this, m_SceneData.SceneEnvironment, m_ShadowPassPipelines[0]->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage());
 	}
 
 	void SceneRenderer::EndScene()
@@ -596,6 +626,8 @@ namespace Vanta {
 	{
 		VA_PROFILE_FUNC();
 
+		m_GPUTimeQueries.ShadowMapPassQuery = m_CommandBuffer->BeginTimestampQuery();
+
 		auto& directionalLights = m_SceneData.SceneLightEnvironment.DirectionalLights;
 		if (directionalLights[0].Multiplier == 0.0f || !directionalLights[0].CastShadows)
 		{
@@ -619,16 +651,20 @@ namespace Vanta {
 			Buffer cascade(&i, sizeof(uint32_t));
 			for (auto& dc : m_ShadowPassDrawList)
 			{
-				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_ShadowPassPipeline, m_UniformBufferSet, nullptr, dc.Mesh, dc.Transform, m_ShadowPassMaterial, cascade);
+				Renderer::RenderMeshWithMaterial(m_CommandBuffer, m_ShadowPassPipelines[i], m_UniformBufferSet, nullptr, dc.Mesh, dc.Transform, m_ShadowPassMaterial, cascade);
 			}
 
 			Renderer::EndRenderPass(m_CommandBuffer);
 		}
+
+		m_CommandBuffer->EndTimestampQuery(m_GPUTimeQueries.ShadowMapPassQuery);
 	}
 
 	void SceneRenderer::GeometryPass()
 	{
 		VA_PROFILE_FUNC();
+
+		m_GPUTimeQueries.GeometryPassQuery = m_CommandBuffer->BeginTimestampQuery();
 
 		Renderer::BeginRenderPass(m_CommandBuffer, m_SelectedGeometryPipeline->GetSpecification().RenderPass);
 		for (auto& dc : m_SelectedMeshDrawList)
@@ -664,46 +700,16 @@ namespace Vanta {
 			Renderer::RenderQuad(m_CommandBuffer, m_GridPipeline, m_UniformBufferSet, nullptr, m_GridMaterial, transform);
 		}
 
-		if (GetOptions().ShowBoundingBoxes)
-		{
-#if 0
-			Renderer2D::BeginScene(viewProjection);
-			for (auto& dc : DrawList)
-				Renderer::DrawAABB(dc.Mesh, dc.Transform);
-			Renderer2D::EndScene();
-#endif
-	}
-
-		Renderer::EndRenderPass(m_CommandBuffer);
-	}
-
-	void SceneRenderer::CompositePass()
-	{
-		VA_PROFILE_FUNC();
-
-		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass, true);
-
-		auto framebuffer = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
-		float exposure = m_SceneData.SceneCamera.Camera.GetExposure();
-		int textureSamples = framebuffer->GetSpecification().Samples;
-
-		CompositeMaterial->Set("u_Uniforms.Exposure", exposure);
-		//CompositeMaterial->Set("u_Uniforms.TextureSamples", textureSamples);
-
-		CompositeMaterial->Set("u_Texture", framebuffer->GetImage());
-
-		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_CompositePipeline, nullptr, CompositeMaterial);
-		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_JumpFloodCompositePipeline, nullptr, m_JumpFloodCompositeMaterial);
 		Renderer::EndRenderPass(m_CommandBuffer);
 
-		//Renderer::BeginRenderPass(m_CommandBuffer, m_JumpFloodCompositePipeline->GetSpecification().RenderPass);
-		//Renderer::EndRenderPass(m_CommandBuffer);
+		m_CommandBuffer->EndTimestampQuery(m_GPUTimeQueries.GeometryPassQuery);
 	}
 
 	void SceneRenderer::JumpFloodPass()
 	{
 		VA_PROFILE_FUNC();
 
+		m_GPUTimeQueries.JumpFloodPassQuery = m_CommandBuffer->BeginTimestampQuery();
 		Renderer::BeginRenderPass(m_CommandBuffer, m_JumpFloodInitPipeline->GetSpecification().RenderPass);
 
 		auto framebuffer = m_SelectedGeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
@@ -736,57 +742,257 @@ namespace Vanta {
 		}
 		
 		m_JumpFloodCompositeMaterial->Set("u_Texture", m_TempFramebuffers[1]->GetImage());
+		m_CommandBuffer->EndTimestampQuery(m_GPUTimeQueries.JumpFloodPassQuery);
 	}
 
-	void SceneRenderer::BloomBlurPass()
+	void SceneRenderer::BloomCompute()
 	{
-#if 0
-		int amount = 10;
-		int index = 0;
+		Ref<VulkanComputePipeline> pipeline = m_BloomComputePipeline.As<VulkanComputePipeline>();
 
-		int horizontalCounter = 0, verticalCounter = 0;
-		for (int i = 0; i < amount; i++)
+		//m_BloomComputeMaterial->Set("o_Image", m_BloomComputeTexture);
+
+		struct BloomComputePushConstants
 		{
-			index = i % 2;
-			Renderer::BeginRenderPass(BloomBlurPass[index]);
-			BloomBlurShader->Bind();
-			BloomBlurShader->SetBool("u_Horizontal", index);
-			if (index)
-				horizontalCounter++;
-			else
-				verticalCounter++;
-			if (i > 0)
+			glm::vec4 Params;
+			float LOD = 0.0f;
+			int Mode = 0; // 0 = prefilter, 1 = downsample, 2 = firstUpsample, 3 = upsample
+		} bloomComputePushConstants;
+		bloomComputePushConstants.Params = { m_BloomSettings.Threshold, m_BloomSettings.Threshold - m_BloomSettings.Knee, m_BloomSettings.Knee * 2.0f, 0.25f / m_BloomSettings.Knee };
+		bloomComputePushConstants.Mode = 0;
+
+		auto inputTexture = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetImage().As<VulkanImage2D>();
+
+		m_GPUTimeQueries.BloomComputePassQuery = m_CommandBuffer->BeginTimestampQuery();
+
+		Renderer::Submit([bloomComputePushConstants, inputTexture, workGroupSize = m_BloomComputeWorkgroupSize, commandBuffer = m_CommandBuffer, bloomTextures = m_BloomComputeTextures, ubs = m_UniformBufferSet, material = m_BloomComputeMaterial.As<VulkanMaterial>(), pipeline]() mutable
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+			Ref<VulkanImage2D> images[3] =
 			{
-				auto fb = BloomBlurPass[1 - index]->GetSpecification().TargetFramebuffer;
-				fb->BindTexture();
-			}
-			else
+				bloomTextures[0]->GetImage().As<VulkanImage2D>(),
+				bloomTextures[1]->GetImage().As<VulkanImage2D>(),
+				bloomTextures[2]->GetImage().As<VulkanImage2D>()
+			};
+
+			auto shader = material->GetShader().As<VulkanShader>();
+
+			auto descriptorImageInfo = images[0]->GetDescriptor();
+			descriptorImageInfo.imageView = images[0]->RT_GetMipImageView(0);
+
+			std::array<VkWriteDescriptorSet, 3> writeDescriptors;
+
+			VkDescriptorSetLayout descriptorSetLayout = shader->GetDescriptorSetLayout(0);
+
+			VkDescriptorSetAllocateInfo allocInfo = {};
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &descriptorSetLayout;
+
+			pipeline->Begin(commandBuffer);
+
+			// Output image
+			VkDescriptorSet descriptorSet = VulkanRenderer::RT_AllocateDescriptorSet(allocInfo);
+			writeDescriptors[0] = *shader->GetDescriptorSet("o_Image");
+			writeDescriptors[0].dstSet = descriptorSet; // Should this be set inside the shader?
+			writeDescriptors[0].pImageInfo = &descriptorImageInfo;
+
+			// Input image
+			writeDescriptors[1] = *shader->GetDescriptorSet("u_Texture");
+			writeDescriptors[1].dstSet = descriptorSet; // Should this be set inside the shader?
+			writeDescriptors[1].pImageInfo = &inputTexture->GetDescriptor();
+
+			writeDescriptors[2] = *shader->GetDescriptorSet("u_BloomTexture");
+			writeDescriptors[2].dstSet = descriptorSet; // Should this be set inside the shader?
+			writeDescriptors[2].pImageInfo = &inputTexture->GetDescriptor();
+
+			vkUpdateDescriptorSets(device, (uint32_t)writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+
+			uint32_t workGroupsX = bloomTextures[0]->GetWidth() / workGroupSize;
+			uint32_t workGroupsY = bloomTextures[0]->GetHeight() / workGroupSize;
+
+			pipeline->SetPushConstants(&bloomComputePushConstants, sizeof(bloomComputePushConstants));
+			pipeline->Dispatch(descriptorSet, workGroupsX, workGroupsY, 1);
+
+			bloomComputePushConstants.Mode = 1;
+
+			VkSampler samplerClamp = VulkanRenderer::GetClampSampler();
+
+			uint32_t mips = bloomTextures[0]->GetMipLevelCount() - 2;
+			for (uint32_t i = 1; i < mips; i++)
 			{
-				auto fb = CompositePass->GetSpecification().TargetFramebuffer;
-				auto id = fb->GetColorAttachmentRendererID(1);
-				Renderer::Submit([id]()
-					{
-						glBindTextureUnit(0, id);
-					});
+				auto[mipWidth, mipHeight] = bloomTextures[0]->GetMipSize(i);
+				workGroupsX = (uint32_t)glm::ceil((float)mipWidth / (float)workGroupSize);
+				workGroupsY = (uint32_t)glm::ceil((float)mipHeight / (float)workGroupSize);
+
+				{
+					// Output image
+					descriptorImageInfo.imageView = images[1]->RT_GetMipImageView(i);
+					
+					descriptorSet = VulkanRenderer::RT_AllocateDescriptorSet(allocInfo);
+					writeDescriptors[0] = *shader->GetDescriptorSet("o_Image");
+					writeDescriptors[0].dstSet = descriptorSet; // Should this be set inside the shader?
+					writeDescriptors[0].pImageInfo = &descriptorImageInfo;
+
+					// Input image
+					writeDescriptors[1] = *shader->GetDescriptorSet("u_Texture");
+					writeDescriptors[1].dstSet = descriptorSet; // Should this be set inside the shader?
+					auto descriptor = bloomTextures[0]->GetImage().As<VulkanImage2D>()->GetDescriptor();
+					//descriptor.sampler = samplerClamp;
+					writeDescriptors[1].pImageInfo = &descriptor;
+
+					writeDescriptors[2] = *shader->GetDescriptorSet("u_BloomTexture");
+					writeDescriptors[2].dstSet = descriptorSet; // Should this be set inside the shader?
+					writeDescriptors[2].pImageInfo = &inputTexture->GetDescriptor();
+
+					vkUpdateDescriptorSets(device, (uint32_t)writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+
+					bloomComputePushConstants.LOD = i - 1.0f;
+					pipeline->SetPushConstants(&bloomComputePushConstants, sizeof(bloomComputePushConstants));
+					pipeline->Dispatch(descriptorSet, workGroupsX, workGroupsY, 1);
+				}
+				{
+					descriptorImageInfo.imageView = images[0]->RT_GetMipImageView(i);
+
+					// Output image
+					descriptorSet = VulkanRenderer::RT_AllocateDescriptorSet(allocInfo);
+					writeDescriptors[0] = *shader->GetDescriptorSet("o_Image");
+					writeDescriptors[0].dstSet = descriptorSet; // Should this be set inside the shader?
+					writeDescriptors[0].pImageInfo = &descriptorImageInfo;
+
+					// Input image
+					writeDescriptors[1] = *shader->GetDescriptorSet("u_Texture");
+					writeDescriptors[1].dstSet = descriptorSet; // Should this be set inside the shader?
+					auto descriptor = bloomTextures[1]->GetImage().As<VulkanImage2D>()->GetDescriptor();
+					//descriptor.sampler = samplerClamp;
+					writeDescriptors[1].pImageInfo = &descriptor;
+
+					writeDescriptors[2] = *shader->GetDescriptorSet("u_BloomTexture");
+					writeDescriptors[2].dstSet = descriptorSet; // Should this be set inside the shader?
+					writeDescriptors[2].pImageInfo = &inputTexture->GetDescriptor();
+
+					vkUpdateDescriptorSets(device, (uint32_t)writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+
+					bloomComputePushConstants.LOD = i;
+					pipeline->SetPushConstants(&bloomComputePushConstants, sizeof(bloomComputePushConstants));
+					pipeline->Dispatch(descriptorSet, workGroupsX, workGroupsY, 1);
+				}
 			}
-			Renderer::SubmitFullscreenQuad(nullptr);
-			Renderer::EndRenderPass();
+
+			bloomComputePushConstants.Mode = 2;
+			workGroupsX *= 2;
+			workGroupsY *= 2;
+
+			// Output image
+			descriptorSet = VulkanRenderer::RT_AllocateDescriptorSet(allocInfo);
+			descriptorImageInfo.imageView = images[2]->RT_GetMipImageView(mips - 2);
+
+			writeDescriptors[0] = *shader->GetDescriptorSet("o_Image");
+			writeDescriptors[0].dstSet = descriptorSet; // Should this be set inside the shader?
+			writeDescriptors[0].pImageInfo = &descriptorImageInfo;
+
+			// Input image
+			writeDescriptors[1] = *shader->GetDescriptorSet("u_Texture");
+			writeDescriptors[1].dstSet = descriptorSet; // Should this be set inside the shader?
+			writeDescriptors[1].pImageInfo = &bloomTextures[0]->GetImage().As<VulkanImage2D>()->GetDescriptor();
+
+			writeDescriptors[2] = *shader->GetDescriptorSet("u_BloomTexture");
+			writeDescriptors[2].dstSet = descriptorSet; // Should this be set inside the shader?
+			writeDescriptors[2].pImageInfo = &inputTexture->GetDescriptor();
+
+			vkUpdateDescriptorSets(device, (uint32_t)writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+
+			bloomComputePushConstants.LOD--;
+			pipeline->SetPushConstants(&bloomComputePushConstants, sizeof(bloomComputePushConstants));
+
+			auto [mipWidth, mipHeight] = bloomTextures[2]->GetMipSize(mips - 2);
+			workGroupsX = (uint32_t)glm::ceil((float)mipWidth / (float)workGroupSize);
+			workGroupsY = (uint32_t)glm::ceil((float)mipHeight / (float)workGroupSize);
+			pipeline->Dispatch(descriptorSet, workGroupsX, workGroupsY, 1);
+
+			bloomComputePushConstants.Mode = 3;
+
+			// Upsample
+			for (int32_t mip = mips - 3; mip >= 0; mip--)
+			{
+				auto [mipWidth, mipHeight] = bloomTextures[2]->GetMipSize(mip);
+				workGroupsX = (uint32_t)glm::ceil((float)mipWidth / (float)workGroupSize);
+				workGroupsY = (uint32_t)glm::ceil((float)mipHeight / (float)workGroupSize);
+
+				// Output image
+				descriptorImageInfo.imageView = images[2]->RT_GetMipImageView(mip);
+				auto descriptorSet = VulkanRenderer::RT_AllocateDescriptorSet(allocInfo);
+				writeDescriptors[0] = *shader->GetDescriptorSet("o_Image");
+				writeDescriptors[0].dstSet = descriptorSet; // Should this be set inside the shader?
+				writeDescriptors[0].pImageInfo = &descriptorImageInfo;
+
+				// Input image
+				writeDescriptors[1] = *shader->GetDescriptorSet("u_Texture");
+				writeDescriptors[1].dstSet = descriptorSet; // Should this be set inside the shader?
+				writeDescriptors[1].pImageInfo = &bloomTextures[0]->GetImage().As<VulkanImage2D>()->GetDescriptor();
+
+				writeDescriptors[2] = *shader->GetDescriptorSet("u_BloomTexture");
+				writeDescriptors[2].dstSet = descriptorSet; // Should this be set inside the shader?
+				writeDescriptors[2].pImageInfo = &images[2]->GetDescriptor();
+
+				vkUpdateDescriptorSets(device, (uint32_t)writeDescriptors.size(), writeDescriptors.data(), 0, nullptr);
+
+				bloomComputePushConstants.LOD = mip;
+				pipeline->SetPushConstants(&bloomComputePushConstants, sizeof(bloomComputePushConstants));
+				pipeline->Dispatch(descriptorSet, workGroupsX, workGroupsY, 1);
+			}
+
+			pipeline->End();
+		});
+		m_CommandBuffer->EndTimestampQuery(m_GPUTimeQueries.BloomComputePassQuery);
+	}
+
+	void SceneRenderer::CompositePass()
+	{
+		VA_PROFILE_FUNC();
+
+		m_GPUTimeQueries.CompositePassQuery = m_CommandBuffer->BeginTimestampQuery();
+		Renderer::BeginRenderPass(m_CommandBuffer, m_CompositePipeline->GetSpecification().RenderPass, true);
+
+		auto framebuffer = m_GeometryPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer;
+		float exposure = m_SceneData.SceneCamera.Camera.GetExposure();
+		int textureSamples = framebuffer->GetSpecification().Samples;
+
+		CompositeMaterial->Set("u_Uniforms.Exposure", exposure);
+		if (m_BloomSettings.Enabled)
+		{
+			CompositeMaterial->Set("u_Uniforms.BloomIntensity", m_BloomSettings.Intensity);
+			CompositeMaterial->Set("u_Uniforms.BloomDirtIntensity", m_BloomSettings.DirtIntensity);
+		}
+		else
+		{
+			CompositeMaterial->Set("u_Uniforms.BloomIntensity", 0.0f);
+			CompositeMaterial->Set("u_Uniforms.BloomDirtIntensity", 0.0f);
 		}
 
-		// Composite bloom
-		{
-			Renderer::BeginRenderPass(BloomBlendPass);
-			BloomBlendShader->Bind();
-			BloomBlendShader->SetFloat("u_Exposure", SceneData.SceneCamera.Camera.GetExposure());
-			BloomBlendShader->SetBool("u_EnableBloom", EnableBloom);
+		//CompositeMaterial->Set("u_Uniforms.TextureSamples", textureSamples);
 
-			CompositePass->GetSpecification().TargetFramebuffer->BindTexture(0);
-			BloomBlurPass[index]->GetSpecification().TargetFramebuffer->BindTexture(1);
+		CompositeMaterial->Set("u_Texture", framebuffer->GetImage());
+		CompositeMaterial->Set("u_BloomTexture", m_BloomComputeTextures[2]);
+		CompositeMaterial->Set("u_BloomDirtTexture", m_BloomDirtTexture);
 
-			Renderer::SubmitFullscreenQuad(nullptr);
-			Renderer::EndRenderPass();
-		}
+		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_CompositePipeline, nullptr, CompositeMaterial);
+		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_JumpFloodCompositePipeline, nullptr, m_JumpFloodCompositeMaterial);
+		Renderer::EndRenderPass(m_CommandBuffer);
+
+		m_CommandBuffer->EndTimestampQuery(m_GPUTimeQueries.CompositePassQuery);
+
+#if 0 // WIP
+		// DOF
+		Renderer::BeginRenderPass(m_CommandBuffer, m_DOFPipeline->GetSpecification().RenderPass);
+		m_DOFMaterial->Set("u_Texture", m_CompositePipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetImage());
+		m_DOFMaterial->Set("u_DepthTexture", m_PreDepthPipeline->GetSpecification().RenderPass->GetSpecification().TargetFramebuffer->GetDepthImage());
+		Renderer::SubmitFullscreenQuad(m_CommandBuffer, m_DOFPipeline, nullptr, m_DOFMaterial);
+		Renderer::EndRenderPass(m_CommandBuffer);
 #endif
+
+		//Renderer::BeginRenderPass(m_CommandBuffer, m_JumpFloodCompositePipeline->GetSpecification().RenderPass);
+		//Renderer::EndRenderPass(m_CommandBuffer);
 	}
 
 	void SceneRenderer::FlushDrawList()
@@ -794,18 +1000,26 @@ namespace Vanta {
 		if (m_ResourcesCreated)
 		{
 			m_CommandBuffer->Begin();
+
+			// Main render passes
 			ShadowMapPass();
 			GeometryPass();
+
+			// Post-processing
 			JumpFloodPass();
+			BloomCompute();
 			CompositePass();
+
 			m_CommandBuffer->End();
 			m_CommandBuffer->Submit();
-			//	BloomBlurPass();
 		}
 		else
 		{
+			// Empty pass
 			m_CommandBuffer->Begin();
+
 			ClearPass();
+
 			m_CommandBuffer->End();
 			m_CommandBuffer->Submit();
 		}
@@ -863,10 +1077,67 @@ namespace Vanta {
 			}
 			ImGui::TreePop();
 		}
+
 		if (UI::BeginTreeNode("Visualization"))
 		{
 			UI::BeginPropertyGrid();
 			UI::Property("Show Shadow Cascades", RendererDataUB.ShowCascades);
+			static int maxDrawCall = 1000;
+			UI::PropertySlider("Selected Draw", VulkanRenderer::GetSelectedDrawCall(), -1, maxDrawCall);
+			UI::Property("Max Draw Call", maxDrawCall);
+			UI::EndPropertyGrid();
+			UI::EndTreeNode();
+		}
+
+		if (UI::BeginTreeNode("Render Statistics"))
+		{
+			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+			ImGui::Text("GPU time: %.3fms", m_CommandBuffer->GetExecutionGPUTime(frameIndex));
+
+			ImGui::Text("Shadow Map Pass: %.3fms", m_CommandBuffer->GetExecutionGPUTime(frameIndex, m_GPUTimeQueries.ShadowMapPassQuery));
+			ImGui::Text("Geometry Pass: %.3fms", m_CommandBuffer->GetExecutionGPUTime(frameIndex, m_GPUTimeQueries.GeometryPassQuery));
+			ImGui::Text("Bloom Pass: %.3fms", m_CommandBuffer->GetExecutionGPUTime(frameIndex, m_GPUTimeQueries.BloomComputePassQuery));
+			ImGui::Text("Jump Flood Pass: %.3fms", m_CommandBuffer->GetExecutionGPUTime(frameIndex, m_GPUTimeQueries.JumpFloodPassQuery));
+			ImGui::Text("Composite Pass: %.3fms", m_CommandBuffer->GetExecutionGPUTime(frameIndex, m_GPUTimeQueries.CompositePassQuery));
+
+			if (UI::BeginTreeNode("Pipeline Statistics"))
+			{
+				const PipelineStatistics& pipelineStats = m_CommandBuffer->GetPipelineStatistics(frameIndex);
+				ImGui::Text("Input Assembly Vertices: %llu", pipelineStats.InputAssemblyVertices);
+				ImGui::Text("Input Assembly Primitives: %llu", pipelineStats.InputAssemblyPrimitives);
+				ImGui::Text("Vertex Shader Invocations: %llu", pipelineStats.VertexShaderInvocations);
+				ImGui::Text("Clipping Invocations: %llu", pipelineStats.ClippingInvocations);
+				ImGui::Text("Clipping Primitives: %llu", pipelineStats.ClippingPrimitives);
+				ImGui::Text("Fragment Shader Invocations: %llu", pipelineStats.FragmentShaderInvocations);
+				ImGui::Text("Compute Shader Invocations: %llu", pipelineStats.ComputeShaderInvocations);
+				UI::EndTreeNode();
+			}
+
+			UI::EndTreeNode();
+		}
+
+		if (UI::BeginTreeNode("Bloom Settings"))
+		{
+			UI::BeginPropertyGrid();
+			UI::Property("Bloom Enabled", m_BloomSettings.Enabled);
+			UI::Property("Threshold", m_BloomSettings.Threshold);
+			UI::Property("Knee", m_BloomSettings.Knee);
+			UI::Property("Upsample Scale", m_BloomSettings.UpsampleScale);
+			UI::Property("Intensity", m_BloomSettings.Intensity, 0.05f, 0.0f, 20.0f);
+			UI::Property("Dirt Intensity", m_BloomSettings.DirtIntensity, 0.05f, 0.0f, 20.0f);
+
+			// TODO: move this to somewhere else
+			UI::Image(m_BloomDirtTexture, ImVec2(64, 64));
+			if (ImGui::IsItemHovered())
+			{
+				if (ImGui::IsItemClicked())
+				{
+					std::string filename = Application::Get().OpenFile("");
+					if (!filename.empty())
+						m_BloomDirtTexture = Texture2D::Create(filename);
+				}
+			}
+
 			UI::EndPropertyGrid();
 			UI::EndTreeNode();
 		}
@@ -900,31 +1171,29 @@ namespace Vanta {
 				UI::BeginPropertyGrid();
 				UI::PropertySlider("Cascade Index", cascadeIndex, 0, 3);
 				UI::EndPropertyGrid();
-				UI::Image(image, (uint32_t)cascadeIndex, { size, size }, { 0, 1 }, { 1, 0 });
+				if (m_ResourcesCreated)
+					UI::Image(image, (uint32_t)cascadeIndex, { size, size }, { 0, 1 }, { 1, 0 });
 				UI::EndTreeNode();
 			}
 
 			UI::EndTreeNode();
 		}
 
-#if 0
-		if (UI::BeginTreeNode("Bloom"))
+		if (UI::BeginTreeNode("Compute Bloom"))
 		{
-			UI::BeginPropertyGrid();
-			UI::Property("Bloom", EnableBloom);
-			UI::Property("Bloom threshold", BloomThreshold, 0.05f);
-			UI::EndPropertyGrid();
-
-			auto fb = BloomBlurPass[0]->GetSpecification().TargetFramebuffer;
-			auto id = fb->GetColorAttachmentRendererID();
-
-			float size = ImGui::GetContentRegionAvailWidth(); // (float)fb->GetWidth() * 0.5f, (float)fb->GetHeight() * 0.5f
-			float w = size;
-			float h = w / ((float)fb->GetWidth() / (float)fb->GetHeight());
-			ImGui::Image((ImTextureID)id, { w, h }, { 0, 1 }, { 1, 0 });
+			float size = ImGui::GetContentRegionAvail().x;
+			if (m_ResourcesCreated)
+			{
+				static int tex = 0;
+				UI::PropertySlider("Texture", tex, 0, 2);
+				static int mip = 0;
+				auto [mipWidth, mipHeight] = m_BloomComputeTextures[tex]->GetMipSize(mip);
+				std::string label = std::format("Mip ({0}x{1})", mipWidth, mipHeight);
+				UI::PropertySlider(label.c_str(), mip, 0, m_BloomComputeTextures[tex]->GetMipLevelCount() - 1);
+				//UI::ImageMip(m_BloomComputeTextures[tex]->GetImage(), mip, { size, size * (1.0f / m_BloomComputeTextures[tex]->GetImage()->GetAspectRatio()) }, { 0, 1 }, { 1, 0 });
+			}
 			UI::EndTreeNode();
-	}
-#endif
+		}
 
 		ImGui::End();
 	}

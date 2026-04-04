@@ -5,9 +5,12 @@
 
 namespace Vanta {
 
+	static std::map<VkImage, WeakRef<VulkanImage2D>> s_ImageReferences;
+
 	VulkanImage2D::VulkanImage2D(ImageSpecification specification)
 		: m_Specification(specification)
 	{
+		VA_CORE_VERIFY(m_Specification.Width > 0 && m_Specification.Height > 0);
 	}
 
 	VulkanImage2D::~VulkanImage2D()
@@ -23,6 +26,7 @@ namespace Vanta {
 
 				VulkanAllocator allocator("VulkanImage2D");
 				allocator.DestroyImage(info.Image, info.MemoryAlloc);
+				s_ImageReferences.erase(info.Image);
 
 				VA_CORE_WARN("VulkanImage2D::Release ImageView = {0}", (const void*)info.ImageView);
 			});
@@ -40,6 +44,9 @@ namespace Vanta {
 
 	void VulkanImage2D::Release()
 	{
+		if (m_Info.Image == nullptr)
+			return;
+
 		Ref<VulkanImage2D> instance = this;
 		VulkanImageInfo info = m_Info;
 		Renderer::SubmitResourceFree([info]() mutable
@@ -51,14 +58,18 @@ namespace Vanta {
 
 			VulkanAllocator allocator("VulkanImage2D");
 			allocator.DestroyImage(info.Image, info.MemoryAlloc);
+			s_ImageReferences.erase(info.Image);
 		});
 		m_Info.Image = nullptr;
 		m_Info.ImageView = nullptr;
 		m_Info.Sampler = nullptr;
+		m_MipImageViews.clear();
 	}
 
 	void VulkanImage2D::RT_Invalidate()
 	{
+		VA_CORE_VERIFY(m_Specification.Width > 0 && m_Specification.Height > 0);
+
 		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
 		VulkanAllocator allocator("Image2D");
 
@@ -73,6 +84,10 @@ namespace Vanta {
 		else if (m_Specification.Usage == ImageUsage::Texture)
 		{
 			usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		}
+		else if (m_Specification.Usage == ImageUsage::Storage)
+		{
+			usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 		}
 
 		VkImageAspectFlags aspectMask = Utils::IsDepthFormat(m_Specification.Format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
@@ -94,6 +109,7 @@ namespace Vanta {
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCreateInfo.usage = usage;
 		m_Info.MemoryAlloc = allocator.AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_GPU_ONLY, m_Info.Image);
+		s_ImageReferences[m_Info.Image] = this;
 
 		// Create a default image view
 		VkImageViewCreateInfo imageViewCreateInfo = {};
@@ -123,7 +139,7 @@ namespace Vanta {
 		samplerCreateInfo.mipLodBias = 0.0f;
 		samplerCreateInfo.maxAnisotropy = 1.0f;
 		samplerCreateInfo.minLod = 0.0f;
-		samplerCreateInfo.maxLod = 1.0f;
+		samplerCreateInfo.maxLod = 100.0f;
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		VK_CHECK_RESULT(vkCreateSampler(device, &samplerCreateInfo, nullptr, &m_Info.Sampler));
 
@@ -170,16 +186,69 @@ namespace Vanta {
 		}
 	}
 
+	VkImageView VulkanImage2D::GetMipImageView(uint32_t mip)
+	{
+		if (m_MipImageViews.find(mip) == m_MipImageViews.end())
+		{
+			Ref<VulkanImage2D> instance = this;
+			Renderer::Submit([instance, mip]() mutable
+			{
+				instance->RT_GetMipImageView(mip);
+			});
+			return nullptr;
+		}
+
+		return m_MipImageViews.at(mip);
+	}
+
+	VkImageView VulkanImage2D::RT_GetMipImageView(uint32_t mip)
+	{
+		if (m_MipImageViews.find(mip) == m_MipImageViews.end())
+		{
+			VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+
+			VkImageAspectFlags aspectMask = Utils::IsDepthFormat(m_Specification.Format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+			if (m_Specification.Format == ImageFormat::DEPTH24STENCIL8)
+				aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+			VkFormat vulkanFormat = Utils::VulkanImageFormat(m_Specification.Format);
+
+			m_PerLayerImageViews.resize(m_Specification.Layers);
+			VkImageViewCreateInfo imageViewCreateInfo = {};
+			imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			imageViewCreateInfo.format = vulkanFormat;
+			imageViewCreateInfo.flags = 0;
+			imageViewCreateInfo.subresourceRange = {};
+			imageViewCreateInfo.subresourceRange.aspectMask = aspectMask;
+			imageViewCreateInfo.subresourceRange.baseMipLevel = mip;
+			imageViewCreateInfo.subresourceRange.levelCount = 1;
+			imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			imageViewCreateInfo.subresourceRange.layerCount = 1;
+			imageViewCreateInfo.image = m_Info.Image;
+
+			VK_CHECK_RESULT(vkCreateImageView(device, &imageViewCreateInfo, nullptr, &m_MipImageViews[mip]));
+		}
+		return m_MipImageViews.at(mip);
+	}
+
 	void VulkanImage2D::UpdateDescriptor()
 	{
 		if (m_Specification.Format == ImageFormat::DEPTH24STENCIL8 || m_Specification.Format == ImageFormat::DEPTH32F)
 			m_DescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		else if (m_Specification.Usage == ImageUsage::Storage)
+			m_DescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 		else
 			m_DescriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		m_DescriptorImageInfo.imageView = m_Info.ImageView;
 		m_DescriptorImageInfo.sampler = m_Info.Sampler;
 
 		//VA_CORE_WARN("VulkanImage2D::UpdateDescriptor to ImageView = {0}", (const void*)m_Info.ImageView);
+	}
+
+	const std::map<VkImage, WeakRef<VulkanImage2D>>& VulkanImage2D::GetImageRefs()
+	{
+		return s_ImageReferences;
 	}
 
 }

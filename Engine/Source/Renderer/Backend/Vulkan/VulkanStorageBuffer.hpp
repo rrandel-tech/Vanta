@@ -10,6 +10,7 @@ namespace Vanta {
 	{
 	public:
 		VulkanStorageBuffer(uint32_t size, uint32_t binding);
+		virtual ~VulkanStorageBuffer();
 
 		virtual void SetData(const void* data, uint32_t size, uint32_t offset = 0) override;
 		virtual void RT_SetData(const void* data, uint32_t size, uint32_t offset = 0) override;
@@ -19,6 +20,7 @@ namespace Vanta {
 		const VkDescriptorBufferInfo& GetDescriptorBufferInfo() const { return m_DescriptorInfo; }
 	private:
 		void RT_Invalidate();
+		void Release();
 	private:
 		VmaAllocation m_MemoryAlloc = nullptr;
 		VkBuffer m_Buffer {};

@@ -196,7 +196,7 @@ namespace Vanta {
 
 		Renderer::Submit([environment, shadow]() mutable
 		{
-			auto shader = Renderer::GetShaderLibrary()->Get("HazelPBR_Static");
+			auto shader = Renderer::GetShaderLibrary()->Get("VantaPBR_Static");
 			Ref<OpenGLShader> pbrShader = shader.As<OpenGLShader>();
 
 			if (auto resource = pbrShader->GetShaderResource("u_EnvRadianceTex"))

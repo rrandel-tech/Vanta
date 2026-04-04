@@ -115,7 +115,6 @@ struct VertexOutput
 layout(location = 0) in VertexOutput Input;
 
 layout(location = 0) out vec4 color;
-layout(location = 1) out vec4 o_BloomColor;
 
 layout(std140, binding = 2) uniform SceneData
 {
@@ -146,6 +145,7 @@ layout(push_constant) uniform Material
 	layout(offset = 64) vec3 AlbedoColor;
 	float Metalness;
 	float Roughness;
+	float Emissive;
 
 	float EnvMapRotation;
 
@@ -305,7 +305,7 @@ vec3 CalculateDirLights(vec3 F0)
 		float cosLi = max(0.0, dot(m_Params.Normal, Li));
 		float cosLh = max(0.0, dot(m_Params.Normal, Lh));
 
-		vec3 F = fresnelSchlick(F0, max(0.0, dot(Lh, m_Params.View)));
+		vec3 F = fresnelSchlickRoughness(F0, max(0.0, dot(Lh, m_Params.View)), m_Params.Roughness);
 		float D = ndfGGX(cosLh, m_Params.Roughness);
 		float G = gaSchlickGGX(cosLi, m_Params.NdotV, m_Params.Roughness);
 
@@ -314,10 +314,18 @@ vec3 CalculateDirLights(vec3 F0)
 
 		// Cook-Torrance
 		vec3 specularBRDF = (F * D * G) / max(Epsilon, 4.0 * cosLi * m_Params.NdotV);
+		specularBRDF = clamp(specularBRDF, vec3(0.0f), vec3(10.0f));
 
 		result += (diffuseBRDF + specularBRDF) * Lradiance * cosLi;
 	}
 	return result;
+}
+
+float Convert_sRGB_FromLinear(float theLinearValue)
+{
+	return theLinearValue <= 0.0031308f
+	? theLinearValue * 12.92f
+	: pow(theLinearValue, 1.0f / 2.4f) * 1.055f - 0.055f;
 }
 
 vec3 IBL(vec3 F0, vec3 Lr)
@@ -331,6 +339,7 @@ vec3 IBL(vec3 F0, vec3 Lr)
 	float NoV = clamp(m_Params.NdotV, 0.0, 1.0);
 	vec3 R = 2.0 * dot(m_Params.View, m_Params.Normal) * m_Params.Normal - m_Params.View;
 	vec3 specularIrradiance = textureLod(u_EnvRadianceTex, RotateVectorAboutY(u_MaterialUniforms.EnvMapRotation, Lr), (m_Params.Roughness) * envRadianceTexLevels).rgb;
+	//specularIrradiance = vec3(Convert_sRGB_FromLinear(specularIrradiance.r), Convert_sRGB_FromLinear(specularIrradiance.g), Convert_sRGB_FromLinear(specularIrradiance.b));
 
 	// Sample BRDF Lut, 1.0 - roughness for y-coord because texture was generated (in Sparky) for gloss model
 	vec2 specularBRDF = texture(u_BRDFLUTTexture, vec2(m_Params.NdotV, 1.0 - m_Params.Roughness)).rg;
@@ -652,24 +661,11 @@ void main()
 		shadowAmount = u_SoftShadows ? PCSS_DirectionalLight(u_ShadowMapTexture, cascadeIndex, shadowMapCoords, u_LightSize) : HardShadows_DirectionalLight(u_ShadowMapTexture, cascadeIndex, shadowMapCoords);
 	}
 
-
-	#if 0
-	vec3 shadowMapCoords = (Input.ShadowMapCoords.xyz / Input.ShadowMapCoords.w);
-	#ifdef OPENGL
-	shadowMapCoords.z = shadowMapCoords.z * 0.5 + 0.5; // scale bias for OpenGL depth value
-	#endif
-
-	shadowAmount = HardShadows_DirectionalLight(u_ShadowMapTexture, shadowMapCoords);
-
-	shadowAmount = PCSS_DirectionalLight(u_ShadowMapTexture, shadowMapCoords, u_LightSize);
-	#endif
-
 	vec3 lightContribution = CalculateDirLights(F0) * shadowAmount;
+	//lightContribution += m_Params.Albedo * u_MaterialUniforms.Emissive;
 	vec3 iblContribution = IBL(F0, Lr) * u_EnvironmentMapIntensity;
 
 	color = vec4(iblContribution + lightContribution, 1.0);
-
-	o_BloomColor = vec4(1.0, 0.0, 1.0, 1.0);
 
 	if (u_ShowCascades)
 	{

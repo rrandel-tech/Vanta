@@ -105,44 +105,41 @@ namespace Vanta {
 		s_Data = new RendererData();
 		s_CommandQueue = new RenderCommandQueue();
 
-		//Renderer::GetConfig().FramesInFlight = 1;
+		// Renderer::GetConfig().FramesInFlight = 1;
 
 		s_RendererAPI = InitRendererAPI();
 
 		s_Data->m_ShaderLibrary = Ref<ShaderLibrary>::Create();
 
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VantaPBR_Static.glsl");
+		// Renderer::GetShaderLibrary()->LoadResources/Shaders("assets/shaders/VantaPBR_Anim.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Grid.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Wireframe.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Skybox.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowMap.glsl");
 
-
-		// Compute shaders
+		// Environment compute shaders
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EquirectangularToCubeMap.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentIrradiance.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreethamSky.glsl");
 
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Grid.glsl");
+		// Post-processing
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PostProcessing/Bloom.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SceneComposite.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/VantaPBR_Static.glsl");
-		//Renderer::GetShaderLibrary()->LoadResources/Shaders("assets/shaders/VantaPBR_Anim.glsl");
-		//Renderer::GetShaderLibrary()->Load("assets/shaders/Outline.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Wireframe.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Skybox.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowMap.glsl");
-		
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreDepth.glsl");
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/LightCulling.glsl", true);
-		
+
 		// Renderer2D Shaders
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Line.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Circle.glsl");
-		
+
 		// Jump Flood Shaders
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Init.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Pass.glsl");
 		Renderer::GetShaderLibrary()->Load("Resources/Shaders/JumpFlood_Composite.glsl");
-		
-		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SelectedGeometry.glsl");
 
+		// Misc
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/SelectedGeometry.glsl");
 
 		// Compile shaders
 		Renderer::WaitAndRender();

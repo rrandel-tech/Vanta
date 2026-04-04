@@ -23,6 +23,8 @@
 #include "imgui_internal.h"
 #include "ImGui/ImGui.hpp"
 
+#include <SDL3/SDL.h>
+
 namespace Vanta {
 
 	/*static void ImGuiShowHelpMarker(const char* desc)
@@ -45,6 +47,11 @@ namespace Vanta {
 
 	EditorLayer::~EditorLayer()
 	{
+	}
+
+	auto operator < (const ImVec2& lhs, const ImVec2& rhs)
+	{
+		return lhs.x < rhs.x && lhs.y < rhs.y;
 	}
 
 	void EditorLayer::OnAttach()
@@ -121,9 +128,9 @@ namespace Vanta {
 	{
 		switch (m_GizmoType)
 		{
-			case  ImGuizmo::OPERATION::TRANSLATE: return 0.5f;
-			case  ImGuizmo::OPERATION::ROTATE: return 45.0f;
-			case  ImGuizmo::OPERATION::SCALE: return 0.5f;
+		case  ImGuizmo::OPERATION::TRANSLATE: return 0.5f;
+		case  ImGuizmo::OPERATION::ROTATE: return 45.0f;
+		case  ImGuizmo::OPERATION::SCALE: return 0.5f;
 		}
 		return 0.0f;
 	}
@@ -156,165 +163,47 @@ namespace Vanta {
 
 		switch (m_SceneState)
 		{
-			case SceneState::Edit:
+		case SceneState::Edit:
+		{
+
+			m_EditorCamera.SetActive(m_AllowViewportCameraEvents || SDL_GetWindowRelativeMouseMode(static_cast<SDL_Window*>(Application::Get().GetWindow().GetNativeWindow())));
+			m_EditorCamera.OnUpdate(ts);
+
+			m_EditorScene->OnRenderEditor(m_ViewportRenderer, ts, m_EditorCamera);
+
+			if (m_ShowSecondViewport)
 			{
-				m_EditorCamera.SetActive(m_ViewportPanelFocused);
-				m_EditorCamera.OnUpdate(ts);
-
-				m_EditorScene->OnRenderEditor(m_ViewportRenderer, ts, m_EditorCamera);
-				if (m_ShowSecondViewport)
-				{
-					m_SecondEditorCamera.SetActive(m_ViewportPanel2Focused);
-					m_SecondEditorCamera.OnUpdate(ts);
-					m_EditorScene->OnRenderEditor(m_SecondViewportRenderer, ts, m_SecondEditorCamera);
-				}
-
-				Renderer2D::SetTargetRenderPass(m_ViewportRenderer->GetExternalCompositeRenderPass());
-
-				if (m_ShowBoundingBoxes)
-				{
-					// Renderer2D::BeginScene(m_EditorCamera.GetViewProjection());
-					if (m_ShowBoundingBoxSelectedMeshOnly)
-					{
-						if (m_SelectionContext.size())
-						{
-							auto& selection = m_SelectionContext[0];
-							if (selection.Entity.HasComponent<MeshComponent>())
-							{
-								if (m_ShowBoundingBoxSubmeshes)
-								{
-									auto& mesh = selection.Entity.GetComponent<MeshComponent>().Mesh;
-									if (mesh)
-									{
-										auto& submeshIndices = mesh->GetSubmeshes();
-										auto meshAsset = mesh->GetMeshAsset();
-										auto& submeshes = meshAsset->GetSubmeshes();
-										for (uint32_t submeshIndex : submeshIndices)
-										{
-											glm::mat4 transform = selection.Entity.GetComponent<TransformComponent>().GetTransform();
-											const AABB& aabb = submeshes[submeshIndex].BoundingBox;
-											Renderer2D::DrawAABB(aabb, transform * submeshes[submeshIndex].Transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-										}
-									}
-								}
-								else
-								{
-									auto& mesh = selection.Entity.GetComponent<MeshComponent>().Mesh;
-									if (mesh)
-									{
-										glm::mat4 transform = selection.Entity.GetComponent<TransformComponent>().GetTransform();
-										const AABB& aabb = mesh->GetMeshAsset()->GetBoundingBox();
-										Renderer2D::DrawAABB(aabb, transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-									}
-								}
-							}
-						}
-					}
-					else
-					{
-						auto entities = m_CurrentScene->GetAllEntitiesWith<MeshComponent>();
-						for (auto e : entities)
-						{
-							Entity entity = { e, m_CurrentScene.Raw() };
-							glm::mat4 transform = entity.GetComponent<TransformComponent>().GetTransform();
-							const AABB& aabb = entity.GetComponent<MeshComponent>().Mesh->GetMeshAsset()->GetBoundingBox();
-							Renderer2D::DrawAABB(aabb, transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-						}
-					}
-					Renderer2D::EndScene();
-				}
-
-
-#if RENDERER_2D
-				if (m_DrawOnTopBoundingBoxes)
-				{
-					Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
-					auto viewProj = m_EditorCamera.GetViewProjection();
-					Renderer2D::BeginScene(viewProj, false);
-					// TODO: Renderer::DrawAABB(m_MeshEntity.GetComponent<MeshComponent>(), m_MeshEntity.GetComponent<TransformComponent>());
-					Renderer2D::EndScene();
-					Renderer::EndRenderPass();
-				}
-
-				if (m_SelectionContext.size() && false)
-				{
-					auto& selection = m_SelectionContext[0];
-
-					if (selection.Mesh && selection.Entity.HasComponent<MeshComponent>())
-					{
-						Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
-						auto viewProj = m_EditorCamera.GetViewProjection();
-						Renderer2D::BeginScene(viewProj, false);
-						glm::vec4 color = (m_SelectionMode == SelectionMode::Entity) ? glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f } : glm::vec4{ 0.2f, 0.9f, 0.2f, 1.0f };
-						Renderer::DrawAABB(selection.Mesh->BoundingBox, selection.Entity.Transform().GetTransform() * selection.Mesh->Transform, color);
-						Renderer2D::EndScene();
-						Renderer::EndRenderPass();
-					}
-				}
-
-				if (m_SelectionContext.size())
-				{
-					auto& selection = m_SelectionContext[0];
-
-					if (selection.Entity.HasComponent<BoxCollider2DComponent>() && false)
-					{
-						const auto& size = selection.Entity.GetComponent<BoxCollider2DComponent>().Size;
-						const TransformComponent& transform = selection.Entity.GetComponent<TransformComponent>();
-
-						Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
-						auto viewProj = m_EditorCamera.GetViewProjection();
-						Renderer2D::BeginScene(viewProj, false);
-						Renderer2D::DrawRotatedRect({ transform.Translation.x, transform.Translation.y }, size * 2.0f, transform.Rotation.z, { 0.0f, 1.0f, 1.0f, 1.0f });
-						Renderer2D::EndScene();
-						Renderer::EndRenderPass();
-					}
-
-					if (selection.Entity.HasComponent<CircleCollider2DComponent>() && false)
-					{
-						const auto& size = selection.Entity.GetComponent<CircleCollider2DComponent>().Radius;
-						const TransformComponent& transform = selection.Entity.GetComponent<TransformComponent>();
-
-						Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
-						auto viewProj = m_EditorCamera.GetViewProjection();
-						Renderer2D::BeginScene(viewProj, false);
-						Renderer2D::DrawCircle({ transform.Translation.x, transform.Translation.y }, size, { 0.0f, 1.0f, 1.0f, 1.0f });
-						Renderer2D::EndScene();
-						Renderer::EndRenderPass();
-					}
-
-				}
-#endif
-
-				break;
+				m_SecondEditorCamera.SetActive(m_ViewportPanel2Focused);
+				m_SecondEditorCamera.OnUpdate(ts);
+				m_EditorScene->OnRenderEditor(m_SecondViewportRenderer, ts, m_SecondEditorCamera);
 			}
-			case SceneState::Play:
-			{
-				if (m_ViewportPanelFocused)
-					m_EditorCamera.OnUpdate(ts);
 
-				m_RuntimeScene->OnUpdate(ts);
-				m_RuntimeScene->OnRenderRuntime(m_ViewportRenderer, ts);
-				break;
-			}
-			case SceneState::Pause:
-			{
-				if (m_ViewportPanelFocused)
-					m_EditorCamera.OnUpdate(ts);
+			OnRender2D();
 
-				m_RuntimeScene->OnRenderRuntime(m_ViewportRenderer, ts);
-				break;
-			}
+			break;
+		}
+		case SceneState::Play:
+		{
+			//m_EditorCamera.SetActive(m_ViewportPanelMouseOver);
+			//m_EditorCamera.OnUpdate(ts);
+
+			m_RuntimeScene->OnUpdate(ts);
+			m_RuntimeScene->OnRenderRuntime(m_ViewportRenderer, ts);
+			break;
+		}
+		case SceneState::Pause:
+		{
+			m_EditorCamera.SetActive(m_ViewportPanelMouseOver);
+			m_EditorCamera.OnUpdate(ts);
+
+			m_RuntimeScene->OnRenderRuntime(m_ViewportRenderer, ts);
+			break;
+		}
 		}
 
 		AssetEditorPanel::OnUpdate(ts);
 
 		SceneRenderer::WaitForThreads();
-	}
-
-	void EditorLayer::ShowBoundingBoxes(bool show, bool onTop)
-	{
-		m_ViewportRenderer->GetOptions().ShowBoundingBoxes = show && !onTop;
-		m_DrawOnTopBoundingBoxes = show && onTop;
 	}
 
 	void EditorLayer::SelectEntity(Entity entity)
@@ -341,6 +230,147 @@ namespace Vanta {
 		m_EditorScene->SetSelectedEntity(entity);
 
 		m_CurrentScene = m_EditorScene;
+	}
+
+	void EditorLayer::OnRender2D()
+	{
+		if (!m_ViewportRenderer->GetFinalPassImage())
+			return;
+
+		Renderer2D::BeginScene(m_EditorCamera.GetViewProjection(), m_EditorCamera.GetViewMatrix());
+
+		if (m_DrawOnTopBoundingBoxes)
+		{
+			Renderer2D::SetTargetRenderPass(m_ViewportRenderer->GetExternalCompositeRenderPass());
+
+			if (m_ShowBoundingBoxes)
+			{
+				if (m_ShowBoundingBoxSelectedMeshOnly)
+				{
+					if (m_SelectionContext.size())
+					{
+						auto& selection = m_SelectionContext[0];
+						if (selection.Entity.HasComponent<MeshComponent>())
+						{
+							if (m_ShowBoundingBoxSubmeshes)
+							{
+								auto& mesh = selection.Entity.GetComponent<MeshComponent>().Mesh;
+								if (mesh)
+								{
+									auto& submeshIndices = mesh->GetSubmeshes();
+									auto meshAsset = mesh->GetMeshAsset();
+									auto& submeshes = meshAsset->GetSubmeshes();
+									for (uint32_t submeshIndex : submeshIndices)
+									{
+										glm::mat4 transform = selection.Entity.GetComponent<TransformComponent>().GetTransform();
+										const AABB& aabb = submeshes[submeshIndex].BoundingBox;
+										Renderer2D::DrawAABB(aabb, transform * submeshes[submeshIndex].Transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+									}
+								}
+							}
+							else
+							{
+								auto& mesh = selection.Entity.GetComponent<MeshComponent>().Mesh;
+								if (mesh)
+								{
+									glm::mat4 transform = selection.Entity.GetComponent<TransformComponent>().GetTransform();
+									const AABB& aabb = mesh->GetMeshAsset()->GetBoundingBox();
+									Renderer2D::DrawAABB(aabb, transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+								}
+							}
+						}
+					}
+				}
+				else
+				{
+					auto entities = m_CurrentScene->GetAllEntitiesWith<MeshComponent>();
+					for (auto e : entities)
+					{
+						Entity entity = { e, m_CurrentScene.Raw() };
+						glm::mat4 transform = entity.GetComponent<TransformComponent>().GetTransform();
+						const AABB& aabb = entity.GetComponent<MeshComponent>().Mesh->GetMeshAsset()->GetBoundingBox();
+						Renderer2D::DrawAABB(aabb, transform, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+					}
+				}
+			}
+
+
+#if RENDERER_2D
+			if (m_DrawOnTopBoundingBoxes)
+			{
+				Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
+				auto viewProj = m_EditorCamera.GetViewProjection();
+				Renderer2D::BeginScene(viewProj, false);
+				glm::vec4 color = (m_SelectionMode == SelectionMode::Entity) ? glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f } : glm::vec4{ 0.2f, 0.9f, 0.2f, 1.0f };
+				Renderer::DrawAABB(selection.Mesh->BoundingBox, selection.Entity.Transform().GetTransform() * selection.Mesh->Transform, color);
+				Renderer2D::EndScene();
+				Renderer::EndRenderPass();
+			}
+		}
+
+		if (m_SelectionContext.size())
+		{
+			auto& selection = m_SelectionContext[0];
+
+			if (selection.Entity.HasComponent<BoxCollider2DComponent>() && false)
+			{
+				const auto& size = selection.Entity.GetComponent<BoxCollider2DComponent>().Size;
+				const TransformComponent& transform = selection.Entity.GetComponent<TransformComponent>();
+
+				if (selection.Mesh && selection.Entity.HasComponent<MeshComponent>())
+				{
+					Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
+					auto viewProj = m_EditorCamera.GetViewProjection();
+					Renderer2D::BeginScene(viewProj, false);
+					glm::vec4 color = (m_SelectionMode == SelectionMode::Entity) ? glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f } : glm::vec4{ 0.2f, 0.9f, 0.2f, 1.0f };
+					Renderer::DrawAABB(selection.Mesh->BoundingBox, selection.Entity.Transform().GetTransform() * selection.Mesh->Transform, color);
+					Renderer2D::EndScene();
+					Renderer::EndRenderPass();
+				}
+			}
+
+			if (selection.Entity.HasComponent<CircleCollider2DComponent>())
+			{
+				auto& selection = m_SelectionContext[0];
+
+				if (selection.Entity.HasComponent<BoxCollider2DComponent>() && false)
+				{
+					const auto& size = selection.Entity.GetComponent<BoxCollider2DComponent>().Size;
+					const TransformComponent& transform = selection.Entity.GetComponent<TransformComponent>();
+
+					Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
+					auto viewProj = m_EditorCamera.GetViewProjection();
+					Renderer2D::BeginScene(viewProj, false);
+					Renderer2D::DrawRotatedRect({ transform.Translation.x, transform.Translation.y }, size * 2.0f, transform.Rotation.z, { 0.0f, 1.0f, 1.0f, 1.0f });
+					Renderer2D::EndScene();
+					Renderer::EndRenderPass();
+				}
+
+				if (selection.Entity.HasComponent<CircleCollider2DComponent>() && false)
+				{
+					const auto& size = selection.Entity.GetComponent<CircleCollider2DComponent>().Radius;
+					const TransformComponent& transform = selection.Entity.GetComponent<TransformComponent>();
+
+					Renderer::BeginRenderPass(m_ViewportRenderer->GetFinalRenderPass(), false);
+					auto viewProj = m_EditorCamera.GetViewProjection();
+					Renderer2D::BeginScene(viewProj, false);
+					Renderer2D::DrawCircle({ transform.Translation.x, transform.Translation.y }, size, { 0.0f, 1.0f, 1.0f, 1.0f });
+					Renderer2D::EndScene();
+					Renderer::EndRenderPass();
+				}
+
+				Renderer::BeginRenderPass(SceneRenderer::GetFinalRenderPass(), false);
+				auto viewProj = m_EditorCamera.GetViewProjection();
+				Renderer2D::BeginScene(viewProj, false);
+				Renderer2D::DrawCircle({ transform.Translation.x, transform.Translation.y }, size, { 0.0f, 1.0f, 1.0f, 1.0f });
+				Renderer2D::EndScene();
+				Renderer::EndRenderPass();
+			}
+#endif
+
+		}
+
+		Renderer2D::EndScene();
 	}
 
 	void EditorLayer::NewScene()
@@ -460,11 +490,8 @@ namespace Vanta {
 		{
 			ImGui::Text("Welcome to Vanta!");
 			ImGui::Separator();
-			ImGui::TextWrapped("Environment maps are currently disabled because they're a little unstable on certain GPU drivers.");
-
-			UI::BeginPropertyGrid();
-			UI::Property("Enable environment maps?", Renderer::GetConfig().ComputeEnvironmentMaps);
-			UI::EndPropertyGrid();
+			ImGui::TextWrapped("Vanta is an early-stage interactive application and rendering engine for Windows.");
+			ImGui::TextWrapped("Please report bugs to vantaengine.com/bugs");
 
 			if (ImGui::Button("OK"))
 				ImGui::CloseCurrentPopup();
@@ -503,6 +530,7 @@ namespace Vanta {
 
 			if (ImGui::Button("OK"))
 				ImGui::CloseCurrentPopup();
+
 			ImGui::EndPopup();
 		}
 	}
@@ -533,7 +561,7 @@ namespace Vanta {
 
 			if (!m_CreateNewMeshPopupData.CreateMeshFilenameBuffer[0])
 				strcpy(m_CreateNewMeshPopupData.CreateMeshFilenameBuffer.data(), filepath.c_str());
-
+			
 			ImGui::InputText("##meshPath", m_CreateNewMeshPopupData.CreateMeshFilenameBuffer.data(), 256);
 
 			if (ImGui::Button("Create"))
@@ -676,9 +704,10 @@ namespace Vanta {
 			UI::BeginPropertyGrid();
 			ImGui::AlignTextToFramePadding();
 
-			UI::PropertySlider("Skybox LOD", m_EditorScene->GetSkyboxLod(), 0.0f, Utils::CalculateMipCount(rendererConfig.EnvironmentMapResolution, rendererConfig.EnvironmentMapResolution));
+			UI::PropertySlider("Skybox LOD", m_EditorScene->GetSkyboxLod(), 0.0f, (float)Utils::CalculateMipCount(rendererConfig.EnvironmentMapResolution, rendererConfig.EnvironmentMapResolution));
 			UI::PropertySlider("Exposure", m_EditorCamera.GetExposure(), 0.0f, 5.0f);
 			UI::PropertySlider("Env Map Rotation", m_EnvMapRotation, -360.0f, 360.0f);
+			UI::PropertySlider("Camera Speed", m_EditorCamera.GetCameraSpeed(), 0.0005f, 2.f);
 
 			if (UI::Property("Line Width", m_LineWidth, 0.5f, 1.0f, 10.0f))
 				Renderer2D::SetLineWidth(m_LineWidth);
@@ -713,7 +742,7 @@ namespace Vanta {
 				int currentSize = (int)glm::log2((float)rendererConfig.EnvironmentMapResolution) - 7;
 				if (UI::PropertyDropdown("Environment Map Size", environmentMapSizes, 6, &currentSize))
 				{
-					rendererConfig.EnvironmentMapResolution = glm::pow(2, currentSize + 7);
+					rendererConfig.EnvironmentMapResolution = (uint32_t)glm::pow(2, currentSize + 7);
 				}
 			}
 
@@ -722,13 +751,13 @@ namespace Vanta {
 				int currentSamples = (int)glm::log2((float)rendererConfig.IrradianceMapComputeSamples) - 7;
 				if (UI::PropertyDropdown("Irradiance Map Compute Samples", irradianceComputeSamples, 6, &currentSamples))
 				{
-					rendererConfig.IrradianceMapComputeSamples = glm::pow(2, currentSamples + 7);
+					rendererConfig.IrradianceMapComputeSamples = (uint32_t)glm::pow(2, currentSamples + 7);
 				}
 			}
 			UI::EndPropertyGrid();
 		}
 		ImGui::End();
-		
+
 		m_ContentBrowserPanel->OnImGuiRender();
 		m_ObjectsPanel->OnImGuiRender();
 
@@ -800,9 +829,12 @@ namespace Vanta {
 		ImVec2 maxBound = { minBound.x + windowSize.x, minBound.y + windowSize.y };
 		m_ViewportBounds[0] = { minBound.x, minBound.y };
 		m_ViewportBounds[1] = { maxBound.x, maxBound.y };
+		m_AllowViewportCameraEvents = ImGui::IsMouseHoveringRect(minBound, maxBound) ;
+
+
 
 		// Gizmos
-		if (m_GizmoType != -1 && m_SelectionContext.size() && m_ViewportPanelMouseOver)
+		if (m_GizmoType != -1 && m_SelectionContext.size())
 		{
 			auto& selection = m_SelectionContext[0];
 
@@ -878,9 +910,9 @@ namespace Vanta {
 			auto data = ImGui::AcceptDragDropPayload("asset_payload");
 			if (data)
 			{
-				int count = data->DataSize / sizeof(AssetHandle);
+				uint64_t count = data->DataSize / sizeof(AssetHandle);
 
-				for (int i = 0; i < count; i++)
+				for (uint64_t i = 0; i < count; i++)
 				{
 					AssetHandle assetHandle = *(((AssetHandle*)data->Data) + i);
 					const AssetMetadata& assetData = AssetManager::GetMetadata(assetHandle);
@@ -1092,6 +1124,12 @@ namespace Vanta {
 				ImGui::EndMenu();
 			}
 
+			if (ImGui::BeginMenu("View"))
+			{
+				ImGui::MenuItem("Asset Manager", nullptr, &m_AssetManagerPanelOpen);
+				ImGui::EndMenu();
+			}
+
 			if (ImGui::BeginMenu("Help"))
 			{
 				if (ImGui::MenuItem("About"))
@@ -1103,7 +1141,7 @@ namespace Vanta {
 		}
 
 		m_SceneHierarchyPanel->OnImGuiRender();
-		
+
 		ImGui::Begin("Materials");
 		if (m_SelectionContext.size())
 		{
@@ -1117,10 +1155,13 @@ namespace Vanta {
 					static uint32_t selectedMaterialIndex = 0;
 					for (uint32_t i = 0; i < materials.size(); i++)
 					{
-						auto& materialInstance = materials[i];
+						auto& material = materials[i];
+						std::string materialName = material->GetName();
+						if (materialName.empty())
+							materialName = std::format("Unnamed Material #{0}", i);
 
 						ImGuiTreeNodeFlags node_flags = (selectedMaterialIndex == i ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Leaf;
-						bool opened = ImGui::TreeNodeEx((void*)(&materialInstance), node_flags, materialInstance->GetName().c_str());
+						bool opened = ImGui::TreeNodeEx((void*)(&material), node_flags, materialName.c_str());
 						if (ImGui::IsItemClicked())
 						{
 							selectedMaterialIndex = i;
@@ -1134,8 +1175,8 @@ namespace Vanta {
 					// Selected material
 					if (selectedMaterialIndex < materials.size())
 					{
-						auto& materialInstance = materials[selectedMaterialIndex];
-						ImGui::Text("Shader: %s", materialInstance->GetShader()->GetName().c_str());
+						auto& material = materials[selectedMaterialIndex];
+						ImGui::Text("Shader: %s", material->GetShader()->GetName().c_str());
 						// Textures ------------------------------------------------------------------------------
 						{
 							// Albedo
@@ -1143,9 +1184,9 @@ namespace Vanta {
 							{
 								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
 
-								auto& albedoColor = materialInstance->GetVector3("u_MaterialUniforms.AlbedoColor");
+								auto& albedoColor = material->GetVector3("u_MaterialUniforms.AlbedoColor");
 								bool useAlbedoMap = true;// materialInstance->GetFloat("u_MaterialUniforms.AlbedoTexToggle");
-								Ref<Texture2D> albedoMap = materialInstance->TryGetTexture2D("u_AlbedoTexture");
+								Ref<Texture2D> albedoMap = material->TryGetTexture2D("u_AlbedoTexture");
 								bool hasAlbedoMap = !albedoMap.EqualsObject(Renderer::GetWhiteTexture()) && albedoMap->GetImage();
 								Ref<Texture2D> albedoUITexture = hasAlbedoMap ? albedoMap : m_CheckerboardTex;
 								UI::Image(albedoUITexture, ImVec2(64, 64));
@@ -1168,7 +1209,7 @@ namespace Vanta {
 												break;
 
 											albedoMap = asset.As<Texture2D>();
-											materialInstance->Set("u_AlbedoTexture", albedoMap);
+											material->Set("u_AlbedoTexture", albedoMap);
 											// NOTE: Uncomment when u_MaterialUniforms.AlbedoTexToggle is a thing
 											//materialInstance->Set("u_MaterialUniforms.AlbedoTexToggle", true);
 										}
@@ -1197,7 +1238,7 @@ namespace Vanta {
 											TextureProperties props;
 											props.SRGB = true;
 											albedoMap = Texture2D::Create(filename, props);
-											materialInstance->Set("u_AlbedoTexture", albedoMap);
+											material->Set("u_AlbedoTexture", albedoMap);
 										}
 									}
 								}
@@ -1213,6 +1254,8 @@ namespace Vanta {
 								ImGui::EndGroup();
 								ImGui::SameLine();
 								ImGui::ColorEdit3("Color##Albedo", glm::value_ptr(albedoColor), ImGuiColorEditFlags_NoInputs);
+								float& emissive = material->GetFloat("u_MaterialUniforms.Emissive");
+								ImGui::DragFloat("Emissive", &emissive);
 							}
 						}
 						{
@@ -1220,8 +1263,8 @@ namespace Vanta {
 							if (ImGui::CollapsingHeader("Normals", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 							{
 								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
-								bool useNormalMap = materialInstance->GetFloat("u_MaterialUniforms.UseNormalMap");
-								Ref<Texture2D> normalMap = materialInstance->TryGetTexture2D("u_NormalTexture");
+								bool useNormalMap = material->GetFloat("u_MaterialUniforms.UseNormalMap");
+								Ref<Texture2D> normalMap = material->TryGetTexture2D("u_NormalTexture");
 								UI::Image((normalMap && normalMap->GetImage()) ? normalMap : m_CheckerboardTex, ImVec2(64, 64));
 
 								if (ImGui::BeginDragDropTarget())
@@ -1242,8 +1285,8 @@ namespace Vanta {
 												break;
 
 											normalMap = asset.As<Texture2D>();
-											materialInstance->Set("u_NormalTexture", normalMap);
-											materialInstance->Set("u_MaterialUniforms.UseNormalMap", true);
+											material->Set("u_NormalTexture", normalMap);
+											material->Set("u_MaterialUniforms.UseNormalMap", true);
 										}
 									}
 
@@ -1268,13 +1311,13 @@ namespace Vanta {
 										if (filename != "")
 										{
 											normalMap = Texture2D::Create(filename);
-											materialInstance->Set("u_NormalTexture", normalMap);
+											material->Set("u_NormalTexture", normalMap);
 										}
 									}
 								}
 								ImGui::SameLine();
 								if (ImGui::Checkbox("Use##NormalMap", &useNormalMap))
-									materialInstance->Set("u_MaterialUniforms.UseNormalMap", useNormalMap);
+									material->Set("u_MaterialUniforms.UseNormalMap", useNormalMap);
 							}
 						}
 						{
@@ -1282,9 +1325,9 @@ namespace Vanta {
 							if (ImGui::CollapsingHeader("Metalness", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 							{
 								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
-								float& metalnessValue = materialInstance->GetFloat("u_MaterialUniforms.Metalness");
+								float& metalnessValue = material->GetFloat("u_MaterialUniforms.Metalness");
 								bool useMetalnessMap = true;// materialInstance->GetFloat("u_MaterialUniforms.MetalnessTexToggle");
-								Ref<Texture2D> metalnessMap = materialInstance->TryGetTexture2D("u_MetalnessTexture");
+								Ref<Texture2D> metalnessMap = material->TryGetTexture2D("u_MetalnessTexture");
 								UI::Image((metalnessMap && metalnessMap->GetImage()) ? metalnessMap : m_CheckerboardTex, ImVec2(64, 64));
 
 								if (ImGui::BeginDragDropTarget())
@@ -1305,7 +1348,7 @@ namespace Vanta {
 												break;
 
 											metalnessMap = asset.As<Texture2D>();
-											materialInstance->Set("u_MetalnessTexture", metalnessMap);
+											material->Set("u_MetalnessTexture", metalnessMap);
 											// NOTE: Uncomment when u_MaterialUniforms.MetalnessTexToggle is a thing
 											//materialInstance->Set("u_MaterialUniforms.MetalnessTexToggle", true);
 										}
@@ -1332,7 +1375,7 @@ namespace Vanta {
 										if (filename != "")
 										{
 											metalnessMap = Texture2D::Create(filename);
-											materialInstance->Set("u_MetalnessTexture", metalnessMap);
+											material->Set("u_MetalnessTexture", metalnessMap);
 										}
 									}
 								}
@@ -1347,9 +1390,9 @@ namespace Vanta {
 							if (ImGui::CollapsingHeader("Roughness", nullptr, ImGuiTreeNodeFlags_DefaultOpen))
 							{
 								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
-								float& roughnessValue = materialInstance->GetFloat("u_MaterialUniforms.Roughness");
+								float& roughnessValue = material->GetFloat("u_MaterialUniforms.Roughness");
 								bool useRoughnessMap = true;// materialInstance->GetFloat("u_MaterialUniforms.RoughnessTexToggle");
-								Ref<Texture2D> roughnessMap = materialInstance->TryGetTexture2D("u_RoughnessTexture");
+								Ref<Texture2D> roughnessMap = material->TryGetTexture2D("u_RoughnessTexture");
 								UI::Image((roughnessMap && roughnessMap->GetImage()) ? roughnessMap : m_CheckerboardTex, ImVec2(64, 64));
 
 								if (ImGui::BeginDragDropTarget())
@@ -1370,7 +1413,7 @@ namespace Vanta {
 												break;
 
 											roughnessMap = asset.As<Texture2D>();
-											materialInstance->Set("u_RoughnessTexture", roughnessMap);
+											material->Set("u_RoughnessTexture", roughnessMap);
 											// NOTE: Uncomment when u_MaterialUniforms.RoughnessTexToggle is a thing
 											//materialInstance->Set("u_MaterialUniforms.RoughnessTexToggle", true);
 										}
@@ -1397,7 +1440,7 @@ namespace Vanta {
 										if (filename != "")
 										{
 											roughnessMap = Texture2D::Create(filename);
-											materialInstance->Set("u_RoughnessTexture", roughnessMap);
+											material->Set("u_RoughnessTexture", roughnessMap);
 										}
 									}
 								}
@@ -1526,7 +1569,7 @@ namespace Vanta {
 			}
 		}
 
-		if (Input::IsKeyPressed(VA_KEY_LEFT_CONTROL))
+		if (Input::IsKeyPressed(VA_KEY_LEFT_CONTROL) && !Input::IsMouseButtonPressed(MouseButton::Right))
 		{
 			switch (e.GetKeyCode())
 			{

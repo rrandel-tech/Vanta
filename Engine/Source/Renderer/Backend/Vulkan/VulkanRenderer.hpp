@@ -3,6 +3,10 @@
 #include "VulkanComputePipeline.hpp"
 #include "Renderer/RendererAPI.hpp"
 
+#include "VulkanMaterial.hpp"
+#include "VulkanUniformBuffer.hpp"
+#include "VulkanStorageBuffer.hpp"
+
 #include "vulkan/vulkan.hpp"
 
 namespace Vanta {
@@ -34,6 +38,10 @@ namespace Vanta {
 		// virtual void LightCulling(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<PipelineCompute> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, const glm::ivec2& screenSize, const glm::ivec3& workGroups) override;
 		virtual void RenderGeometry(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Material> material, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer, const glm::mat4& transform, uint32_t indexCount = 0) override;
 
+		static void RT_UpdateMaterialForRendering(Ref<VulkanMaterial> material, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet);
+		static VkSampler GetClampSampler();
+
+		static int32_t& GetSelectedDrawCall();
 	public:
 		static VkDescriptorSet RT_AllocateDescriptorSet(VkDescriptorSetAllocateInfo& allocInfo);
 	};

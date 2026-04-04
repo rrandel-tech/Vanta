@@ -383,9 +383,9 @@ namespace Vanta {
 		std::vector<VkDescriptorImageInfo> arrayImageInfos;
 
 		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
-		// NOTE: we can't cache the results atm because we might render the same material in different viewports,
+		// NOTE(Yan): we can't cache the results atm because we might render the same material in different viewports,
 		//            and so we can't bind to the same uniform buffers
-		if (m_DirtyDescriptorSets[frameIndex] || true) 
+		if (m_DirtyDescriptorSets[frameIndex] || true)
 		{
 			m_DirtyDescriptorSets[frameIndex] = false;
 			m_WriteDescriptors[frameIndex].clear();

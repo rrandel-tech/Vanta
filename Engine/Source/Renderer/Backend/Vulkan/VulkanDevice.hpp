@@ -28,6 +28,7 @@ namespace Vanta {
 		const QueueFamilyIndices& GetQueueFamilyIndices() const { return m_QueueFamilyIndices; }
 
 		const VkPhysicalDeviceProperties& GetProperties() const { return m_Properties; }
+		const VkPhysicalDeviceLimits& GetLimits() const { return m_Properties.limits; }
 
 		VkFormat GetDepthFormat() const { return m_DepthFormat; }
 

@@ -13,9 +13,6 @@
 #include "VulkanVertexBuffer.hpp"
 #include "VulkanIndexBuffer.hpp"
 #include "VulkanFramebuffer.hpp"
-#include "VulkanMaterial.hpp"
-#include "VulkanUniformBuffer.hpp"
-#include "VulkanStorageBuffer.hpp"
 #include "VulkanRenderCommandBuffer.hpp"
 
 #include "VulkanShader.hpp"
@@ -48,10 +45,15 @@ namespace Vanta {
 		std::vector<VkDescriptorPool> DescriptorPools;
 		std::vector<uint32_t> DescriptorPoolAllocationCount;
 
-
 		// UniformBufferSet -> Shader Hash -> Frame -> WriteDescriptor
 		std::unordered_map<UniformBufferSet*, std::unordered_map<uint64_t, std::vector<std::vector<VkWriteDescriptorSet>>>> UniformBufferWriteDescriptorCache;
 		std::unordered_map<StorageBufferSet*, std::unordered_map<uint64_t, std::vector<std::vector<VkWriteDescriptorSet>>>> StorageBufferWriteDescriptorCache;
+
+		// Default samplers
+		VkSampler SamplerClamp = nullptr;
+
+		int32_t SelectedDrawCall = -1;
+		int32_t DrawCallCount = 0;
 	};
 
 	static VulkanRendererData* s_Data = nullptr;
@@ -252,7 +254,7 @@ namespace Vanta {
 		return s_Data->StorageBufferWriteDescriptorCache[storageBufferSet.Raw()][shaderHash];
 	}
 
-	static void RT_UpdateMaterialForRendering(Ref<VulkanMaterial> material, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet)
+	void VulkanRenderer::RT_UpdateMaterialForRendering(Ref<VulkanMaterial> material, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet)
 	{
 		if (uniformBufferSet)
 		{
@@ -276,12 +278,44 @@ namespace Vanta {
 		}
 	}
 
+	VkSampler VulkanRenderer::GetClampSampler()
+	{
+		if (s_Data->SamplerClamp)
+			return s_Data->SamplerClamp;
+
+		VkSamplerCreateInfo samplerCreateInfo = {};
+		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.maxAnisotropy = 1.0f;
+		samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeV = samplerCreateInfo.addressModeU;
+		samplerCreateInfo.addressModeW = samplerCreateInfo.addressModeU;
+		samplerCreateInfo.mipLodBias = 0.0f;
+		samplerCreateInfo.maxAnisotropy = 1.0f;
+		samplerCreateInfo.minLod = 0.0f;
+		samplerCreateInfo.maxLod = 100.0f;
+		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		
+		VkDevice device = VulkanContext::GetCurrentDevice()->GetVulkanDevice();
+		VK_CHECK_RESULT(vkCreateSampler(device, &samplerCreateInfo, nullptr, &s_Data->SamplerClamp));
+	}
+
+	int32_t& VulkanRenderer::GetSelectedDrawCall()
+	{
+		return s_Data->SelectedDrawCall;
+	}
+
 	void VulkanRenderer::RenderMesh(Ref<RenderCommandBuffer> renderCommandBuffer, Ref<Pipeline> pipeline, Ref<UniformBufferSet> uniformBufferSet, Ref<StorageBufferSet> storageBufferSet, Ref<Mesh> mesh, const glm::mat4& transform)
 	{
 		Renderer::Submit([renderCommandBuffer, pipeline, uniformBufferSet, storageBufferSet, mesh, transform]() mutable
 		{
 			VA_PROFILE_FUNC("VulkanRenderer::RenderMesh");
 			VA_SCOPE_PERF("VulkanRenderer::RenderMesh");
+
+			if (s_Data->SelectedDrawCall != -1 && s_Data->DrawCallCount > s_Data->SelectedDrawCall)
+				return;
 
 			uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 			VkCommandBuffer commandBuffer = renderCommandBuffer.As<VulkanRenderCommandBuffer>()->GetCommandBuffer(frameIndex);
@@ -313,6 +347,9 @@ namespace Vanta {
 			auto& submeshes = mesh->GetSubmeshes();
 			for (uint32_t submeshIndex : submeshes)
 			{
+				if (s_Data->SelectedDrawCall != -1 && s_Data->DrawCallCount > s_Data->SelectedDrawCall)
+					break;
+
 				const Submesh& submesh = meshAssetSubmeshes[submeshIndex];
 				auto material = mesh->GetMaterials()[submesh.MaterialIndex].As<VulkanMaterial>();
 				VkPipelineLayout layout = vulkanPipeline->GetVulkanPipelineLayout();
@@ -332,6 +369,7 @@ namespace Vanta {
 				vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &worldTransform);
 				vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4), uniformStorageBuffer.Size, uniformStorageBuffer.Data);
 				vkCmdDrawIndexed(commandBuffer, submesh.IndexCount, 1, submesh.BaseIndex, submesh.BaseVertex, 0);
+				s_Data->DrawCallCount++;
 			}
 		});
 	}
@@ -724,6 +762,8 @@ namespace Vanta {
 			vkResetDescriptorPool(device, s_Data->DescriptorPools[bufferIndex], 0);
 			memset(s_Data->DescriptorPoolAllocationCount.data(), 0, s_Data->DescriptorPoolAllocationCount.size() * sizeof(uint32_t));
 
+			s_Data->DrawCallCount = 0;
+
 #if 0
 			VkCommandBufferBeginInfo cmdBufInfo = {};
 			cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -853,6 +893,7 @@ namespace Vanta {
 				}
 
 				vkCmdClearAttachments(commandBuffer, totalAttachmentCount, attachments.data(), totalAttachmentCount, clearRects.data());
+
 			}
 
 			// Update dynamic viewport state

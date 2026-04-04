@@ -15,6 +15,8 @@ namespace Vanta {
 		VulkanTexture2D(ImageFormat format, uint32_t width, uint32_t height, const void* data, TextureProperties properties);
 		virtual ~VulkanTexture2D();
 
+		virtual void Resize(uint32_t width, uint32_t height) override;
+
 		void Invalidate();
 
 		virtual ImageFormat GetFormat() const override { return m_Format; }
@@ -33,10 +35,11 @@ namespace Vanta {
 		bool Loaded() const override { return m_ImageData; }
 		const std::string& GetPath() const override;
 		uint32_t GetMipLevelCount() const override;
+		virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override;
 
 		void GenerateMips();
 
-		virtual uint64_t GetHash() const { return (uint64_t)m_Image; }
+		virtual uint64_t GetHash() const { return (uint64_t)m_Image.As<VulkanImage2D>()->GetDescriptor().imageView; }
 	private:
 		std::string m_Path;
 		uint32_t m_Width;
@@ -67,6 +70,7 @@ namespace Vanta {
 		virtual uint32_t GetWidth() const override{ return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
 		virtual uint32_t GetMipLevelCount() const override;
+		virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override;
 
 		virtual uint64_t GetHash() const { return (uint64_t)m_Image; }
 

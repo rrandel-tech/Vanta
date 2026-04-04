@@ -310,20 +310,32 @@ namespace Vanta {
 
 	void AssetManager::WriteRegistryToFile()
 	{
+		// Sort assets by UUID to make project managment easier
+		struct AssetRegistryEntry
+		{
+			std::string FilePath;
+			AssetType Type;
+		};
+		std::map<UUID, AssetRegistryEntry> sortedMap;
+		for (auto& [filepath, metadata] : s_AssetRegistry)
+		{
+			std::string pathToSerialize = metadata.FilePath.string();
+			// NOTE(Yan): if Windows
+			std::replace(pathToSerialize.begin(), pathToSerialize.end(), '\\', '/');
+			sortedMap[metadata.Handle] = { pathToSerialize, metadata.Type };
+			VA_CORE_ASSERT(pathToSerialize.find("Sandbox") == std::string::npos);
+		}
+
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 
 		out << YAML::Key << "Assets" << YAML::BeginSeq;
-		for (auto& [filepath, metadata] : s_AssetRegistry)
+		for (auto& [handle, entry] : sortedMap)
 		{
-			std::string pathToSerialize = metadata.FilePath.string();
-			// NOTE: if Windows
-			std::replace(pathToSerialize.begin(), pathToSerialize.end(), '\\', '/');
-			VA_CORE_ASSERT(pathToSerialize.find("Sandbox") == std::string::npos);
 			out << YAML::BeginMap;
-			out << YAML::Key << "Handle" << YAML::Value << metadata.Handle;
-			out << YAML::Key << "FilePath" << YAML::Value << pathToSerialize;
-			out << YAML::Key << "Type" << YAML::Value << Utils::AssetTypeToString(metadata.Type);
+			out << YAML::Key << "Handle" << YAML::Value << handle;
+			out << YAML::Key << "FilePath" << YAML::Value << entry.FilePath;
+			out << YAML::Key << "Type" << YAML::Value << Utils::AssetTypeToString(entry.Type);
 			out << YAML::EndMap;
 		}
 		out << YAML::EndSeq;

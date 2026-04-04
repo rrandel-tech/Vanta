@@ -48,9 +48,9 @@ namespace Vanta {
 		aiProcess_Triangulate |             // Make sure we're triangles
 		aiProcess_SortByPType |             // Split meshes by primitive type
 		aiProcess_GenNormals |              // Make sure we have legit normals
-		aiProcess_GenUVCoords |             // Convert UVs if required 
+		aiProcess_GenUVCoords |             // Convert UVs if required
 		aiProcess_OptimizeMeshes |          // Batch draws where possible
-		aiProcess_JoinIdenticalVertices |          
+		aiProcess_JoinIdenticalVertices |
 		aiProcess_ValidateDataStructure;    // Validation
 
 	struct LogStream : public Assimp::LogStream
@@ -62,7 +62,7 @@ namespace Vanta {
 				Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
 				Assimp::DefaultLogger::get()->attachStream(new LogStream, Assimp::Logger::Err | Assimp::Logger::Warn);
 			}
-		} 
+		}
 
 		virtual void write(const char* message) override
 		{
@@ -76,7 +76,7 @@ namespace Vanta {
 		LogStream::Initialize();
 
 		VA_CORE_INFO("Loading mesh: {0}", filename.c_str());
-		
+
 		m_Importer = std::make_unique<Assimp::Importer>();
 
 		const aiScene* scene = m_Importer->ReadFile(filename, s_MeshImportFlags);
@@ -256,13 +256,14 @@ namespace Vanta {
 				aiString aiTexPath;
 				uint32_t textureCount = aiMaterial->GetTextureCount(aiTextureType_DIFFUSE);
 				VA_MESH_LOG("    TextureCount = {0}", textureCount);
-				
+
 				glm::vec3 albedoColor(0.8f);
 				aiColor3D aiColor;
 				if (aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == AI_SUCCESS)
 					albedoColor = { aiColor.r, aiColor.g, aiColor.b };
 
 				mi->Set("u_MaterialUniforms.AlbedoColor", albedoColor);
+				//mi->Set("u_MaterialUniforms.Emissive", 0.0f);
 
 				float shininess, metalness;
 				if (aiMaterial->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS)
@@ -512,7 +513,7 @@ namespace Vanta {
 			m_Materials.push_back(mi);
 		}
 
-		
+
 		if (m_IsAnimated)
 		{
 			m_VertexBuffer = VertexBuffer::Create(m_AnimatedVertices.data(), (uint32_t)(m_AnimatedVertices.size() * sizeof(AnimatedVertex)));
@@ -743,7 +744,7 @@ namespace Vanta {
 				return nodeAnim;
 		}
 		return nullptr;
-	} 
+	}
 
 	void MeshAsset::BoneTransform(float time)
 	{

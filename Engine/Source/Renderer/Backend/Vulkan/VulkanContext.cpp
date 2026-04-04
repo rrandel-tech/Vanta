@@ -2,6 +2,8 @@
 #include "VulkanContext.hpp"
 #include "Vulkan.hpp"
 
+#include "VulkanImage.hpp"
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
@@ -17,6 +19,10 @@ namespace Vanta {
 	{
 		(void)flags; (void)object; (void)location; (void)messageCode; (void)pUserData; (void)pLayerPrefix; // Unused arguments
 		VA_CORE_WARN("VulkanDebugCallback:\n  Object Type: {0}\n  Message: {1}", static_cast<int>(objectType), pMessage);
+
+		const auto& imageRefs = VulkanImage2D::GetImageRefs();
+		if (strstr(pMessage, "CoreValidation-DrawState-InvalidImageLayout"))
+			VA_CORE_ASSERT(false);
 		return VK_FALSE;
 	}
 
@@ -131,6 +137,7 @@ namespace Vanta {
 		enabledFeatures.samplerAnisotropy = true;
 		enabledFeatures.wideLines = true;
 		enabledFeatures.fillModeNonSolid = true;
+		enabledFeatures.pipelineStatisticsQuery = true;
 		m_Device = Ref<VulkanDevice>::Create(m_PhysicalDevice, enabledFeatures);
 
 		VulkanAllocator::Init(m_Device);

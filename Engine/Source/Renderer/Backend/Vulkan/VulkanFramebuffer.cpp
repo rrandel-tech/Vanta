@@ -7,18 +7,18 @@
 
 namespace Vanta {
 
-	VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec)
-		: m_Specification(spec)
+	VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& specification)
+		: m_Specification(specification)
 	{
-		if (spec.Width == 0)
+		if (specification.Width == 0)
 		{
 			m_Width = Application::Get().GetWindow().GetWidth();
 			m_Height = Application::Get().GetWindow().GetHeight();
 		}
 		else
 		{
-			m_Width = spec.Width;
-			m_Height = spec.Height;
+			m_Width = specification.Width;
+			m_Height = specification.Height;
 		}
 
 		// Create all image objects immediately so we can start referencing them
@@ -38,8 +38,9 @@ namespace Vanta {
 					ImageSpecification spec;
 					spec.Format = attachmentSpec.Format;
 					spec.Usage = ImageUsage::Attachment;
-					spec.Width = m_Width;
-					spec.Height = m_Height;
+					spec.Width = m_Width * m_Specification.Scale;
+					spec.Height = m_Height * m_Specification.Scale;
+					spec.DebugName = std::format("{0}-DepthAttachment{1}", m_Specification.DebugName.empty() ? "Unnamed FB" : m_Specification.DebugName, attachmentIndex);
 					m_DepthAttachmentImage = Image2D::Create(spec);
 				}
 				else
@@ -47,16 +48,17 @@ namespace Vanta {
 					ImageSpecification spec;
 					spec.Format = attachmentSpec.Format;
 					spec.Usage = ImageUsage::Attachment;
-					spec.Width = m_Width;
-					spec.Height = m_Height;
+					spec.Width = m_Width * m_Specification.Scale;
+					spec.Height = m_Height * m_Specification.Scale;
+					spec.DebugName = std::format("{0}-ColorAttachment{1}", m_Specification.DebugName.empty() ? "Unnamed FB" : m_Specification.DebugName, attachmentIndex);
 					m_AttachmentImages.emplace_back(Image2D::Create(spec));
 				}
 				attachmentIndex++;
 			}
 		}
 
-		VA_CORE_ASSERT(spec.Attachments.Attachments.size());
-		Resize((uint32_t)((float)(m_Width) * spec.Scale), (uint32_t)((float)m_Height * spec.Scale), true);
+		VA_CORE_ASSERT(specification.Attachments.Attachments.size());
+		Resize(m_Width, m_Height, true);
 	}
 
 
@@ -65,8 +67,8 @@ namespace Vanta {
 		if (!forceRecreate && (m_Width == width && m_Height == height))
 			return;
 
-		m_Width = width;
-		m_Height = height;
+		m_Width = width * m_Specification.Scale;
+		m_Height = height * m_Specification.Scale;
 		if (!m_Specification.SwapChainTarget)
 		{
 			Invalidate();

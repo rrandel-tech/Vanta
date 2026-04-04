@@ -37,10 +37,12 @@ namespace Vanta {
 
 		virtual void OnImGuiRender() override;
 		virtual void OnEvent(Event& e) override;
+
+		void OnRender2D();
+
 		bool OnKeyPressedEvent(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
-		void ShowBoundingBoxes(bool show, bool onTop = false);
 		void SelectEntity(Entity entity);
 
 		void NewScene();
@@ -53,7 +55,7 @@ namespace Vanta {
 
 		void UI_WelcomePopup();
 		void UI_AboutPopup();
-
+		
 		void UI_CreateNewMeshPopup();
 		void UI_InvalidAssetMetadataPopup();
 
@@ -152,7 +154,7 @@ namespace Vanta {
 		int m_GizmoType = -1; // -1 = no gizmo
 		float m_SnapValue = 0.5f;
 		float m_RotationSnapValue = 45.0f;
-		bool m_DrawOnTopBoundingBoxes = false;
+		bool m_DrawOnTopBoundingBoxes = true;
 
 		bool m_ShowBoundingBoxes = false;
 		bool m_ShowBoundingBoxSelectedMeshOnly = true;
@@ -161,6 +163,8 @@ namespace Vanta {
 
 		bool m_ViewportPanelMouseOver = false;
 		bool m_ViewportPanelFocused = false;
+		bool m_AllowViewportCameraEvents = false;
+
 
 		bool m_ViewportPanel2MouseOver = false;
 		bool m_ViewportPanel2Focused = false;

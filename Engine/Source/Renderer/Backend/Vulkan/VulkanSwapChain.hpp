@@ -34,7 +34,7 @@ namespace Vanta {
 
 		VkRenderPass GetRenderPass() { return m_RenderPass; }
 
-		VkFramebuffer GetCurrentFramebuffer() { return GetFramebuffer(m_CurrentImageIndex); }
+		VkFramebuffer GetCurrentFramebuffer() { return GetFramebuffer(m_CurrentBufferIndex); }
 		VkCommandBuffer GetCurrentDrawCommandBuffer() { return GetDrawCommandBuffer(m_CurrentBufferIndex); }
 
 		VkFormat GetColorFormat() { return m_ColorFormat; }

@@ -26,7 +26,6 @@ void main()
 #version 450 core
 
 layout(location = 0) out vec4 finalColor;
-layout(location = 1) out vec4 o_Bloom;
 
 layout (binding = 1) uniform samplerCube u_Texture;
 
@@ -38,9 +37,14 @@ layout (push_constant) uniform Uniforms
 
 layout (location = 0) in vec3 v_Position;
 
+float Convert_sRGB_FromLinear(float theLinearValue)
+{
+	return theLinearValue <= 0.0031308f
+		? theLinearValue * 12.92f
+		: pow(theLinearValue, 1.0f / 2.4f) * 1.055f - 0.055f;
+}
+
 void main()
 {
-	finalColor = textureLod(u_Texture, v_Position, u_Uniforms.TextureLod);
-	finalColor.rgb = finalColor.rgb * u_Uniforms.Intensity;
-	o_Bloom = vec4(0.0);
+	finalColor = textureLod(u_Texture, v_Position, u_Uniforms.TextureLod) * u_Uniforms.Intensity;
 }

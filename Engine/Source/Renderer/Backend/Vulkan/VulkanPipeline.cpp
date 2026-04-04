@@ -146,6 +146,7 @@ namespace Vanta {
 			{
 				for (size_t i = 0; i < colorAttachmentCount; i++)
 				{
+					blendAttachmentStates[i].colorWriteMask = 0xf;
 					if (!framebuffer->GetSpecification().Blend)
 						break;
 

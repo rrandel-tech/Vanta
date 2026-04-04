@@ -18,7 +18,6 @@ namespace Vanta {
 	struct SceneRendererOptions
 	{
 		bool ShowGrid = true;
-		bool ShowBoundingBoxes = false;
 		bool ShowSelectedInWireframe = false;
 	};
 
@@ -28,6 +27,16 @@ namespace Vanta {
 		glm::mat4 ViewMatrix;
 		float Near, Far;
 		float FOV;
+	};
+
+	struct BloomSettings
+	{
+		bool Enabled = true;
+		float Threshold = 1.0f;
+		float Knee = 0.1f;
+		float UpsampleScale = 1.0f;
+		float Intensity = 1.0f;
+		float DirtIntensity = 1.0f;
 	};
 
 	struct SceneRendererSpecification
@@ -66,17 +75,22 @@ namespace Vanta {
 			CascadeSplitLambda = lambda;
 		}
 
+		BloomSettings& GetBloomSettings() { return m_BloomSettings; }
+
 		void OnImGuiRender();
 
 		static void WaitForThreads();
 	private:
 		void FlushDrawList();
+
 		void ClearPass();
 		void ShadowMapPass();
 		void GeometryPass();
 		void JumpFloodPass();
+
+		// Post-processing
+		void BloomCompute();
 		void CompositePass();
-		void BloomBlurPass();
 
 		struct CascadeData
 		{
@@ -172,7 +186,7 @@ namespace Vanta {
 		Ref<Pipeline> m_SelectedGeometryPipeline;
 		Ref<Pipeline> m_GeometryWireframePipeline;
 		Ref<Pipeline> m_CompositePipeline;
-		Ref<Pipeline> m_ShadowPassPipeline;
+		Ref<Pipeline> m_ShadowPassPipelines[4];
 		Ref<Material> m_ShadowPassMaterial;
 		Ref<Pipeline> m_SkyboxPipeline;
 		Ref<Material> m_SkyboxMaterial;
@@ -181,9 +195,14 @@ namespace Vanta {
 		Ref<Pipeline> m_JumpFloodInitPipeline;
 		Ref<Pipeline> m_JumpFloodPassPipeline[2];
 		Ref<Pipeline> m_JumpFloodCompositePipeline;
-
 		Ref<Material> m_JumpFloodInitMaterial, m_JumpFloodPassMaterial[2];
 		Ref<Material> m_JumpFloodCompositeMaterial;
+
+		// Bloom compute
+		uint32_t m_BloomComputeWorkgroupSize = 4;
+		Ref<PipelineCompute> m_BloomComputePipeline;
+		Ref<Texture2D> m_BloomComputeTextures[3];
+		Ref<Material> m_BloomComputeMaterial;
 
 		Ref<Material> m_SelectedGeometryMaterial;
 
@@ -214,6 +233,18 @@ namespace Vanta {
 		bool m_NeedsResize = false;
 		bool m_Active = false;
 		bool m_ResourcesCreated = false;
+
+		BloomSettings m_BloomSettings;
+		Ref<Texture2D> m_BloomDirtTexture;
+
+		struct GPUTimeQueries
+		{
+			uint32_t ShadowMapPassQuery = 0;
+			uint32_t GeometryPassQuery = 0;
+			uint32_t BloomComputePassQuery = 0;
+			uint32_t JumpFloodPassQuery = 0;
+			uint32_t CompositePassQuery = 0;
+		} m_GPUTimeQueries;
 	};
 
 }

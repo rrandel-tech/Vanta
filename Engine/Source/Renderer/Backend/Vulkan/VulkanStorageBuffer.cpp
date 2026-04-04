@@ -8,7 +8,6 @@ namespace Vanta {
 	VulkanStorageBuffer::VulkanStorageBuffer(uint32_t size, uint32_t binding)
 		: m_Size(size), m_Binding(binding)
 	{
-
 		Ref<VulkanStorageBuffer> instance = this;
 		Renderer::Submit([instance]() mutable
 		{
@@ -16,8 +15,15 @@ namespace Vanta {
 		});
 	}
 
+	VulkanStorageBuffer::~VulkanStorageBuffer()
+	{
+		Release();
+	}
+
 	void VulkanStorageBuffer::RT_Invalidate()
 	{
+		Release();
+
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -30,7 +36,22 @@ namespace Vanta {
 		m_DescriptorInfo.offset = 0;
 		m_DescriptorInfo.range = m_Size;
 	}
-	
+
+	void VulkanStorageBuffer::Release()
+	{
+		if (!m_MemoryAlloc)
+			return;
+
+		Renderer::SubmitResourceFree([buffer = m_Buffer, memoryAlloc = m_MemoryAlloc]()
+		{
+			VulkanAllocator allocator("StorageBuffer");
+			allocator.DestroyBuffer(buffer, memoryAlloc);
+		});
+
+		m_Buffer = nullptr;
+		m_MemoryAlloc = nullptr;
+	}
+
 	void VulkanStorageBuffer::SetData(const void* data, uint32_t size, uint32_t offset)
 	{
 		memcpy(m_LocalStorage, data, size);

@@ -33,7 +33,6 @@ void main()
 #version 450 core
 
 layout(location = 0) out vec4 color;
-layout(location = 1) out vec4 unused;
 
 layout (push_constant) uniform Material
 {
@@ -43,5 +42,4 @@ layout (push_constant) uniform Material
 void main()
 {
 	color = u_MaterialUniforms.Color;
-	unused = vec4(0.0);
 }

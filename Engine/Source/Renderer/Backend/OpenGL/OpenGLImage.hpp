@@ -19,6 +19,7 @@ namespace Vanta {
 
 		virtual uint32_t GetWidth() const override { return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
+		virtual float GetAspectRatio() const override { return (float)m_Specification.Width / (float)m_Specification.Height; }
 
 		virtual ImageSpecification& GetSpecification() override { return m_Specification; }
 		virtual const ImageSpecification& GetSpecification() const override { return m_Specification; }

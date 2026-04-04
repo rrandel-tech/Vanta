@@ -35,6 +35,19 @@ namespace Vanta {
 		std::string DebugName;
 	};
 
+	struct PipelineStatistics
+	{
+		uint64_t InputAssemblyVertices = 0;
+		uint64_t InputAssemblyPrimitives = 0;
+		uint64_t VertexShaderInvocations = 0;
+		uint64_t ClippingInvocations = 0;
+		uint64_t ClippingPrimitives = 0;
+		uint64_t FragmentShaderInvocations = 0;
+		uint64_t ComputeShaderInvocations = 0;
+
+		// TODO: tesselation shader stats when we have them
+	};
+
 	class Pipeline : public RefCounted
 	{
 	public:
